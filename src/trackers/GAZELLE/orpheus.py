@@ -831,9 +831,8 @@ class Orpheus:
         return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name=await self.get_name(meta))
 
     async def upload(self, meta: Meta) -> bool:
+        # The blacklist was checked before upload and the user chose whether to continue.
         release = self._release(meta)
-        if not await self.get_additional_checks(meta):
-            return False
         status = meta.tracker_status.setdefault(self.tracker, {})
         issues = OrpheusMusicValidator().validate(release)
         errors = [issue.message for issue in issues if issue.level == ValidationLevel.ERROR]
@@ -983,7 +982,8 @@ class Orpheus:
         if not isinstance(decoded, dict) or b"info" not in decoded:
             logger.warning(f"{self.tracker}: [yellow]Orpheus did not return a torrent file; seeding the local torrent.[/yellow]")
             return False
-        comment = decoded.get(b"comment", b"")
+        decoded_dict = cast(dict[bytes, object], decoded)
+        comment = decoded_dict.get(b"comment", b"")
         status["torrent_link"] = comment.decode("utf-8", "replace") if isinstance(comment, bytes) and comment else f"{self.torrent_url}{torrent_id}"
         status["torrent_source"] = "site"
         return True

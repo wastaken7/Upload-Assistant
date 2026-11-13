@@ -212,7 +212,13 @@ def test_search_existing_turns_badges_into_release_terms(tmp_path: Path) -> None
     props = {
         "torrents": {
             "data": [
-                {"id": 7, "name": "Fictional Film (Original Film)", "year": 2001, "size": 1000, "badges": [{"kind": "resolution", "label": "4K"}, {"kind": "source", "label": "WEB-DL"}]}
+                {
+                    "id": 7,
+                    "name": "Fictional Film (Original Film)",
+                    "year": 2001,
+                    "size": 1000,
+                    "badges": [{"kind": "resolution", "label": "4K"}, {"kind": "source", "label": "WEB-DL"}],
+                }
             ],
             "next_page_url": None,
         }
@@ -296,7 +302,36 @@ def test_expired_cookies_skip_the_tracker(tmp_path: Path) -> None:
     assert meta.skipping == "AMIGOSSHARE"
 
 
-def _upload_handler(final: httpx.Response) -> Any:
+# What the name check derives from the .torrent; it reads the episode off the first file.
+NAME_FIELDS: dict[str, Any] = {
+    "title": "Fictional Film",
+    "year": 2001,
+    "year_in_name": True,
+    "season": None,
+    "episode": "",
+    "source": "web-dl",
+    "streaming_tag": "",
+    "repack": False,
+    "proper": False,
+    "group_mode": "preserve",
+    "original_group": "FAKEGRP",
+    "air_date": "",
+}
+
+
+def _multipart(request: httpx.Request) -> dict[str, str]:
+    """Text fields of a multipart body (file parts carry a filename and are skipped)."""
+    fields: dict[str, str] = {}
+    for part in request.content.split(b"--" + request.headers["Content-Type"].split("boundary=")[1].encode()):
+        head, _, value = part.partition(b"\r\n\r\n")
+        if b'name="' in head and b"filename=" not in head:
+            fields[head.split(b'name="')[1].split(b'"')[0].decode()] = value.removesuffix(b"\r\n").decode()
+    return fields
+
+
+def _upload_handler(
+    final: httpx.Response, *, fields: dict[str, Any] | None = None, findings: list[dict[str, str]] | None = None, name_checks: list[dict[str, str]] | None = None
+) -> Any:
     lookup = {
         "type": "movie",
         "imdbId": "tt1234567",
@@ -326,7 +361,21 @@ def _upload_handler(final: httpx.Response) -> Any:
             return httpx.Response(200, json=mediainfo)
         if path == "/torrents/screenshots":
             return httpx.Response(200, json={"path": f"torrent-screens/{len(request.content)}.webp", "url": "/storage/x.webp"})
-        if path == "/torrents" and request.method == "POST":
+        if path == "/torrents/upload/video/name":
+            if name_checks is not None:
+                name_checks.append(_multipart(request) if "multipart" in request.headers.get("Content-Type", "") else dict(httpx.QueryParams(request.content.decode())))
+            blocked = any(finding["severity"] == "bloqueio" for finding in findings or [])
+            body = {
+                "fields": fields or NAME_FIELDS,
+                "name": "Fictional.Film.2001.1080p.WEB-DL.DDP5.1.H.265-FAKEGRP",
+                "siteTitle": "Fictional Film (Original Film)",
+                "matches": True,
+                "attributes": {"video_codec": ["H265 - HDR"]},
+                "problems": {},
+                "analysis": {"blocked": blocked, "findings": findings or []},
+            }
+            return httpx.Response(200, json=body)
+        if path == "/torrents/upload/video" and request.method == "POST":
             return final
         raise AssertionError(f"Unexpected request {request.method} {request.url}")
 
@@ -368,13 +417,23 @@ def test_upload_sends_the_form_the_site_expects(tmp_path: Path, monkeypatch: pyt
     assert asyncio.run(tracker.upload(meta)) is True
     assert meta.tracker_status["AMIGOSSHARE"]["torrent_id"] == "123"
     assert [request.url.path for request in requests].count("/torrents/screenshots") == 3
+    assert [request.url.path for request in requests].count("/torrents/upload/video/name") == 2
 
     form = requests[-1]
+    assert form.url.path == "/torrents/upload/video"
     assert form.headers["Accept"] == "application/json"
     body = form.content.decode("utf-8", errors="replace")
+    # Movies, series and anime are named by the site; the post title goes as `site_title`.
+    assert 'name="name"' not in body
+    assert 'name="release[year]"' not in body
     for field, value in (
         ("category_id", "4"),
-        ("name", "Fictional Film (Original Film)"),
+        ("site_title", "Fictional Film (Original Film)"),
+        ("release[source]", "web-dl"),
+        ("release[original_group]", "FAKEGRP"),
+        ("release[repack]", "0"),
+        ("release[season]", ""),
+        ("bdinfo", ""),
         ("year", "2001"),
         ("imdb_id", "tt1234567"),
         ("cover_path", "torrent-images/aa/cover.webp"),
@@ -384,7 +443,8 @@ def test_upload_sends_the_form_the_site_expects(tmp_path: Path, monkeypatch: pyt
     ):
         assert f'name="{field}"\r\n\r\n{value}\r\n' in body
     attribute_ids = {line for line in body.split("\r\n") if line.isdigit()}
-    assert {"101", "200", "301", "400", "500", "601", "700"} <= attribute_ids
+    # The name check's MediaInfo reading ("H265 - HDR") wins over the plain one ("H265"), as on the site's form.
+    assert {"101", "200", "301", "400", "500", "600", "700"} <= attribute_ids
     assert body.count('name="screenshot_paths[]"') == 3
     assert 'name="torrent"; filename="Fictional Film (Original Film).torrent"' in body
     assert "Compartilhado com Upload Assistant v1.0 (fork)" in body
@@ -407,7 +467,14 @@ def test_debug_mode_does_not_upload_images_or_the_form(tmp_path: Path, monkeypat
     meta.debug = True
 
     assert asyncio.run(tracker.upload(meta)) is True
-    assert [request.url.path for request in requests] == ["/torrents/upload", "/torrents/lookup", "/torrents/mediainfo"]
+    # The name check only previews the name; nothing is stored on the site.
+    assert [request.url.path for request in requests] == [
+        "/torrents/upload",
+        "/torrents/lookup",
+        "/torrents/mediainfo",
+        "/torrents/upload/video/name",
+        "/torrents/upload/video/name",
+    ]
 
 
 def test_lookup_of_a_series_is_refused_for_a_movie(tmp_path: Path) -> None:
@@ -440,3 +507,92 @@ def test_requests_are_read_from_the_requests_page(tmp_path: Path) -> None:
     tracker, _requests = _tracker(lambda _request: httpx.Response(200, text=_page_html("requests/index", props)))
     meta = _movie_meta(tmp_path, search_requests=True)
     assert asyncio.run(tracker.get_requests(meta)) == [{"Name": "Fictional Film", "Reward": "500", "Link": "https://amigos-share.club/pedidos/9"}]
+
+
+@pytest.mark.parametrize(("episode", "tv_pack", "expected"), [("", True, ("1", "")), ("E03", False, ("1", "03"))])
+def test_series_send_their_own_season_and_episode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, episode: str, tv_pack: bool, expected: tuple[str, str]) -> None:
+    """The site read S01E01 off the first file of a season pack."""
+    checks: list[dict[str, str]] = []
+    fields = {**NAME_FIELDS, "title": "Harbor of Ash the Long Night", "season": 1, "episode": "01"}
+    tracker, _requests = _tracker(_upload_handler(httpx.Response(302, headers={"Location": "https://amigos-share.club/torrents/123"}), fields=fields, name_checks=checks))
+    meta = _prepare_upload(tmp_path, monkeypatch, tracker)
+    meta.category, meta.season, meta.episode, meta.tv_pack = "TV", "S01", episode, tv_pack
+    meta.uuid = "release"
+
+    lookup = {"type": "series", "imdbId": "tt1234567", "title": "Fictional Show", "year": 2001, "genres": ["Drama"], "language": "Inglês"}
+    monkeypatch.setattr(tracker, "lookup_imdb", AsyncMock(return_value=lookup))
+    monkeypatch.setattr(asc_module.AmigosShare, "title_case_from_release", lambda _self, _meta, _title: "Harbor of Ash The Long Night")
+
+    assert asyncio.run(tracker.get_data(meta)) is not None
+    assert "release[season]" not in checks[0]
+    assert (checks[1]["release[season]"], checks[1]["release[episode]"]) == expected
+    assert checks[1]["release[year]"] == "2001"
+    assert checks[1]["release[title]"] == "Harbor of Ash The Long Night"
+
+
+@pytest.mark.parametrize(
+    ("title", "uuid", "expected"),
+    [
+        ("Harbor of Ash the Long Night", "Harbor.of.Ash.The.Long.Night.S01.2160p.HMAX.WEB-DL-FAKEGRP", "Harbor of Ash The Long Night"),
+        ("Fictional Film", "Fictional.Film.2001.1080p.WEB-DL-FAKEGRP.mkv", "Fictional Film"),
+        ("Porto das Cinzas", "Harbor.of.Ash.S01.2160p-FAKEGRP", "Porto das Cinzas"),
+        ("", "Anything", ""),
+    ],
+)
+def test_title_keeps_the_case_of_the_release_name(title: str, uuid: str, expected: str) -> None:
+    """The site lowercased `The` and then refused the files for not matching (422 release.name)."""
+    assert AmigosShare(CONFIG).title_case_from_release(Meta(uuid=uuid), title) == expected
+
+
+def test_a_blocked_name_stops_before_screenshots_and_the_form(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    findings = [{"severity": "bloqueio", "message": "Informe o grupo do release."}, {"severity": "aviso", "message": "O nome difere."}]
+    tracker, requests = _tracker(_upload_handler(httpx.Response(500), findings=findings))
+    meta = _prepare_upload(tmp_path, monkeypatch, tracker)
+
+    assert asyncio.run(tracker.upload(meta)) is False
+    assert meta.tracker_status["AMIGOSSHARE"]["status_message"] == "data error - The site blocks the release name: Informe o grupo do release."
+    assert not {"/torrents/screenshots", "/torrents/upload/video"} & {request.url.path for request in requests}
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"analysis": ["blocked"]},
+        {"analysis": {"blocked": False, "findings": {"severity": "bloqueio"}}},
+        {"analysis": {"blocked": False, "findings": ["bloqueio"]}},
+        {"problems": ["x"]},
+        {"attributes": ["x"]},
+    ],
+)
+def test_a_malformed_name_check_is_a_data_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changes: dict[str, Any]) -> None:
+    base = _upload_handler(httpx.Response(500))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        response = base(request)
+        if request.url.path == "/torrents/upload/video/name":
+            return httpx.Response(200, json={**response.json(), **changes})
+        return response
+
+    tracker, requests = _tracker(handler)
+    meta = _prepare_upload(tmp_path, monkeypatch, tracker)
+
+    assert asyncio.run(tracker.upload(meta)) is False
+    assert meta.tracker_status["AMIGOSSHARE"]["status_message"] == "data error - The site could not name the release: unexpected response from the name check."
+    assert not {"/torrents/screenshots", "/torrents/upload/video"} & {request.url.path for request in requests}
+
+
+def test_release_fields_are_sent_like_the_site_form() -> None:
+    assert asc_module.release_form({"title": "X", "repack": False, "hybrid": True, "season": None, "episode": "03"}) == {
+        "release[title]": "X",
+        "release[repack]": "0",
+        "release[hybrid]": "1",
+        "release[season]": "",
+        "release[episode]": "03",
+    }
+
+
+def test_payload_preview_names_the_title_field_by_category(tmp_path: Path) -> None:
+    video = asyncio.run(AmigosShare(CONFIG).get_payload_preview(_movie_meta(tmp_path)))
+    book = asyncio.run(AmigosShare(CONFIG).get_payload_preview(Meta(category="BOOK", author="Jane Writer", title="A Fictional Book")))
+    assert "site_title" in str(video) and "release[...]" in str(video)
+    assert "site_title" not in str(book)

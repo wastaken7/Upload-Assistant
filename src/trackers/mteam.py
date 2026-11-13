@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse, urlunparse
 
 import aiofiles
@@ -16,6 +16,14 @@ from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class MTeam:
@@ -159,33 +167,43 @@ class MTeam:
         try:
             response = await self.session.post(api_url, headers=headers, params=params, timeout=15)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            return data if _is_str_dict(data) else info
 
         except Exception as e:
             logger.info(f"{self.tracker}: Error fetching Douban info: {e}")
             return info
 
-    async def mteam_standard_desc(self, meta: Meta):
+    async def mteam_standard_desc(self, meta: Meta) -> str:
         db_info = await self.get_douban_info(meta)
-        d = db_info.get("data") if isinstance(db_info, dict) else None
+        d = db_info.get("data")
 
-        if db_info and db_info.get("code") == "0" and isinstance(d, dict):
-            title = d.get("title", "")
-            aka = d.get("aka", [])
+        if db_info.get("code") == "0" and _is_str_dict(d):
+            title = str(d.get("title") or "")
+            raw_aka = d.get("aka")
+            aka = [str(x) for x in raw_aka] if _is_obj_list(raw_aka) else []
             translated_names = " / ".join([title, *aka]) if title else " / ".join(aka)
 
-            countries = " / ".join(d.get("countries", []))
-            genres = " / ".join(d.get("genres", []))
-            languages = " / ".join(d.get("languages", []))
-            pubdates = " / ".join(d.get("pubdate", []))
-            durations = " / ".join(d.get("durations", []))
+            raw_countries = d.get("countries")
+            countries = " / ".join(str(x) for x in raw_countries) if _is_obj_list(raw_countries) else ""
+            raw_genres = d.get("genres")
+            genres = " / ".join(str(x) for x in raw_genres) if _is_obj_list(raw_genres) else ""
+            raw_languages = d.get("languages")
+            languages = " / ".join(str(x) for x in raw_languages) if _is_obj_list(raw_languages) else ""
+            raw_pubdates = d.get("pubdate")
+            pubdates = " / ".join(str(x) for x in raw_pubdates) if _is_obj_list(raw_pubdates) else ""
+            raw_durations = d.get("durations")
+            durations = " / ".join(str(x) for x in raw_durations) if _is_obj_list(raw_durations) else ""
 
-            directors = " / ".join([person.get("name", "") for person in d.get("directors", [])])
-            actors = " / ".join([person.get("name", "") for person in d.get("actors", [])])
+            raw_directors = d.get("directors")
+            directors = " / ".join(str(person.get("name", "")) for person in raw_directors if _is_str_dict(person)) if _is_obj_list(raw_directors) else ""
+            raw_actors = d.get("actors")
+            actors = " / ".join(str(person.get("name", "")) for person in raw_actors if _is_str_dict(person)) if _is_obj_list(raw_actors) else ""
 
-            rating_val = d.get("score", "0")
-            rating_count = d.get("rating", {}).get("count", "0")
-            subject_id = d.get("subjectId", "")
+            rating_val = str(d.get("score") or "0")
+            raw_rating = d.get("rating")
+            rating_count = str(raw_rating.get("count", "0")) if _is_str_dict(raw_rating) else "0"
+            subject_id = str(d.get("subjectId") or "")
 
             desc = [
                 f"![]({d.get('coverUrl', '')})",
@@ -317,12 +335,7 @@ class MTeam:
         uuid: str = meta.uuid
         if "upscale" in uuid.lower() and "upscale" not in meta.title:
             logger.info(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
-                if not user_input:
-                    return False
-            else:
-                return False
+            should_continue = False
 
         # Screenshots
         if meta.screens < 3:
@@ -338,12 +351,7 @@ class MTeam:
             logger.info(
                 f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
             )
-            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
-                if not user_input:
-                    return False
-            else:
-                return False
+            should_continue = False
 
         return should_continue
 

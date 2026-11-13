@@ -66,21 +66,15 @@ test("normal mode keeps the existing authenticated network path", async () => {
   assert.equal(csrfCalls, 1);
 });
 
-test("demo metadata and progress remain stable across API actions", async () => {
+test("demo metadata remains stable across API actions", async () => {
   const context = fixture(true);
   const demo = context.window.UAScreenshotMode;
   const before = JSON.stringify(demo.media);
   assert.equal(demo.media.title, "The Automation Menace");
-  assert.equal(demo.media.progress.length, 7);
-  // Bars are mid-run; the bandwidth meter shows a rate over its limit instead.
-  assert.ok(
-    demo.media.progress.every((item) =>
-      item.unit === "kbps"
-        ? item.current > item.total
-        : item.current > 0 && item.current < item.total,
-    ),
-  );
+  // No external tool runs before the IDs are confirmed.
+  assert.equal(demo.media.progress.length, 0);
   assert.ok(demo.output.includes(demo.media.path));
+  assert.ok(demo.output.includes("Is this correct?"));
   await context.uaApiFetch("/api/kill", { method: "POST" });
   assert.equal(JSON.stringify(demo.media), before);
 });
@@ -102,8 +96,8 @@ test("demo review panels and tabs are populated with local fictional data", () =
       demo.media.title.replaceAll(" ", "."),
     ),
   );
-  assert.equal(demo.tabs[0].status, "running");
-  assert.ok(demo.tabs.length > 1);
+  assert.equal(demo.tabs.length, 1);
+  assert.equal(demo.tabs[0].status, "input");
 });
 
 const appSource = read("app.js");
@@ -214,32 +208,44 @@ test("demo subtitles resolve to ten distinct available flags", () => {
   }
 });
 
-test("demo GUI events open a dupe prompt with results in every state", () => {
+test("demo GUI events stop at the ID confirmation and nothing else", () => {
   const context = fixture(true);
   vm.runInContext(read("run_gui_state.js"), context);
-  const { createRunGuiState, reduceRunGuiEvent, selectRunGuiView } =
-    context.window.UARunGui;
-  const state = context.window.UAScreenshotMode.guiEvents.reduce(
+  const {
+    createRunGuiState,
     reduceRunGuiEvent,
-    createRunGuiState(),
-  );
+    selectRunGuiView,
+    readPayloadPreviews,
+  } = context.window.UARunGui;
+  const demo = context.window.UAScreenshotMode;
+  const state = demo.guiEvents.reduce(reduceRunGuiEvent, createRunGuiState());
   const view = selectRunGuiView(state);
+  const stage = (key) => view.stages.find((entry) => entry.key === key).status;
 
   assert.equal(view.prompt.type, "yes_no");
-  assert.equal(view.prompt.context.kind, "dupes");
-  assert.ok(view.slots[`0:${view.prompt.context.tracker}`]);
-  assert.ok(view.dupes[`0:${view.prompt.context.tracker}`].entries.length);
+  assert.equal(view.prompt.question, "Is this correct?");
+  assert.equal(view.prompt.context.kind, "confirm");
   assert.equal(view.awaiting, true);
+  assert.equal(stage("prep"), "done");
+  assert.equal(stage("confirm"), "start");
+  assert.ok(!stage("dupes"));
+  assert.equal(view.trackers.length, 0);
+  assert.equal(view.warnings.length, 0);
+  assert.equal(view.attention.length, 0);
+
+  const { base_name: baseName, release_names: names } = view.prompt.context;
+  assert.equal(baseName, demo.media.name);
+  assert.ok(Object.values(names).includes(baseName));
+  assert.ok(Object.values(names).some((name) => name !== baseName));
+  const previews = readPayloadPreviews(view.prompt.context);
   assert.equal(
-    view.trackers
-      .map((entry) => entry.status)
-      .sort()
-      .join(),
-    "dupe,pending,skipped",
+    previews.map((preview) => preview.tracker).join(),
+    Object.keys(names).join(),
   );
-  assert.equal(view.warnings.length, 1);
-  assert.equal(
-    view.stages.find((stage) => stage.key === "dupes").status,
-    "start",
-  );
+  // Every drop-down resolves to its shared list of choices.
+  for (const preview of previews) {
+    for (const field of preview.fields.filter((f) => f.kind === "choice")) {
+      assert.ok(field.choices.length > 1, `${preview.tracker} ${field.key}`);
+    }
+  }
 });

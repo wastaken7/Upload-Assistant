@@ -10,7 +10,6 @@ import httpx
 from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
-from src.manual_input import confirm_override
 from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.trackers.common import Common
@@ -189,14 +188,13 @@ class Nebulance:
             return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 logger.info(f"{self.tracker}: [red]Only TV or TV Movies are allowed at {self.tracker}, this has a tvmaze ID[/red]")
-                if not await confirm_override(meta, "Do you want to upload it?"):
-                    return False
+                passed = False
             else:
-                if not meta.unattended:
-                    logger.info(f"{self.tracker}: [red]Only TV Is allowed at {self.tracker}[/red]")
+                logger.info(f"{self.tracker}: [red]Only TV Is allowed at {self.tracker}[/red]")
                 return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -209,11 +207,10 @@ class Nebulance:
             return False
 
         if meta.is_disc:
-            if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]does not allow raw discs[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]does not allow raw discs[/bold red]")
             return False
 
-        return True
+        return passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]] | bool:
         dupes: list[dict[str, Any]] = []
@@ -258,8 +255,9 @@ class Nebulance:
                             error_data = cast(dict[str, Any], response.json())
                         except json.JSONDecodeError:
                             error_data = {}
-                        error = error_data.get("error", {})
-                        message = str(error.get("message", "")) if isinstance(error, dict) else ""
+                        error: object = error_data.get("error")
+                        error_dict: dict[str, Any] = cast(dict[str, Any], error) if isinstance(error, dict) else {}
+                        message = str(error_dict.get("message", ""))
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
                     response.raise_for_status()
@@ -281,7 +279,7 @@ class Nebulance:
                         file_list_value = each.get("file_list", [])
                         file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
                         files_str = ", ".join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
-                        result = {
+                        dupe_result: dict[str, Any] = {
                             "name": str(each.get("rls_name", "")),
                             "files": files_str,
                             "size": int(each.get("size", 0)),
@@ -289,7 +287,7 @@ class Nebulance:
                             "file_count": len(file_list) if file_list else 1,
                             "download": str(each.get("download", "")),
                         }
-                        dupes.append(result)
+                        dupes.append(dupe_result)
 
         return dupes
 

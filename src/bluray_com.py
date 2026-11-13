@@ -124,7 +124,7 @@ async def ensure_release_subheader(meta: Meta) -> None:
         return
     failed_urls = _failed_subheader_urls.get()
     if failed_urls is None:
-        failed_urls = set()
+        failed_urls = set[str]()
         _failed_subheader_urls.set(failed_urls)
     if url in failed_urls:
         return
@@ -526,13 +526,13 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
         await asyncio.sleep(delay)
 
-        headers = {
+        headers: dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate, br",
             "Connection": "keep-alive",
-            "Referer": releases_url,
+            "Referer": str(releases_url),
             "X-Requested-With": "XMLHttpRequest",
         }
 
@@ -622,7 +622,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
             logger.info(f"[dim]Enter its number. {choices_help}")
 
             labels = [f"{release['title']} ({release['movie_year']})" if release.get("movie_year") else release["title"] for release in matching_releases]
-            details = [
+            details: list[dict[str, Any]] = [
                 {
                     "meta": " · ".join(
                         f"{name}: {value}"
@@ -701,7 +701,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
 
     # always save a file in case the existing results are invalid
     try:
-        debug_payload = {
+        debug_payload: dict[str, Any] = {
             "movie": {"title": (meta.title if meta.title is not None else "Unknown"), "imdb_id": f"tt{(meta.imdb_id if meta.imdb_id is not None else '0000000'):07d}"},
             "matching_releases": matching_releases,
         }
@@ -1747,7 +1747,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     close_labels = [
                         f"{release['title']} ({release['country']}) · score {next(score for score, r in scored_releases if r == release):.1f}/100" for release in close_matches
                     ]
-                    close_details = [
+                    close_details: list[dict[str, Any]] = [
                         {
                             "meta": " · ".join(
                                 f"{name}: {value}"

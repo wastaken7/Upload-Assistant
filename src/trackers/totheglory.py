@@ -4,7 +4,7 @@ import json
 import re
 from http.cookiejar import Cookie, CookieJar
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -22,6 +22,14 @@ from src.meta import Meta
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class ToTheGlory:
@@ -61,33 +69,40 @@ class ToTheGlory:
         """Read browser exports and internal JSON cookies (including legacy .pkl files)."""
         with Path(cookiefile).open(encoding="utf-8") as cookie_file:
             raw_cookies = json.load(cookie_file)
-        if isinstance(raw_cookies, dict):
-            entries = []
+        entries: list[dict[str, Any]] = []
+        if _is_str_dict(raw_cookies):
             for name, data in raw_cookies.items():
-                if not isinstance(data, dict):
+                if not _is_str_dict(data):
                     raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
                 entries.append({**data, "name": name})
-        elif isinstance(raw_cookies, list):
-            entries = raw_cookies
+        elif _is_obj_list(raw_cookies):
+            for item in raw_cookies:
+                if not _is_str_dict(item):
+                    raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
+                entries.append(item)
         else:
             raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
 
         cookies = CookieJar()
         for data in entries:
-            if not isinstance(data, dict) or not isinstance(data.get("name"), str) or not data["name"]:
+            name_val = data.get("name")
+            if not isinstance(name_val, str) or not name_val:
                 raise ValueError(f"{self.tracker}: Invalid cookie JSON format")
-            domain = data.get("domain") or urlparse(self.base_url).hostname or ""
-            path = data.get("path") or "/"
-            expires = data.get("expires", data.get("expirationDate"))
+            domain_val = data.get("domain")
+            domain = str(domain_val) if domain_val else (urlparse(self.base_url).hostname or "")
+            path_val = data.get("path")
+            path = str(path_val) if path_val else "/"
+            expires_val = data.get("expires", data.get("expirationDate"))
+            expires = int(expires_val) if isinstance(expires_val, (int, float)) else None
             cookies.set_cookie(
                 Cookie(
                     version=0,
-                    name=data["name"],
+                    name=name_val,
                     value=str(data.get("value", "")),
                     port=None,
                     port_specified=False,
                     domain=domain,
-                    domain_specified=bool(data.get("domain")),
+                    domain_specified=bool(domain_val),
                     domain_initial_dot=domain.startswith("."),
                     path=path,
                     path_specified=True,
@@ -261,7 +276,7 @@ class ToTheGlory:
         torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
         async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
             mi_text = await mi_dump.read()
-        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"), "nfo": ("torrent.nfo", mi_text)}
+        files: dict[str, Any] = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"), "nfo": ("torrent.nfo", mi_text)}
         url = f"{self.base_url}/takeupload.php"
 
         # Submit

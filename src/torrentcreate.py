@@ -35,6 +35,16 @@ from src.torrent_policy import hdbits_pieces_allowed as hdbits_pieces_allowed
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
+
+
+def _torrent_content_size(path: str | os.PathLike[str], fallback: int) -> int:
+    """Return the payload size a torrent hashed, or ``fallback`` when it cannot be read."""
+    try:
+        return int(Torrent.read(path).size or 0) or fallback
+    except Exception:
+        return fallback
+
+
 DISC_EXCLUDE_GLOBS = ("._*", "*/._*", "*.lwi")
 
 
@@ -57,6 +67,8 @@ def calculate_piece_size(
 class CustomTorrent(torf.Torrent):
     def __init__(self, meta: Meta, *args: Any, **kwargs: Any) -> None:
         self._meta = meta
+        self._webui_progress_id: str | None = None
+        self._webui_progress_label: str | None = None
 
         # Extract and store the precalculated piece size
         self._precalculated_piece_size: int | None = kwargs.pop("piece_size", None)
@@ -104,6 +116,10 @@ class CustomTorrent(torf.Torrent):
             self._piece_size = self._precalculated_piece_size
             self.metainfo["info"]["piece length"] = self._precalculated_piece_size
             return
+
+
+# Characters mkbrr reads as pattern syntax or as a separator in --exclude.
+_MKBRR_GLOB_CHARACTERS = frozenset(",*?[]{}\\")
 
 
 class TorrentCreator:
@@ -186,7 +202,8 @@ class TorrentCreator:
         return piece_size
 
     @staticmethod
-    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+    def _mkbrr_exclude_parts(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> tuple[list[str], list[str]]:
+        """Return the unselected file names and the extension patterns to exclude."""
         if allow_subs:
             manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.txt", "*.xml"]
         else:
@@ -203,7 +220,31 @@ class TorrentCreator:
                     continue
                 exclude_files.add(fname)
 
-        return ",".join(sorted(exclude_files) + manual_patterns)
+        return sorted(exclude_files), manual_patterns
+
+    @staticmethod
+    def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        return ",".join(names + manual_patterns)
+
+    @staticmethod
+    def mkbrr_exact_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str | None:
+        """Return mkbrr exclusions that drop only unselected files, or None when none exist.
+
+        mkbrr splits ``--exclude`` at commas and matches each glob, ignoring case,
+        against file names rather than paths. Excluding ``bonus/E01.mkv`` would
+        therefore also drop a selected ``E01.mkv``, and a name with a comma or
+        glob characters, such as ``sample.[GRP].mkv``, would not be excluded.
+        """
+        names, manual_patterns = TorrentCreator._mkbrr_exclude_parts(root_folder, filelist, allow_subs)
+        if any(not _MKBRR_GLOB_CHARACTERS.isdisjoint(name) for name in names):
+            return None
+        selected = {Path(file).name.casefold() for file in filelist}
+        if any(name.casefold() in selected for name in names):
+            return None
+        if any(fnmatch.fnmatchcase(name, pattern) for name in selected for pattern in manual_patterns):
+            return None
+        return ",".join(names + manual_patterns)
 
     @classmethod
     async def create_torrent(
@@ -214,7 +255,7 @@ class TorrentCreator:
         tracker_url: str | None = None,
         piece_size: int = 0,
         make_default: bool = False,
-    ) -> str | Torrent:
+    ) -> str | Path | Torrent:
         # Ensure only one torrent creation runs at a time
         wait_started: float | None = None
         if cls._create_torrent_semaphore.locked():
@@ -249,7 +290,12 @@ class TorrentCreator:
                 if is_subs and Path(path).is_file():
                     path = Path(path).parent
 
-                if meta.category not in ("MOVIE", "TV"):
+                # MOVIE and TV are detected only after the early base-torrent
+                # task starts, while every other category is set before it, so
+                # an unset category is a video release.
+                is_video = str(meta.category or "").upper() in ("", "MOVIE", "TV")
+
+                if not is_video:
                     # Music releases always keep their folder, including
                     # one-track singles (e.g. Orpheus rejects folderless music).
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder and meta.category != "MUSIC":
@@ -294,8 +340,16 @@ class TorrentCreator:
 
                 initial_size = await asyncio.to_thread(calculate_size)
 
+                mkbrr_exclude: str | None = None
+                use_mkbrr = bool(meta.mkbrr)
+                if use_mkbrr and not meta.is_disc and is_video:
+                    mkbrr_exclude = await asyncio.to_thread(cls.mkbrr_exact_exclude_string, str(path), creation_filelist, is_subs)
+                    if mkbrr_exclude is None:
+                        logger.debug("[yellow]mkbrr cannot exclude only the unselected files; creating this torrent without mkbrr.[/yellow]")
+                        use_mkbrr = False
+
                 # If using mkbrr, run the external application
-                if meta.mkbrr:
+                if use_mkbrr:
                     try:
                         # Validate input path to prevent potential command injection
                         if not Path(path).exists():
@@ -345,9 +399,8 @@ class TorrentCreator:
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
 
-                        if not meta.is_disc and meta.category in ("MOVIE", "TV"):
-                            exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
-                            cmd.extend(["--exclude", exclude_str])
+                        if mkbrr_exclude is not None:
+                            cmd.extend(["--exclude", mkbrr_exclude])
                         elif meta.is_disc:
                             cmd.extend(["--exclude", ",".join(exclude)])
 
@@ -431,7 +484,9 @@ class TorrentCreator:
                                 return result
 
                         async with resource_slot("torrent-hash", "torrent hashing"):
+                            hash_started = time.monotonic()
                             result = await asyncio.to_thread(run_mkbrr)
+                            hash_ms = (time.monotonic() - hash_started) * 1000
 
                         # Verify the torrent was actually created
                         if result != 0:
@@ -445,9 +500,25 @@ class TorrentCreator:
                             manifest = TorrentManifest(meta.base_dir, meta.uuid)
                             entry = manifest.register(output_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                             output_path.unlink(missing_ok=True)
-                            await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="base")
+                            await record_event_async(
+                                "artifact",
+                                service="torrent",
+                                operation="created",
+                                outcome="success",
+                                category="base_subs" if is_subs else "base",
+                                bytes_count=entry.content_size,
+                                duration_ms=hash_ms,
+                            )
                             return str(manifest.entry_path(entry))
-                        await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="tracker")
+                        await record_event_async(
+                            "artifact",
+                            service="torrent",
+                            operation="created",
+                            outcome="success",
+                            category="tracker",
+                            bytes_count=_torrent_content_size(output_path, initial_size),
+                            duration_ms=hash_ms,
+                        )
                         return output_path
 
                     except subprocess.CalledProcessError as e:
@@ -497,7 +568,9 @@ class TorrentCreator:
 
                 try:
                     async with resource_slot("torrent-hash", "torrent hashing"):
+                        hash_started = time.monotonic()
                         await asyncio.to_thread(generate_torrent)
+                        hash_ms = (time.monotonic() - hash_started) * 1000
                 except Exception as error:
                     publish_progress(progress_id, progress_label, detail=str(error), status="failed", group="media", unit="pieces")
                     raise
@@ -514,9 +587,25 @@ class TorrentCreator:
                     manifest = TorrentManifest(meta.base_dir, meta.uuid)
                     entry = manifest.register(staging_path, "base_subs" if is_subs else "base", "generated", make_default=make_default)
                     staging_path.unlink(missing_ok=True)
-                    await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="base")
+                    await record_event_async(
+                        "artifact",
+                        service="torrent",
+                        operation="created",
+                        outcome="success",
+                        category="base_subs" if is_subs else "base",
+                        bytes_count=entry.content_size,
+                        duration_ms=hash_ms,
+                    )
                     return str(manifest.entry_path(entry))
-                await record_event_async("artifact", service="torrent", operation="created", outcome="success", category="tracker")
+                await record_event_async(
+                    "artifact",
+                    service="torrent",
+                    operation="created",
+                    outcome="success",
+                    category="tracker",
+                    bytes_count=int(torrent.size or 0) or initial_size,
+                    duration_ms=hash_ms,
+                )
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
@@ -578,20 +667,14 @@ class TorrentCreator:
             record_event("artifact", service="torrent", operation="created", outcome="success", category="randomized")
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
+    async def create_base_from_existing_torrent(torrentpath: str | Path, base_dir: str, uuid: str) -> str | None:
+        # Reuse statistics are recorded when the item completes, from the
+        # manifest, because client searches can also register reusable bases.
         if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             has_subs = any(Path(str(f)).suffix.lower() in SUBTITLE_EXTENSIONS for f in base_torrent.files)
             manifest = TorrentManifest(base_dir, uuid)
             entry = manifest.register(torrentpath, "base_subs" if has_subs else "base", "client")
-            await record_event_async(
-                "artifact",
-                service="torrent",
-                operation="reused",
-                outcome="success",
-                category="base",
-                bytes_count=source_size,
-            )
             return str(manifest.entry_path(entry))
         return None
 
@@ -649,7 +732,7 @@ async def create_torrent(
     tracker_url: str | None = None,
     piece_size: int = 0,
     make_default: bool = False,
-) -> str | Torrent:
+) -> str | Path | Torrent:
     return await TorrentCreator.create_torrent(
         meta=meta,
         path=path,
@@ -668,8 +751,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) 
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str, source_size: int = 0) -> str | None:
-    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid, source_size)
+async def create_base_from_existing_torrent(torrentpath: str | Path, base_dir: str, uuid: str) -> str | None:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
 
 
 def get_mkbrr_path(meta: Meta) -> str:

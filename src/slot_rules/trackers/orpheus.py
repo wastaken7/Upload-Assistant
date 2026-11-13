@@ -10,7 +10,6 @@ preferred encodes replace older ones.  Orpheus search results are turned into
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
 from enum import Enum
 from typing import Any
 
@@ -18,8 +17,6 @@ from src.slot_rules.base import SlotRules
 from src.slot_rules.models import SlotDecision, Verdict
 from src.slot_rules.profile import ReleaseProfile
 
-# Rules transcribed from rules.php?p=upload on this date.
-RULES_DATE_2026_10_21 = date(2026, 10, 21)
 # Meta key where the Orpheus search stores its decision for ``evaluate_slots``.
 SLOT_DECISION_KEY = "ORPHEUS_slot_decision"
 
@@ -396,7 +393,6 @@ class OrpheusSlotRules(SlotRules):
     """Dupe and trump rules for one Orpheus release group."""
 
     TRACKER = "ORPHEUS"
-    RULES_DATE = RULES_DATE_2026_10_21
 
     def decide(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:  # noqa: ARG002
         # Music is compared with ``evaluate_music``; video profiles never reach Orpheus.

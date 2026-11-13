@@ -4,7 +4,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import anitopy
 import cli_ui
@@ -15,9 +15,18 @@ from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.xxx_lookup import generated_release_name
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
+
+
+def _is_obj_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -125,7 +134,7 @@ class NameManager:
         if active_trackers:
             region, distributor, trackers_to_remove = await self.missing_disc_info(meta, active_trackers)
             for tracker in trackers_to_remove:
-                if tracker in meta.trackers:
+                if _is_obj_list(meta.trackers) and tracker in meta.trackers:
                     meta.trackers.remove(tracker)
             if distributor and "SKIPPED" not in distributor:
                 meta.distributor = distributor
@@ -178,7 +187,7 @@ class NameManager:
         if meta.manual_name is not None:
             name = str(meta.manual_name).strip()
         elif meta.category == "XXX":
-            release_name = str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
+            release_name = generated_release_name(meta) or str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
             name = release_name.replace(".", " ")
         elif meta.category == "MOVIE":  # MOVIE SPECIFIC
             if type == "DISC":  # Disk
@@ -429,9 +438,9 @@ class NameManager:
     @staticmethod
     def _music_release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
         """Read a serialized MusicRelease field without its provenance."""
-        fields = release.get("fields", {})
-        value = fields.get(name, {}) if isinstance(fields, dict) else {}
-        return value.get("value", default) if isinstance(value, dict) else default
+        fields: object = release.get("fields")
+        value: object = fields.get(name) if _is_str_dict(fields) else None
+        return value.get("value", default) if _is_str_dict(value) else default
 
     @staticmethod
     def _music_codec(value: Any) -> str:
@@ -463,13 +472,14 @@ class NameManager:
 
     def extract_music_name(self, meta: Meta) -> str:
         """Build MUSIC names with the LST Discogs-based naming convention."""
-        release = meta.music_release if isinstance(meta.music_release, dict) else {}
+        release: dict[str, Any] = meta.music_release if _is_str_dict(meta.music_release) else {}
         artist = self._music_release_field(release, "artist", meta.artist)
         title = self._music_release_field(release, "album", meta.title)
         year = self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))
         source = self._music_source(self._music_release_field(release, "media", meta.source))
-        tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
-        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+        raw_tracks = release.get("tracks", [])
+        tracks: list[Any] = raw_tracks if _is_obj_list(raw_tracks) else []
+        first_track: dict[str, Any] = tracks[0] if tracks and _is_str_dict(tracks[0]) else {}
         codec = self._music_codec(first_track.get("codec") or first_track.get("format") or meta.format or meta.type)
         parts = [str(artist), "-", str(title), str(year), source, codec]
 

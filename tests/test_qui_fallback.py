@@ -114,9 +114,7 @@ async def test_add_falls_back_to_webui_credentials_after_qui_retries(tmp_path):
         patch.object(client, "create_ssl_context_for_client", return_value=None),
         patch("src.torrent_clients.qbittorrent.httpx.AsyncClient", return_value=session),
     ):
-        await client.qbittorrent(
-            str(release), torrent, str(tmp_path), str(tmp_path), dict(WEBUI_CLIENT, qui_proxy_url=PROXY_URL), "", meta.filelist, meta, "EXAMPLE"
-        )
+        await client.qbittorrent(str(release), torrent, str(tmp_path), str(tmp_path), dict(WEBUI_CLIENT, qui_proxy_url=PROXY_URL), "", meta.filelist, meta, "EXAMPLE")
 
     add_direct.assert_awaited_once()
     assert add_direct.call_args.args[0] is direct

@@ -1,5 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-"""Cathode-Ray.Tube torrent coexistence rules (transcribed 2026-10-15)."""
+"""Cathode-Ray.Tube torrent coexistence rules."""
 
 from collections.abc import Sequence
 

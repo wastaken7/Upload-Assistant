@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import gc
+import importlib
 import json
 import os
 import platform
@@ -24,8 +25,7 @@ from typing import Any, cast
 import ffmpeg
 from PIL import Image
 
-from data import config as data_config
-from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
+from src.artwork import COVER_FRAME_ANSWER, is_public_http_url, is_valid_cover_image, is_valid_image_bytes, save_cover_frame, saved_cover_frame
 from src.binaries import configured_binary
 from src.cleanup import cleanup_manager
 from src.console import logger
@@ -36,13 +36,31 @@ from src.resource_coordinator import holds_slot
 from src.screenshot_manifest import capture_pages as manifest_capture_pages
 from src.screenshot_manifest import capture_timestamps
 from src.screenshot_manifest import clear_group as clear_screenshot_group
+from src.screenshot_manifest import discard_file as discard_screenshot_file
+from src.screenshot_manifest import entries as manifest_entries
+from src.screenshot_manifest import entry_for as manifest_entry_for
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file as forget_screenshot_file
+from src.screenshot_manifest import has_flag as manifest_has_flag
 from src.screenshot_manifest import register as register_screenshots
+from src.screenshot_manifest import replace_file as replace_screenshot_file
+from src.screenshot_manifest import set_flag as manifest_set_flag
 from src.screenshot_overlays import overlay_filters, overlay_fontfile, overlay_options
 from src.stats import record_event_async
 from src.temp_paths import artwork_dir, release_temp_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
+
+_ffmpeg: Any = ffmpeg
+
+
+def _get_data_config() -> dict[str, Any]:
+    with contextlib.suppress(Exception):
+        mod = importlib.import_module("data.config")
+        cfg = getattr(mod, "config", {})
+        if isinstance(cfg, dict):
+            return cast(dict[str, Any], cfg)
+    return {}
+
 
 default_config: dict[str, Any] = {}
 task_limit = 1
@@ -121,64 +139,286 @@ def _format_contact_sheet_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
-def _xxx_contact_sheet_static_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, fontfile: str | None) -> Any:
-    stream = ffmpeg.input(str(video_path))
-    stream = _xxx_contact_sheet_timestamp_filter(stream, r"%{pts\\:hms}", fontfile)
-    return stream.filter("fps", fps=f"{frame_count}/{duration:.6f}").filter("scale", 320, -2).filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
+XXX_CONTACT_SHEET_KIND = "xxx_contact_sheet"
+_XXX_SHEETS_MARKED_FLAG = "xxx_contact_sheets_marked"
+# imgbox, pixhost and BitPorn reject images over 10 MB.
+XXX_CONTACT_SHEET_MAX_BYTES = 10_000_000
+# libwebp's default quality first, then smaller files until the sheet fits.
+_XXX_WEBP_QUALITIES = (75, 60, 45, 30)
+# Static tiles stay this far from the end, where the video stream may already have ended.
+_XXX_STATIC_TILE_MARGIN = 1.0
+# One tile or one stack of a sheet; generous for slow 4K decodes and network drives.
+_XXX_FFMPEG_TIMEOUT_SECONDS = 600
 
 
-def _xxx_contact_sheet_animated_tile(video_path: Path, start_time: float, animation_seconds: float, fontfile: str | None) -> Any:
-    stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
-    return _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
+def _xxx_contact_sheet_signature(rows: int, columns: int, animated: bool, animation_seconds: float) -> dict[str, Any]:
+    """Return the settings a cached sheet must match to be reused."""
+    return {"rows": rows, "columns": columns, "animated": animated, "animation_seconds": animation_seconds if animated else None}
 
 
-async def _render_xxx_animated_contact_sheet(
+def _xxx_contact_sheet_start_times(frame_count: int, duration: float, clip_seconds: float, phase: float = 0.5) -> list[float]:
+    """Spread tile start times evenly, each at ``phase`` within its share of the video.
+
+    The default middle of each share skips the opening frame, which is often
+    black or a logo.
+    """
+    max_start = max(0.0, duration - clip_seconds)
+    return [max_start * (index + phase) / frame_count for index in range(frame_count)]
+
+
+def _xxx_contact_sheet_tile(video_path: Path, start_time: float, clip_seconds: float, fontfile: str | None) -> Any:
+    """Return one scaled tile; the timestamp is drawn after scaling so it stays readable."""
+    animated = clip_seconds > 0
+    stream = _ffmpeg.input(str(video_path), ss=start_time, t=clip_seconds).filter("fps", fps=8) if animated else _ffmpeg.input(str(video_path), ss=start_time)
+    stream = _xxx_contact_sheet_timestamp_filter(stream.filter("scale", 320, -2), _format_contact_sheet_timestamp(start_time), fontfile)
+    return stream.filter("setpts", "PTS-STARTPTS") if animated else stream
+
+
+def _xxx_contact_sheet_grid(tiles: list[Path], columns: int, rows: int, title: str, include_title: bool, fontfile: str | None) -> Any:
+    inputs = [_ffmpeg.input(str(tile_path)) for tile_path in tiles]
+    # hstack/vstack reject a single input, so a one-wide row or one-row sheet skips them.
+    rows_streams = [inputs[row * columns] if columns == 1 else _ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
+    sheet = rows_streams[0] if rows == 1 else _ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+    return _xxx_contact_sheet_title_filter(sheet, title, include_title, fontfile)
+
+
+async def _run_xxx_contact_sheet_ffmpeg(command: Any, loglevel: str) -> tuple[int | None, bytes]:
+    """Run one tile or stack command, giving up on a stalled ffmpeg instead of waiting forever.
+
+    Cancelling ``run_ffmpeg`` on timeout terminates its ffmpeg process.
+    """
+    try:
+        return_code, _stdout, stderr = await asyncio.wait_for(run_ffmpeg(command.global_args("-y", "-loglevel", loglevel)), timeout=_XXX_FFMPEG_TIMEOUT_SECONDS)
+    except TimeoutError:
+        return None, f"FFmpeg did not finish within {_XXX_FFMPEG_TIMEOUT_SECONDS} seconds".encode()
+    return return_code, stderr
+
+
+async def _render_xxx_contact_sheet_grid(
     video_path: Path,
     output_path: Path,
     work_root: Path,
-    frame_count: int,
     duration: float,
-    columns: int,
     rows: int,
-    animation_seconds: float,
+    columns: int,
+    animation_seconds: float | None,
     fontfile: str | None,
+    title: str,
     include_title: bool,
     loglevel: str,
-) -> tuple[int | None, bytes]:
-    """Render an animated sheet one tile at a time, then stack the small clips.
+    phase: float = 0.5,
+) -> bool:
+    """Render a sheet one tile at a time, then stack the small tiles.
 
-    Decoding every tile in one ffmpeg process keeps one full decoder per tile
-    in memory at once (gigabytes for 4K HEVC). Rendering tiles in sequence
-    holds a single decoder; the final stack only reads 320px clips.
+    Each tile seeks straight to its time, so only a few seconds of video are
+    decoded per tile. Decoding every tile in one ffmpeg process would keep one
+    full decoder per tile in memory at once (gigabytes for 4K HEVC); rendering
+    tiles in sequence holds a single decoder, and the final stack only reads
+    320px tiles. ``animation_seconds`` makes an animated WebP, otherwise a PNG.
+    Returns whether the sheet fits ``XXX_CONTACT_SHEET_MAX_BYTES``; raises
+    RuntimeError when ffmpeg fails.
     """
-    max_start = max(0.0, duration - animation_seconds)
+    animated = animation_seconds is not None
+    clip_seconds = animation_seconds or 0.0
+    frame_count = rows * columns
+    start_times = _xxx_contact_sheet_start_times(frame_count, duration, clip_seconds if animated else min(_XXX_STATIC_TILE_MARGIN, duration / 2), phase)
     work_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="xxx-tiles-", dir=work_root, ignore_cleanup_errors=True) as work_dir:
         tiles: list[Path] = []
-        for index in range(frame_count):
-            start_time = max_start * index / max(frame_count - 1, 1)
-            tile_path = Path(work_dir) / f"tile-{index:03d}.mkv"
-            tile = _xxx_contact_sheet_animated_tile(video_path, start_time, animation_seconds, fontfile)
-            # Lossless intermediate: the clips are re-encoded once, into WebP.
-            command = ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None).global_args("-y", "-loglevel", loglevel)
-            return_code, _stdout, stderr = await run_ffmpeg(command)
+        for index, start_time in enumerate(start_times):
+            tile_path = Path(work_dir) / f"tile-{index:03d}.{'mkv' if animated else 'png'}"
+            tile = _xxx_contact_sheet_tile(video_path, start_time, clip_seconds, fontfile)
+            # Animated tiles use a lossless intermediate; the clips are re-encoded once, into WebP.
+            command = _ffmpeg.output(tile, str(tile_path), vcodec="ffv1", an=None) if animated else _ffmpeg.output(tile, str(tile_path), vframes=1)
+            return_code, stderr = await _run_xxx_contact_sheet_ffmpeg(command, loglevel)
             if return_code != 0 or not tile_path.is_file():
                 # run_ffmpeg writes its report beside the output; keep the
                 # failed tile's report once the tile directory is removed.
                 for report in Path(work_dir).glob("ffmpeg-*.log"):
                     with contextlib.suppress(OSError):
                         report.replace(work_root / report.name)
-                return return_code, stderr
+                raise RuntimeError(stderr.decode(errors="replace").strip() or f"FFmpeg could not render tile {index + 1}")
             tiles.append(tile_path)
 
-        inputs = [ffmpeg.input(str(tile_path)) for tile_path in tiles]
-        # hstack/vstack reject a single input, so a one-wide row or one-row sheet skips them.
-        rows_streams = [inputs[row * columns] if columns == 1 else ffmpeg.filter(inputs[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
-        sheet = rows_streams[0] if rows == 1 else ffmpeg.filter(rows_streams, "vstack", inputs=rows)
-        stream = _xxx_contact_sheet_title_filter(sheet, video_path.name, include_title, fontfile)
-        command = ffmpeg.output(stream, str(output_path), vcodec="libwebp_anim", loop=0, r=8, t=animation_seconds).global_args("-y", "-loglevel", loglevel)
-        return_code, _stdout, stderr = await run_ffmpeg(command)
-        return return_code, stderr
+        sheet = _xxx_contact_sheet_grid(tiles, columns, rows, title, include_title, fontfile)
+        for quality in _XXX_WEBP_QUALITIES if animated else (None,):
+            if animated:
+                command = _ffmpeg.output(sheet, str(output_path), vcodec="libwebp_anim", quality=quality, loop=0, r=8, t=animation_seconds)
+            else:
+                command = _ffmpeg.output(sheet, str(output_path), vframes=1, compression_level=ffmpeg_compression)
+            return_code, stderr = await _run_xxx_contact_sheet_ffmpeg(command, loglevel)
+            if return_code != 0 or not output_path.is_file():
+                raise RuntimeError(stderr.decode(errors="replace").strip() or "FFmpeg could not stack the contact sheet")
+            if output_path.stat().st_size <= XXX_CONTACT_SHEET_MAX_BYTES:
+                return True
+        return False
+
+
+async def _render_xxx_contact_sheet(
+    video_path: Path,
+    output_stem: Path,
+    work_root: Path,
+    rows: int,
+    columns: int,
+    animated: bool,
+    animation_seconds: float,
+    fontfile: str | None,
+    title: str,
+    include_title: bool,
+    loglevel: str,
+    phase: float = 0.5,
+) -> Path:
+    """Render one video's sheet next to ``output_stem`` and return its path.
+
+    An animated sheet that stays too large at the lowest WebP quality is
+    replaced by a static PNG, so image hosts and trackers do not reject it.
+    """
+    probe = await asyncio.to_thread(_ffmpeg.probe, str(video_path))
+    duration = float(probe["format"]["duration"])
+    if duration <= 0:
+        raise ValueError("duration must be positive")
+
+    animated_path = output_stem.with_name(f"{output_stem.name}.webp")
+    static_path = output_stem.with_name(f"{output_stem.name}.png")
+    try:
+        if animated:
+            if await _render_xxx_contact_sheet_grid(
+                video_path, animated_path, work_root, duration, rows, columns, animation_seconds, fontfile, title, include_title, loglevel, phase
+            ):
+                return animated_path
+            size = animated_path.stat().st_size
+            animated_path.unlink(missing_ok=True)
+            logger.warning(
+                f"[yellow]The animated contact sheet for {video_path.name} is {size / 1_000_000:.1f} MB even at the lowest quality, "
+                f"over the {XXX_CONTACT_SHEET_MAX_BYTES // 1_000_000} MB that image hosts accept; using a static sheet instead. "
+                "Lower 'xxx_contact_sheet_rows', 'xxx_contact_sheet_columns' or 'xxx_contact_sheet_animation_seconds' to keep it animated.[/yellow]"
+            )
+
+        if not await _render_xxx_contact_sheet_grid(video_path, static_path, work_root, duration, rows, columns, None, fontfile, title, include_title, loglevel, phase):
+            logger.warning(
+                f"[yellow]The contact sheet for {video_path.name} is {static_path.stat().st_size / 1_000_000:.1f} MB, "
+                f"over the {XXX_CONTACT_SHEET_MAX_BYTES // 1_000_000} MB that some image hosts and trackers accept.[/yellow]"
+            )
+        return static_path
+    except BaseException:
+        # Leave no half-written sheet behind for a later run to pick up.
+        animated_path.unlink(missing_ok=True)
+        static_path.unlink(missing_ok=True)
+        raise
+
+
+def _select_xxx_contact_sheet_videos(video_paths: list[Path], max_videos: int) -> list[Path]:
+    """Pick up to ``max_videos`` videos, spread across the pack's folders.
+
+    Videos are taken in turns from each folder, so every part of a pack is
+    represented instead of only the first folder; a flat release keeps its
+    first videos. The order is the order of picking, so a smaller limit always
+    selects a prefix of a larger one. Cached sheets are reused by position, so
+    this keeps each cached sheet matched to the same video.
+    """
+    folders: dict[Path, list[Path]] = {}
+    for path in dict.fromkeys(video_paths):
+        folders.setdefault(path.parent, []).append(path)
+
+    picked: list[Path] = []
+    for round_index in range(max((len(queue) for queue in folders.values()), default=0)):
+        picked.extend(queue[round_index] for queue in folders.values() if round_index < len(queue))
+    return picked[:max_videos]
+
+
+def _xxx_contact_sheet_titles(video_paths: list[Path], release_path: str | None) -> dict[Path, str]:
+    """Label each sheet by file name, or by its path in the pack when the videos span folders."""
+    root = Path(release_path) if release_path else None
+    if root is None or len({path.parent for path in video_paths}) <= 1:
+        return {path: path.name for path in video_paths}
+    with contextlib.suppress(OSError):
+        root = root.resolve()
+    titles: dict[Path, str] = {}
+    for path in video_paths:
+        try:
+            titles[path] = path.relative_to(root).as_posix()
+        except ValueError:
+            titles[path] = path.name
+    return titles
+
+
+def _xxx_contact_sheet_details(video_path: Path, settings: dict[str, Any], *, title: str, include_title: bool) -> dict[str, Any]:
+    """Manifest fields that mark a file as one video's contact sheet."""
+    return {"kind": XXX_CONTACT_SHEET_KIND, "source": str(video_path), "settings": settings, "title": title, "include_title": include_title}
+
+
+def is_xxx_contact_sheet(base_dir: str | Path, folder_id: str, path: Path) -> bool:
+    """Return whether a local screenshot is an XXX contact sheet."""
+    entry = manifest_entry_for(base_dir, folder_id, path)
+    return entry is not None and entry.get("kind") == XXX_CONTACT_SHEET_KIND
+
+
+def _reusable_xxx_contact_sheets(base_dir: str, folder_id: str, capture_group: str, video_paths: list[Path], settings: dict[str, Any]) -> dict[str, Path]:
+    """Return the cached sheet of each selected video, discarding sheets that no longer match.
+
+    A sheet is reused only for the same video and the same sheet settings, so
+    changing the grid or the animation regenerates it. Screenshots captured
+    before sheets were marked are cleared once, so their unmarked sheets are
+    not mistaken for, or mixed with, single frames.
+    """
+    if not manifest_has_flag(base_dir, folder_id, _XXX_SHEETS_MARKED_FLAG):
+        clear_screenshot_group(base_dir, folder_id, capture_group)
+        manifest_set_flag(base_dir, folder_id, _XXX_SHEETS_MARKED_FLAG)
+        return {}
+    group_entries = manifest_entries(base_dir, folder_id, capture_group)
+
+    wanted = {str(video_path) for video_path in video_paths}
+    reusable: dict[str, Path] = {}
+    for path, entry in group_entries:
+        if entry.get("kind") != XXX_CONTACT_SHEET_KIND:
+            continue
+        source = entry.get("source")
+        if isinstance(source, str) and source in wanted and source not in reusable and entry.get("settings") == settings:
+            reusable[source] = path
+        else:
+            discard_screenshot_file(base_dir, folder_id, path)
+    return reusable
+
+
+async def regenerate_xxx_contact_sheet(base_dir: str, folder_id: str, path: Path, meta: Meta) -> Path | None:
+    """Render a contact sheet again at new random times within each tile's share.
+
+    Uses the video and settings the sheet was made with. Returns the sheet's
+    path, which changes only when an oversized animation falls back to PNG,
+    or None when ``path`` is not a contact sheet.
+    """
+    entry = manifest_entry_for(base_dir, folder_id, path)
+    if entry is None or entry.get("kind") != XXX_CONTACT_SHEET_KIND:
+        return None
+    source = entry.get("source")
+    raw_settings = entry.get("settings")
+    if not isinstance(source, str) or not Path(source).is_file() or not isinstance(raw_settings, dict):
+        raise FileNotFoundError("The video behind this contact sheet is no longer available")
+    settings = cast(dict[str, Any], raw_settings)
+    animated = settings.get("animated") is True
+    title = entry.get("title")
+    fontfile = _xxx_contact_sheet_fontfile()
+    work_root = release_temp_dir(base_dir, folder_id)
+    staged_stem = path.with_name(f".{path.stem}.regenerate-{secrets.token_hex(4)}")
+    output_path = await _render_xxx_contact_sheet(
+        Path(source),
+        staged_stem,
+        work_root,
+        int(settings.get("rows") or 1),
+        int(settings.get("columns") or 1),
+        animated,
+        float(settings.get("animation_seconds") or 5.0),
+        fontfile,
+        title if isinstance(title, str) else Path(source).name,
+        entry.get("include_title") is True,
+        "verbose" if meta.ffdebug else "quiet",
+        phase=secrets.SystemRandom().uniform(0.1, 0.9),
+    )
+    try:
+        return replace_screenshot_file(base_dir, folder_id, path, output_path)
+    except BaseException:
+        output_path.unlink(missing_ok=True)
+        raise
 
 
 async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main", extra_screens: int = 0) -> list[str]:
@@ -189,77 +429,69 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     """
     rows, columns, max_videos = xxx_contact_sheet_settings()
     animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
-    video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
+    settings = _xxx_contact_sheet_signature(rows, columns, animated_webp, animation_seconds)
+    video_paths = _select_xxx_contact_sheet_videos([Path(path) for path in paths if Path(path).is_file()], max_videos)
     if not video_paths:
         meta.screens = 0
         return []
 
-    existing = manifest_files(base_dir, folder_id, capture_group)
-    if meta.retake or (existing and len(existing) < len(video_paths)):
+    if meta.retake:
         clear_screenshot_group(base_dir, folder_id, capture_group)
-        existing = []
-    sheets = [str(path) for path in existing[: len(video_paths)]] if not meta.retake and len(existing) >= len(video_paths) else []
+    cached = _reusable_xxx_contact_sheets(base_dir, folder_id, capture_group, video_paths, settings)
+    missing = [video_path for video_path in video_paths if str(video_path) not in cached]
 
-    if not sheets:
+    if missing:
         screenshot_dir = screenshots_dir(base_dir, folder_id)
         results: list[str] = []
-        frame_count = rows * columns
+        details: dict[str, dict[str, Any]] = {}
         fontfile = _xxx_contact_sheet_fontfile()
         if fontfile is None:
             logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
-        for index, video_path in enumerate(video_paths, start=1):
-            output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
-            if output_path.exists() and not meta.retake:
-                results.append(str(output_path))
-                continue
-
+        titles = _xxx_contact_sheet_titles(video_paths, meta.path if meta.isdir else None)
+        for video_path in missing:
+            index = video_paths.index(video_path) + 1
             try:
-                probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
-                duration = float(probe["format"]["duration"])
-                if duration <= 0:
-                    raise ValueError("duration must be positive")
-                loglevel = "verbose" if meta.ffdebug else "quiet"
-                include_title = len(video_paths) > 1
-                if animated_webp:
-                    return_code, stderr = await _render_xxx_animated_contact_sheet(
-                        video_path,
-                        output_path,
-                        release_temp_dir(base_dir, folder_id),
-                        frame_count,
-                        duration,
-                        columns,
-                        rows,
-                        animation_seconds,
-                        fontfile,
-                        include_title,
-                        loglevel,
-                    )
-                else:
-                    stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                    stream = _xxx_contact_sheet_title_filter(stream, video_path.name, include_title, fontfile)
-                    command = ffmpeg.output(stream, str(output_path), vframes=1, compression_level=ffmpeg_compression).global_args("-y", "-loglevel", loglevel)
-                    return_code, _stdout, stderr = await run_ffmpeg(command)
-                if return_code != 0 or not output_path.is_file():
-                    logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
-                    continue
-                results.append(str(output_path))
+                output_path = await _render_xxx_contact_sheet(
+                    video_path,
+                    screenshot_dir / f"xxx-contact-sheet-{index}",
+                    release_temp_dir(base_dir, folder_id),
+                    rows,
+                    columns,
+                    animated_webp,
+                    animation_seconds,
+                    fontfile,
+                    titles[video_path],
+                    len(video_paths) > 1,
+                    "verbose" if meta.ffdebug else "quiet",
+                )
             except Exception as error:
                 logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
+                continue
+            results.append(str(output_path))
+            details[str(output_path)] = _xxx_contact_sheet_details(video_path, settings, title=titles[video_path], include_title=len(video_paths) > 1)
 
-        registered = register_screenshots(base_dir, folder_id, results, capture_group) if results else []
+        registered = register_screenshots(base_dir, folder_id, results, capture_group, details=details) if results else []
         await record_event_async("artifact", service="screenshot", operation="created", category="standard", count=len(registered))
-        sheets = [str(path) for path in registered]
+        cached = _reusable_xxx_contact_sheets(base_dir, folder_id, capture_group, video_paths, settings)
+    sheets = [str(cached[str(video_path)]) for video_path in video_paths if str(video_path) in cached]
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
         # A fixed target keeps reruns from adding one more frame every time.
         # Replacements are forced so the hosted-image cutoff cannot skip them.
         force_capture = extra_screens > 0
         screens_to_request = extra_screens if force_capture else len(sheets) + normal_screens
-        await screenshots(
-            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
-        )
+        # The group was already cleared above on a retake; clearing it again
+        # inside screenshots() would delete the sheets just made.
+        retake = meta.retake
+        meta.retake = False
+        try:
+            await screenshots(
+                str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, force_capture, cleanup_after_capture=False, capture_group=capture_group
+            )
+        finally:
+            meta.retake = retake
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
-    return sheets
+    return [sheet for sheet in sheets if Path(sheet).is_file()]
 
 
 async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
@@ -276,13 +508,14 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
         if candidate_path.suffix and candidate_path.suffix.casefold() not in VIDEO_EXTENSIONS:
             continue
         try:
-            probe = await asyncio.to_thread(ffmpeg.probe, str(candidate_path))
+            probe: dict[str, Any] = await asyncio.to_thread(_ffmpeg.probe, str(candidate_path))
             candidate_duration = float(probe["format"]["duration"])
-            streams = probe.get("streams", [])
-            has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
+            raw_streams = probe.get("streams", [])
+            streams = cast(list[dict[str, Any]], raw_streams) if isinstance(raw_streams, list) else []
+            has_video_stream = any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
             if candidate_duration <= 0 or not has_video_stream:
                 continue
-        except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
+        except OSError, KeyError, TypeError, ValueError, _ffmpeg.Error:
             continue
         video_path = candidate_path
         duration = candidate_duration
@@ -297,9 +530,16 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
         # Avoid the opening frame, which is frequently black or only a logo.
         lower = min(max(duration * 0.10, 1.0), max(duration - 0.1, 0.0))
         upper = max(lower, min(duration * 0.85, max(duration - 0.1, 0.0)))
-        timestamp = secrets.SystemRandom().uniform(lower, upper) if random_frame and upper > lower else lower
-        stream = ffmpeg.input(str(video_path), ss=str(timestamp))
-        command = ffmpeg.output(
+        saved = None if random_frame else saved_cover_frame(meta)
+        if random_frame and upper > lower:
+            timestamp = secrets.SystemRandom().uniform(lower, upper)
+        elif saved is not None and saved < duration:
+            # The frame a person picked for this release in an earlier run.
+            timestamp = saved
+        else:
+            timestamp = lower
+        stream = _ffmpeg.input(str(video_path), ss=str(timestamp))
+        command = _ffmpeg.output(
             stream,
             str(output_path),
             vframes=1,
@@ -315,13 +555,15 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
 
     meta.artwork_path = str(output_path)
     meta.artwork_url = ""
-    logger.warning(
-        "[yellow]No XXX cover was found after checking, in order: explicit --poster, "
-        "a local artwork sidecar, and provider artwork. For the local search, place a valid "
-        "GIF/JPG/JPEG/PNG/WEBP image beside the media (or inside the release folder) with a "
-        "filename containing one of: poster, cover, front, folder, artwork. "
-        f"Generated a fallback cover from a video frame: {output_path.name}.[/yellow]"
-    )
+    if random_frame:
+        # Picked by a person in the Web UI: rebuild this frame in later runs.
+        meta.manual_answers[COVER_FRAME_ANSWER] = round(timestamp, 3)
+        try:
+            save_cover_frame(base_dir, folder_id, timestamp)
+        except OSError as error:
+            logger.warning(f"[yellow]The new XXX cover will not be remembered for later runs: {error}[/yellow]")
+    # Debug only: a frame cover is the normal outcome for releases without artwork.
+    logger.debug(f"No XXX cover from --poster, a local artwork sidecar or the provider; generated {output_path.name} from a video frame.")
     return str(output_path)
 
 
@@ -341,10 +583,12 @@ def get_ffmpeg_output_path(command: Any, cmd_list: list[str]) -> str:
             continue
         visited.add(id(node))
 
-        kwargs = getattr(node, "kwargs", {})
-        filename = kwargs.get("filename") if isinstance(kwargs, dict) else None
-        if filename is not None:
-            return str(filename)
+        node_kwargs = getattr(node, "kwargs", None)
+        if isinstance(node_kwargs, Mapping):
+            str_kwargs = cast(Mapping[str, Any], node_kwargs)
+            filename = str_kwargs.get("filename")
+            if filename is not None:
+                return str(filename)
 
         incoming_edges = getattr(node, "incoming_edges", ())
         nodes.extend(edge.upstream_node for edge in incoming_edges if getattr(edge, "upstream_node", None) is not None)
@@ -416,8 +660,11 @@ def dvd_screenshot_has_content(path: str | Path) -> bool:
         if Path(path).stat().st_size < 20 * 1024:
             return False
         with Image.open(path) as image:
-            low, high = image.convert("L").getextrema()
-            return high >= 10 and high - low >= 10
+            extrema = image.convert("L").getextrema()
+            if isinstance(extrema, tuple) and len(extrema) == 2 and isinstance(extrema[0], (int, float)) and isinstance(extrema[1], (int, float)):
+                low, high = float(extrema[0]), float(extrema[1])
+                return bool(high >= 10.0 and (high - low) >= 10.0)
+            return False
     except OSError, ValueError:
         return False
 
@@ -597,7 +844,7 @@ async def disc_screenshots(
             for root, _dirs, files in os.walk(bdinfo_path):
                 for name in files:
                     if name.lower() == str(each.get("file", "")).lower():
-                        file_path = Path(root) / name
+                        file_path = str(Path(root) / name)
                         break  # Stop searching once the file is found
 
     if bdinfo.get("video"):
@@ -762,6 +1009,7 @@ async def disc_screenshots(
                     "zipline",
                     "midnightscene",
                     "bioma",
+                    "luminapix",
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
@@ -810,6 +1058,7 @@ async def disc_screenshots(
                                 "zipline",
                                 "midnightscene",
                                 "bioma",
+                                "luminapix",
                                 "passtheimage",
                                 "seedpool_cdn",
                                 "sharex",
@@ -917,9 +1166,9 @@ async def matching_dvd_title(disc_path: Path, expected_duration: float) -> int |
 
     for title in range(1, 100):
         try:
-            info = await asyncio.to_thread(ffmpeg.probe, str(disc_path), cmd=probe_binary, f="dvdvideo", title=title)
+            info = await asyncio.to_thread(_ffmpeg.probe, str(disc_path), cmd=probe_binary, f="dvdvideo", title=title)
             duration = float(info["format"]["duration"])
-        except ffmpeg.Error, FileNotFoundError, KeyError, TypeError, ValueError, OSError:
+        except _ffmpeg.Error, FileNotFoundError, KeyError, TypeError, ValueError, OSError:
             continue
         if abs(duration - expected_duration) <= max(30.0, expected_duration * 0.02):
             return title
@@ -953,7 +1202,7 @@ async def dvd_screenshots(
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
     existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, capture_group)]
-    normal_screens = []
+    normal_screens: list[str] = []
     for image in existing_screens:
         if dvd_screenshot_has_content(image):
             normal_screens.append(image)
@@ -1010,7 +1259,7 @@ async def dvd_screenshots(
     voblength = 0.0
     for title_vob in title_vobs:
         try:
-            vob_mi = json.loads(MediaInfo.parse(title_vob, output="JSON"))
+            vob_mi = json.loads(str(MediaInfo.parse(title_vob, output="JSON")))
             video_durations = [
                 float(track.get("Duration", 0))
                 for track in vob_mi.get("media", {}).get("track", [])
@@ -1214,7 +1463,9 @@ async def capture_dvd_screenshot(
 async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, confirmed_only: bool = False) -> bool:
     import mutagen
 
-    def _extract():
+    _mutagen: Any = mutagen
+
+    def _extract() -> bool:
         filelist = meta.filelist
         if not filelist:
             p = meta.path
@@ -1233,52 +1484,58 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
                 continue
 
             try:
-                audio = mutagen.File(audio_path)
+                audio: Any = _mutagen.File(audio_path)
                 if audio is None:
                     continue
 
                 # 1. FLAC / OGG pictures
-                if hasattr(audio, "pictures") and audio.pictures:
-                    pic = None
+                pictures: Any = getattr(audio, "pictures", None)
+                if pictures:
+                    pic: Any = None
                     if confirmed_only:
-                        for p in audio.pictures:
+                        for p in cast(list[Any], pictures):
                             if getattr(p, "type", None) == 3:
                                 pic = p
                                 break
                     else:
-                        pic = audio.pictures[0]
+                        pic = pictures[0]
 
                     if pic is not None:
+                        pic_data = cast(bytes, getattr(pic, "data", b""))
                         with Path(dest_path).open("wb") as f:
-                            f.write(pic.data)
+                            f.write(pic_data)
                         return True
 
                 # 2. MP3 ID3 APIC
-                if audio.tags:
-                    apic_to_use = None
-                    for key in audio.tags:
+                audio_tags = getattr(audio, "tags", None)
+                if audio_tags:
+                    apic_to_use: Any = None
+                    tag_keys = cast(list[str], list(audio_tags.keys()))
+                    for key in tag_keys:
                         if key.startswith("APIC"):
-                            apic = audio.tags[key]
+                            apic = audio_tags[key]
                             if getattr(apic, "type", None) == 3:
                                 apic_to_use = apic
                                 break
 
                     if not apic_to_use and not confirmed_only:
-                        for key in audio.tags:
+                        for key in tag_keys:
                             if key.startswith("APIC"):
-                                apic_to_use = audio.tags[key]
+                                apic_to_use = audio_tags[key]
                                 break
 
                     if apic_to_use is not None:
+                        apic_data = cast(bytes, getattr(apic_to_use, "data", b""))
                         with Path(dest_path).open("wb") as f:
-                            f.write(apic_to_use.data)
+                            f.write(apic_data)
                         return True
 
                 # 3. MP4 / M4A / M4B
-                if "covr" in audio:
+                if hasattr(audio, "__contains__") and "covr" in audio:
                     covr = audio["covr"]
                     if isinstance(covr, list) and len(covr) > 0:
-                        item = covr[0]
+                        covr_list = cast(list[Any], covr)
+                        item: Any = covr_list[0]
                         with Path(dest_path).open("wb") as f:
                             f.write(bytes(item))
                         return True
@@ -1376,7 +1633,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
             opf_data = z.read(rootfile_path)
             root = ET.fromstring(opf_data)
 
-            manifest_items = {}
+            manifest_items: dict[str, dict[str, str]] = {}
             cover_item_id = None
             cover_href_direct = None
             opf_dir = str(Path(rootfile_path).parent)
@@ -1399,8 +1656,8 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
                         cover_item_id = content_attr
 
             def resolve_path(base_dir: str, rel_path: str) -> str:
-                combined = Path(base_dir) / rel_path.replace("\\", "/") if base_dir else rel_path.replace("\\", "/")
-                parts = []
+                combined = str(Path(base_dir) / rel_path.replace("\\", "/")) if base_dir else rel_path.replace("\\", "/")
+                parts: list[str] = []
                 for part in combined.split("/"):
                     if part == "." or not part:
                         continue
@@ -1527,11 +1784,12 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
         import pymupdf
 
         def _render_pdf_cover() -> Path | None:
-            with pymupdf.open(path) as doc:
+            _pymupdf: Any = pymupdf
+            with _pymupdf.open(path) as doc:
                 if len(doc) == 0:
                     return None
-                page = doc[0]
-                pix = page.get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0))
+                page: Any = doc[0]
+                pix: Any = page.get_pixmap(matrix=_pymupdf.Matrix(2.0, 2.0))
                 pix.save(output_path)
                 return output_path
 
@@ -1546,7 +1804,7 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
 
     from PIL import Image
 
-    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
+    unrar_path = str(_get_data_config().get("DEFAULT", {}).get("unrar_path", "") or "").strip()
     if unrar_path:
         import rarfile as _rarfile
 
@@ -1563,7 +1821,7 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
 
     def _extract_comic_cover() -> Path | None:
         temp_extract.mkdir(parents=True, exist_ok=True)
-        compressed_file = None
+        compressed_file: Any = None
         try:
             if extension == "cbz":
                 try:
@@ -1579,16 +1837,17 @@ async def extract_document_cover(path: str, dest_path: str) -> Path | None:
             if not compressed_file:
                 return None
 
-            image_files = [f for f in compressed_file.namelist() if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"))]
+            raw_namelist = cast(list[str], compressed_file.namelist())
+            image_files: list[str] = [f for f in raw_namelist if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"))]
             if not image_files:
                 return None
 
             image_files.sort(key=natural_sort_key)
-            cover_name = image_files[0]
+            cover_name: str = image_files[0]
             compressed_file.extract(cover_name, temp_extract)
             extracted_path = temp_extract / cover_name
 
-            suffix = extracted_path.suffix.lower()
+            suffix = str(extracted_path.suffix).lower()
             cover_path = output_path.with_suffix(suffix) if suffix in {".jpg", ".jpeg", ".png"} else output_path
             if suffix in {".jpg", ".jpeg", ".png"}:
                 shutil.copy2(extracted_path, cover_path)
@@ -1722,7 +1981,7 @@ COMIC_IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp")
 
 def _open_comic_archive(path: str) -> tuple[Any, list[str]] | None:
     """Open a CBZ/CBR (zip or rar, whatever the extension says) and list its pages in reading order."""
-    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
+    unrar_path = str(_get_data_config().get("DEFAULT", {}).get("unrar_path", "") or "").strip()
     if unrar_path:
         import rarfile as _rarfile
 
@@ -1742,7 +2001,8 @@ def _open_comic_archive(path: str) -> tuple[Any, list[str]] | None:
     def natural_sort_key(s: str) -> list[int | str]:
         return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
 
-    image_files = sorted((f for f in archive.namelist() if f.lower().endswith(COMIC_IMAGE_SUFFIXES)), key=natural_sort_key)
+    archive_namelist = cast(list[str], archive.namelist())
+    image_files: list[str] = sorted((f for f in archive_namelist if f.lower().endswith(COMIC_IMAGE_SUFFIXES)), key=natural_sort_key)
     return archive, image_files
 
 
@@ -1774,33 +2034,39 @@ def _lone_image_clip(page: Any) -> tuple[Any, float] | None:
     """
     import pymupdf
 
+    _pymupdf: Any = pymupdf
     if page.get_text().strip() or page.first_annot:
         return None
-    images = page.get_image_info()
+    images = cast(list[dict[str, Any]], page.get_image_info())
     if len(images) != 1:
         return None
     # Image and drawing boxes are unrotated page coordinates; get_pixmap clips in rotated ones.
-    bbox = pymupdf.Rect(images[0]["bbox"])
+    bbox: Any = _pymupdf.Rect(images[0]["bbox"])
     if any(not bbox.contains(drawing["rect"]) for drawing in page.get_drawings()):
         return None
     clip = bbox * page.rotation_matrix & page.rect
     if clip.is_empty or clip.get_area() >= page.rect.get_area() / 2:
         return None
-    return clip, min(images[0]["width"] / bbox.width, images[0]["height"] / bbox.height)
+    bbox_width = float(getattr(bbox, "width", 0))
+    bbox_height = float(getattr(bbox, "height", 0))
+    if bbox_width <= 0 or bbox_height <= 0:
+        return None
+    return clip, min(float(images[0]["width"]) / bbox_width, float(images[0]["height"]) / bbox_height)
 
 
 def _render_document_page(doc: Any, page_num: int, dest_stem: Path, suffix: str = ".png") -> Path:
     import pymupdf
 
+    _pymupdf: Any = pymupdf
     dest_path = dest_stem.with_name(f"{dest_stem.name}{suffix}")
-    page = doc[page_num]
+    page: Any = doc[page_num]
     zoom, clip = 2.0, None
     lone_image = _lone_image_clip(page)
     if lone_image:
         clip, native_zoom = lone_image
         # Fill the normal page render size without upscaling past the image's own resolution.
         zoom = max(zoom, min(zoom * page.rect.width / clip.width, zoom * page.rect.height / clip.height, native_zoom))
-    pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip)
+    pix: Any = page.get_pixmap(matrix=_pymupdf.Matrix(zoom, zoom), clip=clip)
     if suffix == ".png":
         pix.save(dest_path)
     else:
@@ -1823,9 +2089,12 @@ def capture_ebook_page(path: str, dest_stem: Path, exclude_pages: set[int], forc
             page = select_ebook_pages(len(image_files), 1, [], exclude_pages)[0]
             return _write_comic_page(archive, image_files[page], dest_stem, force_suffix), page
 
-    with contextlib.suppress(Exception):
-        pymupdf.TOOLS.mupdf_display_errors(False)
-    with pymupdf.open(path) as doc:
+    tools: Any = getattr(pymupdf, "TOOLS", None)
+    if tools is not None:
+        with contextlib.suppress(Exception):
+            tools.mupdf_display_errors(False)
+    _pymupdf: Any = pymupdf
+    with _pymupdf.open(path) as doc:
         if len(doc) == 0:
             raise ValueError("The book does not have pages")
         page = select_ebook_pages(len(doc), 1, [], exclude_pages)[0]
@@ -1848,8 +2117,10 @@ async def generate_ebook_screenshots(
     """
     import pymupdf
 
-    with contextlib.suppress(Exception):
-        pymupdf.TOOLS.mupdf_display_errors(False)
+    tools: Any = getattr(pymupdf, "TOOLS", None)
+    if tools is not None:
+        with contextlib.suppress(Exception):
+            tools.mupdf_display_errors(False)
 
     output_dir = screenshots_dir(base_dir, folder_id).resolve()
     sanitized_filename = await sanitize_filename(filename)
@@ -2039,6 +2310,10 @@ async def screenshots(
     try:
         mi_text = await asyncio.to_thread(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
         mi = json.loads(mi_text)
+        mi_tracks = mi.get("media", {}).get("track", []) if isinstance(mi.get("media"), dict) else []
+        if len(mi_tracks) < 2:
+            logger.error("[red]MediaInfo found no video stream, so screenshots were skipped. The file may be incomplete or unreadable.[/red]")
+            return None
         video_track = mi["media"]["track"][1]
 
         def safe_float(value: Any, default: float = 0.0, field_name: str = "") -> float:
@@ -2314,6 +2589,7 @@ async def screenshots(
                     "zipline",
                     "midnightscene",
                     "bioma",
+                    "luminapix",
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
@@ -2384,6 +2660,7 @@ async def screenshots(
                                     "zipline",
                                     "midnightscene",
                                     "bioma",
+                                    "luminapix",
                                     "passtheimage",
                                     "seedpool_cdn",
                                     "sharex",
@@ -2438,7 +2715,21 @@ async def screenshots(
                     elif (
                         img_host
                         and img_host
-                        in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "thrimg", "utppm"]
+                        in [
+                            "lensdump",
+                            "ptscreens",
+                            "onlyimage",
+                            "dalexni",
+                            "zipline",
+                            "midnightscene",
+                            "bioma",
+                            "luminapix",
+                            "passtheimage",
+                            "seedpool_cdn",
+                            "sharex",
+                            "thrimg",
+                            "utppm",
+                        ]
                         and new_size > 75000
                     ):
                         valid_image = True
@@ -2597,7 +2888,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             def build_cmd(use_libplacebo: bool = True) -> Any:
                 inp = cast(Any, ffmpeg).input(path, ss=str(ss_time))
                 # Build output and global args
-                out_kwargs = {"vframes": 1, "vf": vf_chain, "compression_level": ffmpeg_compression, "pred": "mixed"}
+                out_kwargs: dict[str, Any] = {"vframes": 1, "vf": vf_chain, "compression_level": ffmpeg_compression, "pred": "mixed"}
                 info_cmd = inp.output(image_path, **out_kwargs)
 
                 global_args = ["-y", "-loglevel", loglevel, "-hide_banner", "-map", "0:v:0", "-an", "-sn"]

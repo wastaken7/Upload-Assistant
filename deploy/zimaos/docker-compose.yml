@@ -1,0 +1,69 @@
+# Upload Assistant for the ZimaOS / CasaOS App Store.
+# Submit this folder as Apps/UploadAssistant/ in IceWhaleTech/CasaOS-AppStore,
+# with docs/assets/logo.svg copied there as icon.svg.
+# Update `image` and `x-casaos.version` on each release.
+name: upload-assistant
+services:
+  upload-assistant:
+    image: ghcr.io/wastaken7/upload-assistant:v4.9
+    container_name: upload-assistant
+    command: ["--webui", "0.0.0.0:5000"]
+    restart: unless-stopped
+    network_mode: bridge
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: $TZ
+      UA_BROWSE_ROOTS: /data/torrents,/state/tmp
+      XDG_CONFIG_HOME: /state/config
+    ports:
+      - target: 5000
+        published: "5000"
+        protocol: tcp
+    volumes:
+      - type: bind
+        # A fixed folder: if AppID were empty, /DATA/AppData itself would be
+        # mounted and the entrypoint would change the owner of every app's files.
+        source: /DATA/AppData/upload-assistant
+        target: /state
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /DATA/Downloads
+        target: /data/torrents
+    stop_grace_period: 15s
+x-casaos:
+  id: io.github.wastaken7.upload-assistant
+  main: upload-assistant
+  index: /
+  port_map: "5000"
+  scheme: http
+  version: "4.9"
+  architectures:
+    - amd64
+    - arm64
+  category: Media
+  author: wastaken7
+  developer: wastaken7
+  icon: https://cdn.jsdelivr.net/gh/wastaken7/Upload-Assistant@development/docs/assets/logo.svg
+  title:
+    en_US: Upload Assistant
+  tagline:
+    en_US: Prepare and upload releases to private trackers
+  description:
+    en_US: |
+      Upload Assistant prepares and uploads releases to private trackers.
+      It reads MediaInfo or BDInfo, takes screenshots, builds descriptions,
+      creates the torrent and sends it to your torrent client.
+  tips:
+    before_install:
+      en_US: |
+        On the first start, open the app log and copy the one-time setup code,
+        then open the WebUI and create your account.
+        /DATA/Downloads is mapped to /data/torrents. If your torrent client sees
+        your downloads under another path, set local_path and remote_path for
+        that client in the configuration.
+  website: https://github.com/wastaken7/Upload-Assistant
+  repo: https://github.com/wastaken7/Upload-Assistant
+  support: https://github.com/wastaken7/Upload-Assistant/issues
+  docs: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/docker-gui.md

@@ -91,7 +91,7 @@ class PrivateHD(AZTrackerBase):
 
         current_year = datetime.now(UTC).year
         try:
-            year = int(meta.year)
+            year = int(meta.year) if meta.year is not None else 0
         except TypeError, ValueError:
             year = 0
         if year:

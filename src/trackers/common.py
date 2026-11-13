@@ -8,10 +8,10 @@ import re
 import secrets
 import sys
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import bencodepy
@@ -32,12 +32,16 @@ from src.distributors import distributor_name
 from src.exportmi import export_info
 from src.genre_map import AUDIBLE_ENG_GENRE_MAP, AUDIBLE_PTBR_GENRE_MAP, ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
-from src.manual_input import Question, ask, confirm_override
+from src.manual_input import Question, ask
 from src.meta import Meta
 from src.torrent_manifest import TorrentManifest
 from src.unit3d_catalogs import region_id as resolve_region_id
 from src.unit3d_catalogs import region_name as resolve_region_name
 from src.usenetcreate import verify_nzb_has_password
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class Common:
@@ -107,11 +111,12 @@ class Common:
                 alias_lookup[value] = set(normalized_group)
         return alias_lookup
 
-    def _coerce_language_values(self, values: Any) -> list[str]:
+    def _coerce_language_values(self, values: object) -> list[str]:
         if isinstance(values, str):
             return [values]
         if isinstance(values, list):
-            return [value for value in values if isinstance(value, str)]
+            items: list[object] = list(values)
+            return [value for value in items if isinstance(value, str)]
         return []
 
     def _expand_language_candidates(self, language: str, alias_lookup: dict[str, set[str]]) -> set[str]:
@@ -211,17 +216,13 @@ class Common:
         if await self.has_portuguese_external_subtitle(meta):
             return True
 
-        subtitles = await self.check_language_requirements(
+        return await self.check_language_requirements(
             meta,
             tracker,
             languages_to_check=["portuguese", "português", "por", "pt", "pt-br", "pt br", "brazilian portuguese"],
             check_audio=True,
             check_subtitle=True,
-            prompt_on_failure=False,
         )
-        if not subtitles and (not meta.unattended or meta.unattended_confirm):
-            return await self.prompt_user_for_confirmation(f"{tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?")
-        return subtitles
 
     def _format_language_for_display(self, language: str) -> str:
         if not language:
@@ -248,15 +249,13 @@ class Common:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda p, e: Path(p).mkdir(parents=True, exist_ok=e), path, exist_ok)
 
-    async def get_torrent_filename(self, meta: Meta, tracker_config: Any) -> str:
+    async def get_torrent_filename(self, meta: Meta, tracker_config: Mapping[str, Any] | None) -> str:
         """
         Decide which torrent filename/prefix to use (BASE or BASE_SUBS) depending on
         the allow_ext_subtitles setting and presence of the subtitles torrent.
         """
         torrent_filename = "BASE"
-        allow_ext_subtitles = False
-        if isinstance(tracker_config, dict):
-            allow_ext_subtitles = tracker_config.get("allow_ext_subtitles", False)
+        allow_ext_subtitles = bool(tracker_config.get("allow_ext_subtitles", False)) if tracker_config else False
         if allow_ext_subtitles:
             subs_path = TorrentManifest(meta.base_dir, meta.uuid).default_path("base_subs")
             if subs_path is not None:
@@ -466,7 +465,7 @@ class Common:
             info = encode(info_value)
             return hashlib.sha1(info, usedforsecurity=False).hexdigest()  # SHA1 required for torrent info hash
 
-    async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> str | None:
+    async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> Path | None:
         if image_list is None:
             logger.info("[yellow]No image links to save.[/yellow]")
             return None
@@ -607,10 +606,6 @@ class Common:
                 sys.exit(1)
         else:
             return True
-
-    async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
-        with webui_events.field_prompt("Confirmation", {"Release": (meta.name or meta.title) if meta else ""}, hint=message):
-            return await confirm_override(meta, message, default=True)
 
     async def _ask_douban_link(self, meta: Meta, summary: dict[str, Any], reason: str) -> str:
         link = await ask(
@@ -1184,7 +1179,6 @@ class Common:
         require_both: bool = False,
         original_language: bool = False,
         original_required: bool = False,
-        prompt_on_failure: bool = True,
     ) -> bool:
         """
         Check if the media metadata meets specific language requirements for audio and/or subtitles.
@@ -1211,9 +1205,8 @@ class Common:
         :type original_language: bool
         :param original_required: If True, the original language must be present in the audio tracks.
         :type original_required: bool
-        :param prompt_on_failure: If True, ask whether to continue when the requirement is not met.
-        :type prompt_on_failure: bool
         :return: True if the media meets the specified language requirements, False otherwise.
+            Whether to upload anyway is asked by the tracker checks, not here.
         :rtype: bool
         """
         category = meta.category
@@ -1232,11 +1225,6 @@ class Common:
                         f"[yellow]Required one of:[/yellow] {', '.join(languages_to_check)}\n"
                         f"[cyan]Found book language:[/cyan] {book_language}"
                     )
-                    if prompt_on_failure:
-                        return await self.prompt_user_for_confirmation(
-                            f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
-                            meta,
-                        )
                 return meets_requirement
             return True
 
@@ -1279,11 +1267,6 @@ class Common:
                     f"[yellow]Required original audio language:[/yellow] {language_display}\n"
                     f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
                 )
-                if prompt_on_failure:
-                    return await self.prompt_user_for_confirmation(
-                        f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
-                        meta,
-                    )
                 return False
 
             audio_ok = not check_audio or any(lang in audio_languages for lang in languages_to_check)
@@ -1331,11 +1314,6 @@ class Common:
                         f"[cyan]Found Subtitles:[/cyan] {', '.join(subtitle_languages) or 'None'}"
                     )
 
-            if not meets_requirement and prompt_on_failure:
-                return await self.prompt_user_for_confirmation(
-                    f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
-                    meta,
-                )
             return meets_requirement
 
         except Exception as e:
@@ -1375,18 +1353,17 @@ class Common:
 
         return f"{resolution} @ {video_bitrate} kbps - {audio} @ {audio_bitrate} kbps"
 
-    async def check_and_confirm_adult_media_upload(self, meta: Meta, tracker: str) -> bool:
+    async def check_adult_media_allowed(self, meta: Meta, tracker: str) -> bool:
         """
-        Check if the media is categorized as adult/pornographic and prompt the user for confirmation before uploading to a non-adult tracker.
+        Fail the check for adult/pornographic media on a tracker that does not allow it.
 
         :param meta: Metadata dictionary containing category and genre information.
-        :param tracker: The tracker name for display in the prompt.
-        :return: True if the user confirms or if the media is not adult, False otherwise.
+        :param tracker: The tracker name for display.
+        :return: False if the media is adult, True otherwise.
         """
         if meta.adult_media:
             logger.info(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            return False
 
         return True
 
@@ -1435,7 +1412,7 @@ class Common:
         # Split by separators (like :, -, (, ), [, ]) so each segment is capitalized independently
         parts = re.split(r"([:\-\(\)\[\]])", title)
 
-        formatted_parts = []
+        formatted_parts: list[str] = []
         for part in parts:
             if not part:
                 formatted_parts.append("")
@@ -1446,7 +1423,7 @@ class Common:
 
             # For this text segment, split into words and spaces
             tokens = re.split(r"(\s+)", part)
-            formatted_tokens = []
+            formatted_tokens: list[str] = []
             word_count = 0
 
             for token in tokens:
@@ -1588,7 +1565,7 @@ class Common:
             return ""
 
         # Final fallback: ask user
-        genres = await ask(
+        genres: object = await ask(
             meta,
             Question(
                 key="genres.ptbr",
@@ -1602,5 +1579,6 @@ class Common:
                 tracker=tracker,
             ),
         )
-        raw_list = [unidecode(t).replace(" ", ".") for t in genres or []]
+        genres_items: list[str] = [str(item) for item in genres] if _is_obj_list(genres) else []
+        raw_list = [unidecode(t).replace(" ", ".") for t in genres_items]
         return ", ".join(raw_list[:5])

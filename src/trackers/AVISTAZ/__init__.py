@@ -6,7 +6,7 @@ import re
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 from urllib.parse import urlparse
 
 import aiofiles
@@ -21,7 +21,7 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.manual_input import Question, ask, confirm_override
+from src.manual_input import Question, ask
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.stats import record_event_async
@@ -31,12 +31,17 @@ from src.trackers.naming import add_incomplete_pack_marker
 Config = dict[str, Any]
 
 
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
 class AZTrackerBase:
     auth_type = "cookies"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     source_flag: str = ""
     banned_groups: tuple[str, ...] = ()
+    secret_token: str = ""
 
     def __init__(self, config: Config, tracker_name: str):
         self.config = config
@@ -207,17 +212,16 @@ class AZTrackerBase:
         return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if self.config["TRACKERS"][self.tracker].get("check_for_rules", True):
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not await confirm_override(meta, "Do you want to continue anyway?"):
-                    return False
+                passed = False
 
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
             logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
-            if not await confirm_override(meta):
-                return False
+            passed = False
 
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
@@ -227,7 +231,7 @@ class AZTrackerBase:
             logger.info(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
             return False
 
-        return True
+        return passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         duplicates: list[dict[str, str]] = []
@@ -439,7 +443,8 @@ class AZTrackerBase:
                     )
                     if langs is None and meta.skipping == self.tracker:
                         return {}
-                    for lang in langs or []:
+                    lang_items: list[str] = [str(item) for item in langs] if _is_obj_list(langs) else []
+                    for lang in lang_items:
                         target_id = self.lang_map.get(lang.lower())
                         if target_id:
                             audio_ids.add(target_id)
@@ -508,7 +513,7 @@ class AZTrackerBase:
 
         limit = 3 if (meta.category == "TV" and meta.tv_pack == 0) else 15
 
-        disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][
+        disc_menu_links = [str(img.get("raw_url")) for img in meta.menu_images if img.get("raw_url")][
             :12
         ]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
@@ -719,7 +724,7 @@ class AZTrackerBase:
         if amount > 0:
             logger.info(f"{self.tracker}: Deleted from description: {amount} NFO section.")
 
-        parser = bbcode.Parser(replace_links=False)
+        parser: Any = bbcode.Parser(replace_links=False)
 
         def render_img(_name: str, value: str, options: dict[str, Any], _parent: Any, _context: Any) -> str:
             width = options.get("img") or options.get("width")
@@ -738,7 +743,7 @@ class AZTrackerBase:
         parser.add_formatter("img", render_img, render_embedded=False, replace_links=False)
         parser.add_formatter("align", render_align)
         parser.add_formatter("spoiler", render_spoiler)
-        final_html_desc = parser.format(processed_desc)
+        final_html_desc: str = parser.format(processed_desc)
 
         desc_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
         desc_file_path.parent.mkdir(parents=True, exist_ok=True)

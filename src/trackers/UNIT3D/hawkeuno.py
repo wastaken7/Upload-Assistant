@@ -243,8 +243,7 @@ class HawkeUno(UNIT3D):
                             logger.debug(f"{self.tracker}: Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
-                                if not meta.unattended:
-                                    logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
+                                logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
                                 return False
                         else:
                             logger.debug(f"{self.tracker}: No CRF value found in encoding settings.")
@@ -259,8 +258,7 @@ class HawkeUno(UNIT3D):
                                     bit_rate_kbps = bit_rate_num / 1000
 
                                     if bit_rate_kbps < 3000:
-                                        if not meta.unattended:
-                                            logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
+                                        logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
                                         return False
 
         return should_continue
@@ -336,7 +334,7 @@ class HawkeUno(UNIT3D):
         resolved_id = resolution_id.get(meta_resolution, "10")
         return {"resolution_id": resolved_id}
 
-    async def get_type_id(self, meta: Meta, media_type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -350,8 +348,8 @@ class HawkeUno(UNIT3D):
             return type_id
         if reverse:
             return {v: k for k, v in type_id.items()}
-        if media_type:
-            return {"type_id": type_id.get(media_type, "0")}
+        if type:
+            return {"type_id": type_id.get(type, "0")}
         meta_type = meta.type or ""
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}
@@ -631,7 +629,8 @@ class HawkeUno(UNIT3D):
                 error_json = e.response.json()
                 details = error_json.get("data") or ""
                 if isinstance(details, list):
-                    details = "; ".join(str(detail) for detail in details)
+                    details_list: list[object] = list(details)
+                    details = "; ".join(str(detail) for detail in details_list)
                 detail_text = f"{error_json.get('message') or ''} {details}".strip()
                 if detail_text:
                     msg = f"HTTP {e.response.status_code} - {detail_text}"

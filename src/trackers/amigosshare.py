@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import unquote, urljoin, urlparse
 
 import aiofiles
@@ -27,7 +27,7 @@ from src.description_review import get_base_description
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
-from src.manual_input import Question, ask, choices_from, confirm_override
+from src.manual_input import Question, ask, choices_from
 from src.manual_questions import game_platform
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
@@ -35,6 +35,15 @@ from src.trackers.common import Common
 
 type Page = dict[str, Any]
 type Profile = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 # Parent categories of the upload form; the profile of each one lists the fields it asks for.
 CATEGORY_IDS = {"series": 3, "filmes": 4, "ebook": 5, "jogos": 7, "adultos": 2, "anime": 11}
@@ -118,6 +127,10 @@ VIDEO_EXTENSIONS = frozenset({".mkv", ".mp4", ".avi", ".m2ts", ".ts", ".m4v", ".
 SUBTITLE_EXTENSIONS = frozenset({".srt", ".ass"})
 ARCHIVE_EXTENSIONS = frozenset({".rar", ".zip", ".7z", ".tar", ".gz"})
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+# Since 2026-11-07 the site names movie, series and anime torrents itself, from MediaInfo and the release fields;
+# `/torrents` refuses those categories ("enviados com o nome do release gerado pelo MediaInfo").
+VIDEO_NAME_PATH = "/torrents/upload/video/name"
+VIDEO_UPLOAD_PATH = "/torrents/upload/video"
 REMOTE_IMAGE_FORMATS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
 
@@ -210,6 +223,11 @@ def format_description(description: str, base_url: str) -> str:
     description = re.sub(r"\[/td\]", " ", description, flags=re.IGNORECASE)
     description = re.sub(r"\[/?(?:align(?:=[^\]]*)?|font(?:=[^\]]*)?|table|tr|td|th|user|note|alert|left|right)\]", "", description, flags=re.IGNORECASE)
     return re.sub(r"\n{3,}", "\n\n", description).strip()
+
+
+def release_form(release: Mapping[str, Any]) -> dict[str, str]:
+    """``release[...]`` fields as the site's form sends them: booleans as 1/0, null as empty."""
+    return {f"release[{key}]": ("1" if value else "0") if isinstance(value, bool) else "" if value is None else str(value) for key, value in release.items()}
 
 
 def resolution_from_dimensions(text: str) -> str:
@@ -626,16 +644,19 @@ class AmigosShare:
         """Screenshots are stored by the site before the form is sent; the form lists their paths."""
         paths: list[str] = []
         for name, content, content_type in images:
+            response: httpx.Response | None = None
             for _attempt in range(5):
                 response = await self.session.post(f"{self.base_url}/torrents/screenshots", files={"image": (name, content, content_type)}, headers=self.ajax_headers())
                 if response.status_code != 429:
                     break
                 await asyncio.sleep(retry_after_seconds(response.headers.get("Retry-After")))
+            if response is None:
+                continue
             try:
-                body: Any = response.json()
+                body: object = response.json()
             except ValueError:
                 body = None
-            path = cast(dict[str, Any], body).get("path") if isinstance(body, dict) else None
+            path = body.get("path") if _is_str_dict(body) else None
             if response.is_success and path:
                 paths.append(str(path))
             else:
@@ -669,6 +690,73 @@ class AmigosShare:
         parts.append(self.signature(meta))
         return format_description("\n\n".join(part for part in parts if part.strip()), self.base_url)
 
+    # Release name (movies, series and anime)
+
+    async def preview_name(self, payload: dict[str, str], torrent: bytes) -> tuple[int, Any]:
+        """The site's name check: it derives the release fields from the .torrent and reports what blocks the name; nothing is saved."""
+        files = {"torrent": ("release.torrent", torrent, "application/x-bittorrent")} if torrent else None
+        response = await self.session.post(f"{self.base_url}{VIDEO_NAME_PATH}", data=payload, files=files, headers=self.ajax_headers())
+        try:
+            return response.status_code, response.json()
+        except ValueError:
+            return response.status_code, None
+
+    def title_case_from_release(self, meta: Meta, title: str) -> str:
+        """The derived title with the case of the release name.
+
+        The site lowercases articles it reads from the file names (``Harbor.of.Ash.The…`` becomes ``the``) and then
+        refuses those same files because they no longer match the name."""
+        words = title.split()
+        match = re.search(r"[. ]".join(map(re.escape, words)), str(meta.uuid), re.IGNORECASE) if words else None
+        return match.group(0).replace(".", " ") if match else title
+
+    async def name_release(self, meta: Meta, profile: Profile, mediainfo_text: str, bdinfo: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
+        """The release fields the site names the torrent from, and its check of them; None when it blocks the name."""
+        tracker_status = meta.tracker_status.setdefault(self.tracker, {})
+        base_path = await self.common.get_base_torrent_path(meta, self.tracker, self.tracker_config)
+        torrent = base_path.read_bytes() if base_path is not None and base_path.is_file() else b""
+        payload = {"mediainfo": mediainfo_text, "type": str(profile.get("key") or ""), "imdb_id": meta.imdb_tt or ""}
+        if bdinfo:
+            payload["bdinfo"] = bdinfo
+
+        status, derived = await self.preview_name(payload, torrent)
+        fields = derived.get("fields") if _is_str_dict(derived) else None
+        if status != 200 or not _is_str_dict(fields):
+            tracker_status["status_message"] = f"data error - The site could not name the release: {error_text(derived, f'HTTP {status}')}"
+            return None
+        release: dict[str, Any] = {key: value for key, value in fields.items() if key != "year"}
+        release["title"] = self.title_case_from_release(meta, str(release.get("title") or ""))
+        if meta.category == "TV":
+            # The site reads the episode off the first file, so a season pack came out as S01E01.
+            season = re.sub(r"\D", "", str(meta.season or ""))
+            release["season"] = str(int(season)) if season else ""
+            release["episode"] = "" if meta.tv_pack else re.sub(r"\D", "", str(meta.episode or ""))
+
+        status, checked = await self.preview_name({**payload, **release_form(release), "release[year]": str(fields.get("year") or meta.year or "")}, torrent)
+        if status != 200 or not _is_str_dict(checked):
+            tracker_status["status_message"] = f"data error - The site could not name the release: {error_text(checked, f'HTTP {status}')}"
+            return None
+        analysis: object = checked.get("analysis") or {}
+        findings: object = (analysis.get("findings") or []) if _is_str_dict(analysis) else None
+        problems: object = checked.get("problems") or {}
+        attributes: object = checked.get("attributes") or {}
+        if not (
+            _is_str_dict(analysis) and _is_obj_list(findings) and all(_is_str_dict(finding) for finding in findings) and _is_str_dict(problems) and _is_str_dict(attributes)
+        ):
+            tracker_status["status_message"] = "data error - The site could not name the release: unexpected response from the name check."
+            return None
+        findings = cast(list[dict[str, Any]], findings)
+        blocking = [str(finding.get("message")) for finding in findings if finding.get("severity") == "bloqueio"]
+        blocking = blocking or [str(message) for message in problems.values()]
+        for finding in findings:
+            if finding.get("severity") != "bloqueio":
+                logger.info(f"{self.tracker}: {finding.get('message')}", extra={"markup": False})
+        if analysis.get("blocked") or blocking:
+            tracker_status["status_message"] = f"data error - The site blocks the release name: {'; '.join(blocking) or 'blocked'}"
+            return None
+        logger.info(f"{self.tracker}: Release name generated by the site: {checked.get('name')}", extra={"markup": False})
+        return release, cast(dict[str, Any], checked)
+
     # Upload form
 
     async def get_data(self, meta: Meta) -> dict[str, Any] | None:
@@ -696,6 +784,17 @@ class AmigosShare:
         if mediainfo and mediainfo.get("report"):
             mediainfo_text = str(mediainfo["report"])
 
+        named: tuple[dict[str, Any], dict[str, Any]] | None = None
+        bdinfo = await self.get_bdinfo_summary(meta)
+        if profile.get("mediainfo"):
+            named = await self.name_release(meta, profile, mediainfo_text, bdinfo)
+            if named is None:
+                return None
+            # Like the upload form, the name check's reading of the MediaInfo wins over the plain one.
+            reading: dict[str, Any] = dict(mediainfo or {})
+            reading["attributes"] = {**cast(dict[str, Any], reading.get("attributes") or {}), **cast(dict[str, Any], named[1].get("attributes") or {})}
+            mediainfo = reading
+
         attribute_ids = await self.choose_attributes(meta, profile, site_choices(profile, lookup, mediainfo))
         if attribute_ids is None:
             tracker_status["status_message"] = "data error - A required characteristic was not chosen."
@@ -703,9 +802,15 @@ class AmigosShare:
 
         year = (lookup or {}).get("year") or meta.year
         anonymous = bool(meta.anon) or bool(self.tracker_config.get("anon", False))
+        if named:
+            # The post title (rule 6) goes as `site_title`; the site's form fills it from the name check.
+            site_title = str(named[1].get("siteTitle") or "") if meta.manual_name is None else ""
+            title_field = {"site_title": site_title or await self.get_name(meta, lookup)}
+        else:
+            title_field = {"name": await self.get_name(meta, lookup)}
         data: dict[str, Any] = {
             "category_id": str(await self.get_category_id(meta)),
-            "name": await self.get_name(meta, lookup),
+            **title_field,
             "year": str(year or ""),
             "anonymous": "1" if anonymous else "0",
             "description": await self.build_description(meta),
@@ -727,16 +832,21 @@ class AmigosShare:
         # The form only sends the subtitle when the audio is not dubbed-only or original.
         if profile.get("subtitle") and set(attribute_ids) & {int(option_id) for option_id in profile.get("subtitleWhen", [])}:
             data["subtitle"] = await self.get_subtitle(meta, cast(str | None, (mediainfo or {}).get("subtitle")))
+        if named:
+            data["bdinfo"] = bdinfo
+            data.update(release_form(named[0]))
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
         """The upload form as it is known before the site is asked for IMDb and MediaInfo data."""
         video = meta.category in ("MOVIE", "TV")
+        # Movies, series and anime send the post title as `site_title` (see VIDEO_UPLOAD_PATH).
+        name_key = "site_title" if video else "name"
         anonymous = bool(meta.anon) or bool(self.tracker_config.get("anon", False))
         category_id = await payload_preview.unless_asked(self.get_category_id(meta))
         data: dict[str, Any] = {
             "category_id": category_id if isinstance(category_id, payload_preview.Later) else str(category_id),
-            "name": payload_preview.Later(payload_preview.FROM_TRACKER_NOTE) if video and meta.manual_name is None else await self.get_name(meta),
+            name_key: payload_preview.Later(payload_preview.FROM_TRACKER_NOTE) if video and meta.manual_name is None else await self.get_name(meta),
             "year": str(meta.year or ""),
             "anonymous": "1" if anonymous else "0",
         }
@@ -747,6 +857,7 @@ class AmigosShare:
         specs = {
             "category_id": payload_preview.readonly("Category"),
             "name": payload_preview.text("Name"),
+            "site_title": payload_preview.text("Title"),
             "year": payload_preview.text("Year", numeric=True),
             "anonymous": payload_preview.flag("Anonymous"),
             "imdb_id": payload_preview.readonly("IMDb"),
@@ -754,10 +865,11 @@ class AmigosShare:
         }
         deferred = {
             "attribute_ids[]": "Chosen from the site's IMDb and MediaInfo reading at upload time",
+            **({"release[...]": "Derived by the site's name check from the MediaInfo and the .torrent at upload time"} if video else {}),
             "description": payload_preview.DESCRIPTION_NOTE,
             "screenshot_paths[]": payload_preview.SCREENSHOTS_NOTE,
         }
-        return payload_preview.describe(self.tracker, data, specs, deferred=deferred)
+        return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key=name_key)
 
     # Checks, duplicates and requests
 
@@ -788,16 +900,17 @@ class AmigosShare:
         if meta.category == "XXX" and meta.source_size < self.minimum_adult_size:
             logger.info(f"{self.tracker}: [bold red]Adult videos must be at least 100 MB (rule 5.16).[/bold red]")
             return False
+        passed = True
         if self.tracker_config.get("check_for_rules", True) and (warnings := self.rules(meta)):
             logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n" + "\n\n".join(warnings))
-            if not await confirm_override(meta, "Do you want to continue anyway?"):
-                return False
+            passed = False
         if meta.category in ("MOVIE", "TV"):
             if not meta.language_checked:
                 await languages_manager.process_desc_language(meta, tracker=self.tracker)
             # Foreign content needs Brazilian Portuguese audio or subtitles (rule 15.2.11).
-            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
-        return True
+            if not await self.common.check_portuguese_video_requirements(meta, self.tracker):
+                passed = False
+        return passed
 
     def search_params(self, meta: Meta) -> dict[str, str]:
         key = self.get_profile_key(meta)
@@ -825,7 +938,8 @@ class AmigosShare:
             torrents = cast(dict[str, Any], cast(dict[str, Any], page.get("props") or {}).get("torrents") or {})
             for item in cast(list[dict[str, Any]], torrents.get("data") or []):
                 # Titles are the work's name, so the badges (resolution, source, codec, HDR) stand in for the release name.
-                badges = [cast(dict[str, Any], badge) for badge in item.get("badges") or [] if isinstance(badge, dict)]
+                raw_badges: object = item.get("badges")
+                badges = [badge for badge in raw_badges if _is_str_dict(badge)] if _is_obj_list(raw_badges) else []
                 labels = ["2160p" if str(badge.get("label", "")).upper() == "4K" else str(badge.get("label", "")) for badge in badges]
                 duplicates.append(
                     {
@@ -902,11 +1016,11 @@ class AmigosShare:
             await failure_file.write(html)
         return str(failure_path)
 
-    async def send_form(self, meta: Meta, data: dict[str, Any], files: dict[str, tuple[str, bytes, str]]) -> str:
+    async def send_form(self, meta: Meta, data: dict[str, Any], files: dict[str, tuple[str, bytes, str]], path: str = "/torrents") -> str:
         """Post the form and return the new torrent ID; a failure is recorded in the tracker status."""
         tracker_status = meta.tracker_status[self.tracker]
         headers = self.ajax_headers()
-        response = await self.session.post(f"{self.base_url}/torrents", data=data, files=files, headers=headers, timeout=self.upload_timeout)
+        response = await self.session.post(f"{self.base_url}{path}", data=data, files=files, headers=headers, timeout=self.upload_timeout)
         location = response.headers.get("Location", "")
         if response.is_redirect and (match := re.search(r"/torrents/(\d+)(?:[/?#]|$)", location)):
             return match.group(1)
@@ -971,12 +1085,12 @@ class AmigosShare:
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
-        files = {"torrent": (f"{data['name']}.torrent", torrent_bytes, "application/x-bittorrent")}
+        files = {"torrent": (f"{data.get('name') or data.get('site_title') or meta.uuid}.torrent", torrent_bytes, "application/x-bittorrent")}
         if cover:
             files["cover"] = cover
 
         try:
-            torrent_id = await self.send_form(meta, data, files)
+            torrent_id = await self.send_form(meta, data, files, VIDEO_UPLOAD_PATH if profile.get("mediainfo") else "/torrents")
         except httpx.TimeoutException:
             tracker_status["status_message"] = "data error - The upload timed out; check the waiting queue on the site before retrying."
             return False

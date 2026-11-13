@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from src.meta import Meta
 from src import trackerstatus
+from src.meta import Meta
 
 
 class LookupReached(Exception):

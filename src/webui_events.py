@@ -24,11 +24,14 @@ import os
 import re
 import sys
 import time
-from collections.abc import Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeIs, cast
+
+if TYPE_CHECKING:
+    from src.meta import Meta
 
 GUI_EVENT_STDOUT_PREFIX = "UA_GUI_EVENT_JSON:"
 GUI_EVENTS_ENV = "UA_WEBUI_GUI_EVENTS"
@@ -58,6 +61,12 @@ type TrackerStatus = Literal["pending", "success", "failed", "skipped", "dupe", 
 
 _stdout_lock = Lock()
 _prompt_ids = itertools.count(1)
+
+
+def _is_obj_tuple(val: object) -> TypeIs[tuple[object, ...]]:
+    return isinstance(val, tuple)
+
+
 _current_item: dict[str, Any] | None = None
 _active_stage: str | None = None
 # Stages started for the current item, so the final tracker summary knows whether uploading ran.
@@ -73,6 +82,46 @@ _FLAG_CODE = re.compile(r"[a-z]{2}")
 
 def enabled() -> bool:
     return os.environ.get(GUI_EVENTS_ENV) == "1" and bool(os.environ.get(GUI_EVENT_NONCE_ENV))
+
+
+# In-process observers (e.g. aggregate statistics) of stage changes and request
+# matches. They are called in CLI runs too, and never receive release names.
+_listeners: list[Callable[[str, Mapping[str, Any]], None]] = []
+
+
+def add_listener(listener: Callable[[str, Mapping[str, Any]], None]) -> None:
+    if listener not in _listeners:
+        _listeners.append(listener)
+
+
+def _notify(kind: str, payload: Mapping[str, Any]) -> None:
+    for listener in _listeners:
+        with contextlib.suppress(Exception):
+            listener(kind, payload)
+
+
+# In-process observers of the release details shown in the results panel
+# (possible dupes, slot verdicts and request matches), used by the local
+# upload history. Unlike the listeners above, they receive the same sanitized
+# names and links as the Web UI, in CLI runs too.
+_detail_listeners: list[Callable[[str, Mapping[str, Any]], None]] = []
+
+
+def add_detail_listener(listener: Callable[[str, Mapping[str, Any]], None]) -> None:
+    if listener not in _detail_listeners:
+        _detail_listeners.append(listener)
+
+
+def _wants_details() -> bool:
+    return enabled() or bool(_detail_listeners)
+
+
+def _publish_detail(kind: str, payload: Mapping[str, Any]) -> None:
+    """Hand a results-panel event to detail observers, then to the Web UI."""
+    for listener in _detail_listeners:
+        with contextlib.suppress(Exception):
+            listener(kind, payload)
+    _emit(kind, payload)
 
 
 def event_prefix(nonce: str) -> str:
@@ -133,7 +182,7 @@ def begin_item(path: str, index: int, total: int) -> None:
     _emit("item", _current_item)
 
 
-def _item_artwork(meta: Mapping[str, Any]) -> dict[str, str]:
+def _item_artwork(meta: Mapping[str, Any] | Meta) -> dict[str, str]:
     """Return the release cover as a public URL or a local image file.
 
     A local ``artwork_file`` is never shown to the browser: the server swaps
@@ -154,7 +203,7 @@ def _item_artwork(meta: Mapping[str, Any]) -> dict[str, str]:
     return {}
 
 
-def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | None = None, artwork: Mapping[str, Any] | None = None) -> None:
+def update_item(*, personal_release: bool | None = None, run_options: Mapping[str, Any] | Meta | None = None, artwork: Mapping[str, Any] | Meta | None = None) -> None:
     """Publish resolved release flags, bounded run settings and the release cover."""
     global _current_item
     if not enabled() or _current_item is None:
@@ -189,6 +238,7 @@ def stage(key: str, status: StageStatus) -> None:
         _started_stages.add(key)
     elif _active_stage == key:
         _active_stage = None
+    _notify("stage", {"key": key, "status": status})
     _emit("stage", {"key": key, "status": status})
 
 
@@ -480,7 +530,7 @@ def _context_payload() -> dict[str, Any] | None:
             items = cast(list[Any], value)[:MAX_LIST_ITEMS]
             payload[name] = [
                 [plain_text(part, 300, markup=False) for part in item]
-                if isinstance(item, tuple)
+                if _is_obj_tuple(item)
                 # Option details are already plain and bounded by numbered_options.
                 else dict(cast(Mapping[str, Any], item))
                 if isinstance(item, Mapping)
@@ -561,12 +611,12 @@ def _release_entries(entries: Iterable[Mapping[str, Any] | str], source_size: in
 
 def dupes(tracker: str, entries: Iterable[Mapping[str, Any] | str], *, source_size: int | None = None, note: str = "", trumpable: bool = False) -> None:
     """Report the possible duplicates shown before an "upload anyway?" prompt."""
-    if not enabled():
+    if not _wants_details():
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "entries": _release_entries(entries, source_size), "trumpable": bool(trumpable)}
     if note:
         payload["note"] = plain_text(note)
-    _emit("dupes", payload)
+    _publish_detail("dupes", payload)
 
 
 def slot(
@@ -580,10 +630,11 @@ def slot(
     conflicts: Iterable[Mapping[str, Any]] = (),
     notes: Iterable[str] = (),
     rules_date: date | None = None,
+    rules_url: str = "",
     source_size: int | None = None,
 ) -> None:
     """Report a tracker's slot recommendation with the same detail as the terminal box."""
-    if not enabled():
+    if not _wants_details():
         return
     payload: dict[str, Any] = {
         "tracker": plain_text(tracker, 64),
@@ -605,7 +656,10 @@ def slot(
         age_days = (datetime.now().astimezone().date() - rules_date).days
         age = "today" if age_days <= 0 else f"{age_days} day{'s' if age_days != 1 else ''} ago"
         payload["rules"] = f"Rules as of {rules_date.isoformat()} ({age}). This is only a recommendation; tracker rules change over time."
-    _emit("slot", payload)
+    rules_link = _http_link(rules_url) if rules_url else ""
+    if rules_link:
+        payload["rules_url"] = rules_link
+    _publish_detail("slot", payload)
 
 
 def tracker_result(
@@ -617,7 +671,7 @@ def tracker_result(
     message: Any = None,
     duration: float | None = None,
 ) -> None:
-    if not enabled() or status not in TRACKER_STATUSES:
+    if not _wants_details() or status not in TRACKER_STATUSES:
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "status": status}
     url = _http_link(link)
@@ -630,11 +684,12 @@ def tracker_result(
         payload["message"] = text
     if isinstance(duration, (int, float)) and duration > 0:
         payload["duration"] = round(float(duration), 2)
-    _emit("tracker", payload)
+    _publish_detail("tracker", payload)
 
 
 def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = None, status: Any = None, exact: bool = False) -> None:
-    if not enabled():
+    _notify("request", {"tracker": str(tracker), "exact": bool(exact)})
+    if not _wants_details():
         return
     payload: dict[str, Any] = {"tracker": plain_text(tracker, 64), "name": plain_text(name, 300, markup=False), "exact": bool(exact)}
     url = _http_link(link)
@@ -645,7 +700,7 @@ def request_match(tracker: str, name: Any, *, link: Any = None, reward: Any = No
     if status not in (None, ""):
         payload["status"] = plain_text(status, 100)
     if payload["name"]:
-        _emit("request", payload)
+        _publish_detail("request", payload)
 
 
 def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_started: bool = True) -> TrackerStatus:
@@ -675,7 +730,7 @@ def tracker_status_from_meta(status: Mapping[str, Any], *, final: bool, upload_s
     return "skipped"
 
 
-_DEFAULT_STATUS_MESSAGES: dict[str, str] = {
+DEFAULT_STATUS_MESSAGES: dict[str, str] = {
     "banned": "Release group is banned on this tracker",
     "dupe": "Possible dupe on this tracker",
     "skipped": "Not uploaded",
@@ -699,5 +754,5 @@ def publish_tracker_statuses(tracker_status: Mapping[str, Any], *, final: bool =
             # Passed the dupe check and approved; the upload result comes later.
             tracker_result(str(tracker), resolved, message="No potential dupes found" if status.get("dupe") is False else None)
             continue
-        message = status.get("status_message") or _DEFAULT_STATUS_MESSAGES.get(resolved)
+        message = status.get("status_message") or DEFAULT_STATUS_MESSAGES.get(resolved)
         tracker_result(str(tracker), resolved, message=message)

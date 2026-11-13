@@ -8,15 +8,11 @@
 
 Upload Assistant collects metadata, generates screenshots and artwork, creates torrent or NZB files, and publishes releases to the destinations you choose. Use it through a browser interface (WebUI) or the command line (CLI).
 
-<img width="3840" height="2160" alt="1" src="https://github.com/user-attachments/assets/b375a324-2925-4e70-90e6-136881099b3e" />
+<img width="1920" height="1080" alt="Upload Interface" src="https://github.com/user-attachments/assets/d0ac719b-632d-4935-aad7-34fa66f7bca7" />
 
 ---
 
-<img width="5760" height="3240" alt="2" src="https://github.com/user-attachments/assets/613b35a6-1523-431a-8a55-3884f5db48d4" />
-
----
-
-<img width="5739" height="4143" alt="3" src="https://github.com/user-attachments/assets/9164de0f-7901-4a1b-a567-10f97f3cf33b" />
+<img width="1920" height="1350" alt="Statistics Interface" src="https://github.com/user-attachments/assets/1f6c350d-3400-441f-8a42-39dbdfaafac6" />
 
 ---
 
@@ -343,6 +339,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                     | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                   | FunFile                | FUNFILE                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/greatposterwall.png" alt="" width="16" height="16" />    | Great Poster Wall      | GREATPOSTERWALL        | MOVIE                        |
+| <img src="web_ui/static/img/trackers/happyfappy.png" width="16" height="16" />                | HappyFappy             | HAPPYFAPPY             | XXX                          |
 | <img src="web_ui/static/img/trackers/hawkeuno.png" width="16" height="16" />                  | hawke-uno              | HAWKEUNO               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdbits.png" width="16" height="16" />                    | HDBits                 | HDBITS                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdspace.png" width="16" height="16" />                   | HD-Space               | HDSPACE                | MOVIE, TV                    |
@@ -352,6 +349,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />                | InfinityHD             | INFINITYHD             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/iptorrents.png" width="16" height="16" />                | IPTorrents             | IPTORRENTS             | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/itatorrents.png" width="16" height="16" />               | ItaTorrents            | ITATORRENTS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/kufirc.png" width="16" height="16" />                    | Kufirc                 | KUFIRC                 | XXX                          |
 | <img src="web_ui/static/img/trackers/lajidui.png" width="16" height="16" />                   | lajidui                | LAJIDUI                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lemonhd.png" width="16" height="16" />                   | LemonHD                | LEMONHD                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lastdigitalunderground.png" width="16" height="16" />    | LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
@@ -390,6 +388,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/samaritano.png" width="16" height="16" />                | Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/seedpool.png" width="16" height="16" />                  | seedpool               | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/shareisland.png" width="16" height="16" />               | ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/simurg.png" width="16" height="16" />                    | Simurg                 | SIMURG                 | BOOK                         |
 | <img src="web_ui/static/img/trackers/skipthecommercials.png" alt="" width="16" height="16" /> | SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE (Documentary only), TV |
 | <img src="web_ui/static/img/trackers/speedapp.png" width="16" height="16" />                  | SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/swarmazon.png" width="16" height="16" />                 | Swarmazon              | SWARMAZON              | MOVIE, TV                    |

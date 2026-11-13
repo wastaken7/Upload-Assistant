@@ -1,8 +1,8 @@
 """Folder-scoped search uses the existing authenticated browse contract."""
 
-from pathlib import Path
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 

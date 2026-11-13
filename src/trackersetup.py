@@ -4,9 +4,10 @@ import importlib
 import json
 import re
 import sys
+from collections.abc import Iterator, KeysView
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -22,12 +23,20 @@ from src.meta import Meta
 from src.trackers.common import Common
 
 
-class LazyTrackerDict(dict):
-    def __init__(self, modules):
-        self._modules = modules
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+class LazyTrackerDict(dict[str, Any]):
+    def __init__(self, modules: dict[str, tuple[str, str]]) -> None:
+        self._modules: dict[str, tuple[str, str]] = modules
         super().__init__()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         if key in self._modules:
             if not super().__contains__(key):
                 mod_name, cls_name = self._modules[key]
@@ -36,35 +45,35 @@ class LazyTrackerDict(dict):
             return super().__getitem__(key)
         raise KeyError(key)
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         return key in self._modules or super().__contains__(key)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         try:
             return self[key]
         except KeyError:
             return default
 
-    def items(self):
+    def items(self) -> Iterator[tuple[str, Any]]:  # type: ignore[override]
         for key in self._modules:
             yield key, self[key]
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:  # type: ignore[override]
         return self._modules.keys()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self._modules)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._modules)
 
-    def values(self):
+    def values(self) -> Iterator[Any]:  # type: ignore[override]
         for key in self._modules:
             yield self[key]
 
 
 # Static auth types to prevent loading all trackers at startup
-STATIC_AUTH_TYPES = {
+STATIC_AUTH_TYPES: dict[str, str | None] = {
     "1PTBA": "cookies",
     "AITHER": "unit3d_api",
     "ALPHARATIO": "cookies",
@@ -98,6 +107,7 @@ STATIC_AUTH_TYPES = {
     "FLOOD": "other_api",
     "FUNFILE": "cookies",
     "GREATPOSTERWALL": "other_api",
+    "HAPPYFAPPY": "cookies",
     "HAWKEUNO": "unit3d_api",
     "HDBITS": "cookies",
     "HDSPACE": "cookies",
@@ -107,6 +117,7 @@ STATIC_AUTH_TYPES = {
     "INFINITYHD": "unit3d_api",
     "IPTORRENTS": "cookies",
     "ITATORRENTS": "unit3d_api",
+    "KUFIRC": "cookies",
     "LAJIDUI": "cookies",
     "LASTDIGITALUNDERGROUND": "unit3d_api",
     "LATTEAM": "unit3d_api",
@@ -147,6 +158,7 @@ STATIC_AUTH_TYPES = {
     "SAMARITANO": "unit3d_api",
     "SEEDPOOL": "unit3d_api",
     "SHAREISLAND": "unit3d_api",
+    "SIMURG": "other_api",
     "SKIPTHECOMMERCIALS": "unit3d_api",
     "SPEEDAPP": "other_api",
     "SUIO": "other_api",
@@ -171,6 +183,12 @@ STATIC_AUTH_TYPES = {
 
 JsonDict = dict[str, Any]
 example_config: dict[str, Any]
+
+
+def _mark_unconfigured(meta: Meta, tracker_name: str, message: str) -> None:
+    """Record why a selected tracker was left out, so results and history still list it as skipped."""
+    status = meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})
+    status.update(upload=False, skipped=True, status_message=message, skip_reason="not_configured")
 
 
 class TrackerSetup:
@@ -210,11 +228,13 @@ class TrackerSetup:
                 if "api_key" in example_tracker_config and not tracker_config.get("api_key") and not has_legacy_btn_api:
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
                     if not meta.debug:
+                        _mark_unconfigured(meta, tracker_name, "Missing API key in the tracker configuration")
                         continue
 
                 if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
                     if not meta.debug:
+                        _mark_unconfigured(meta, tracker_name, "Missing announce URL in the tracker configuration")
                         continue
 
             supported_cats = getattr(tracker_class, "supported_categories", None)
@@ -268,7 +288,7 @@ class TrackerSetup:
 
         return valid_trackers
 
-    async def get_banned_groups(self, meta: Meta, tracker: str) -> str | None:
+    async def get_banned_groups(self, meta: Meta, tracker: str) -> str | Path | None:
         file_path = Path(meta.base_dir) / "data" / "banned" / f"{tracker}_banned_groups.json"
 
         tracker_instance = self._create_tracker_instance(tracker)
@@ -363,7 +383,7 @@ class TrackerSetup:
 
         return file_path
 
-    async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any]) -> None:
+    async def write_banned_groups_to_file(self, file_path: str | Path, json_data: list[Any]) -> None:
         try:
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -382,7 +402,7 @@ class TrackerSetup:
         except Exception as e:
             logger.info(f"An error occurred: {e}")
 
-    async def sync_trash_groups(self, file_path: str) -> None:
+    async def sync_trash_groups(self, file_path: str | Path) -> None:
         """Fetch TRaSH guide JSON and extract release group names to ban file.
 
         This downloads the TRaSH LQ release-group specifications, extracts
@@ -444,12 +464,12 @@ class TrackerSetup:
 
         await self.write_banned_groups_to_file(file_path, json_data)
 
-    def _write_file(self, file_path: str, data: JsonDict) -> None:
+    def _write_file(self, file_path: str | Path, data: JsonDict) -> None:
         """Blocking file write operation, runs in a background thread"""
         with Path(file_path).open("w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
 
-    async def should_update(self, file_path: str) -> bool:
+    async def should_update(self, file_path: str | Path) -> bool:
         try:
             content = await asyncio.to_thread(self._read_file, file_path)
             data = cast(JsonDict, json.loads(content))
@@ -461,7 +481,7 @@ class TrackerSetup:
             logger.info(f"Error reading file: {e}")
             return True
 
-    def _read_file(self, file_path: str) -> str:
+    def _read_file(self, file_path: str | Path) -> str:
         """Helper function to read the file in a blocking thread"""
         with Path(file_path).open(encoding="utf-8") as file:
             return file.read()
@@ -475,29 +495,40 @@ class TrackerSetup:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("AITHER", "CAPYBARABR", "DARKPEERS", "INFINITYHD", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
+        if tracker.upper() in ("AITHER", "CAPYBARABR", "DARKPEERS", "INFINITYHD", "LST", "LUMINARR", "SPEEDAPP", "ULCX", "ZENITH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
                 return False
             if not file_path:
-                logger.info(f"[bold red]Failed to load banned groups for '{tracker}'.")
-                return False
+                if not banned_group_list:
+                    logger.info(f"[bold red]Failed to load banned groups for '{tracker}'.")
+                    return False
+                # Keep checking against the tracker's built-in list.
+                logger.info(f"[bold yellow]Failed to load banned groups for '{tracker}', using the built-in list.")
 
             # Load the banned groups from the file
             try:
-                content = await asyncio.to_thread(self._read_file, file_path)
-                data = json.loads(content)
-                banned_groups = data.get("banned_groups", "")
-                if banned_groups:
-                    banned_group_list = banned_groups.split(", ")
+                if file_path:
+                    content = await asyncio.to_thread(self._read_file, file_path)
+                    data = json.loads(content)
+                    raw_data = data.get("raw_data")
+                    # Keep the site's reason, when it sends one, to show it as the note.
+                    raw_items = [cast(JsonDict, item) for item in (cast(list[Any], raw_data) if isinstance(raw_data, list) else []) if isinstance(item, dict)]
+                    with_reasons = [[str(item["name"]), str(item.get("reason") or "")] for item in raw_items if item.get("name")]
+                    banned_groups = data.get("banned_groups", "")
+                    if with_reasons:
+                        banned_group_list = with_reasons
+                    elif banned_groups:
+                        banned_group_list = banned_groups.split(", ")
 
-            except FileNotFoundError:
-                logger.info(f"[bold red]Banned group file for '{tracker}' not found.")
-                return False
-            except json.JSONDecodeError:
-                logger.info(f"[bold red]Failed to parse banned group file for '{tracker}'.")
-                return False
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                problem = "not found" if isinstance(e, FileNotFoundError) else "could not be parsed"
+                if not banned_group_list:
+                    logger.info(f"[bold red]Banned group file for '{tracker}' {problem}.")
+                    return False
+                # The cache may not have been written: keep checking against the built-in list.
+                logger.info(f"[bold yellow]Banned group file for '{tracker}' {problem}, using the built-in list.")
 
         banned_note = ""
         for tag in banned_group_list:
@@ -508,7 +539,7 @@ class TrackerSetup:
                 tag_name = tag_list[0]
                 if group_tags == tag_name.lower():
                     logger.info(f"[bold yellow]{meta.tag[1:]}[/bold yellow][bold red] was found on [bold yellow]{tracker}'s[/bold yellow] list of banned groups.")
-                    if len(tag_list) > 1:
+                    if len(tag_list) > 1 and tag_list[1]:
                         banned_note = tag_list[1]
                         logger.info(f"[bold red]NOTE: [bold yellow]{tag_list[1]}")
                     result = True
@@ -539,7 +570,7 @@ class TrackerSetup:
 
         return False
 
-    async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict]) -> None:
+    async def write_internal_claims_to_file(self, file_path: str | Path, data: list[JsonDict]) -> None:
         try:
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -737,10 +768,12 @@ class TrackerSetup:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if "data" in data_dict and isinstance(data_dict["data"], list):
-                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif "results" in data_dict and isinstance(data_dict["results"], list):
-                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
+                    data_val = data_dict.get("data")
+                    results_val = data_dict.get("results")
+                    if _is_obj_list(data_val):
+                        results_list.extend([item for item in data_val if _is_str_dict(item)])
+                    elif _is_obj_list(results_val):
+                        results_list.extend([item for item in results_val if _is_str_dict(item)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -796,10 +829,12 @@ class TrackerSetup:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if "data" in data_dict and isinstance(data_dict["data"], list):
-                        results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif "results" in data_dict and isinstance(data_dict["results"], list):
-                        results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
+                    data_val = data_dict.get("data")
+                    results_val = data_dict.get("results")
+                    if _is_obj_list(data_val):
+                        results_list.extend([item for item in data_val if _is_str_dict(item)])
+                    elif _is_obj_list(results_val):
+                        results_list.extend([item for item in results_val if _is_str_dict(item)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
                         return requests
@@ -1142,353 +1177,6 @@ class TrackerSetup:
         results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
         return any(results)
 
-    async def process_trumpables(self, meta: Meta, tracker: str) -> bool:
-        tracker_instance = self._create_tracker_instance(tracker)
-        if tracker_instance is None:
-            logger.info(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
-            return False
-
-        url = getattr(tracker_instance, "trumping_url", None)
-        if not isinstance(url, str):
-            logger.info(f"[red]Tracker {tracker} does not support trumping reports.[/red]")
-            return False
-
-        reported_torrent_id = f"{meta.get(f'{tracker}_trumpable_id', '')}"
-        if not reported_torrent_id:
-            # Try tracker-specific matched ID
-            reported_torrent_id = f"{meta.get(f'{tracker}_matched_id', '')}"
-        if not reported_torrent_id and meta.get(f"{tracker}_matched_episode_ids", []):
-            reported_torrent_id = f"{meta[f'{tracker}_matched_episode_ids'][0].get('id', '')}"
-        if not reported_torrent_id:
-            logger.info(f"[red]No reported torrent ID found in meta for trumpable processing on {tracker}[/red]")
-            return False
-        # Store per-tracker to avoid overwriting across multiple trackers
-        meta[f"{tracker}_reported_torrent_id"] = reported_torrent_id
-        if tracker == "LST":
-            logger.debug("[bold green]LST does not support searching existing trump reports[/bold green]")
-            return True
-
-        if not isinstance(meta.skip_upload_trackers, list):
-            meta.skip_upload_trackers = []
-
-        trumping_reports, status = await self.get_tracker_trumps(tracker, url, reported_torrent_id)
-        upload = False
-        if status != 200:
-            logger.info(f"[bold red]Failed to retrieve trumping reports from {tracker}. HTTP Status: {status}[/bold red]")
-            # Mark this tracker as failed/skipped and continue to the next tracker
-            logger.info(f"[bold red]Marking {tracker} to be skipped due to API failure[/bold red]")
-            if tracker not in meta.skip_upload_trackers:
-                meta.skip_upload_trackers.append(tracker)
-            return False
-        if trumping_reports:
-            logger.info(f"[bold yellow]Found {len(trumping_reports)} existing trumping report/s on {tracker} for this release[/bold yellow]")
-            for report in trumping_reports:
-                logger.info(f"  [cyan]Report ID:[/cyan] {report.get('id')} - [cyan]Title:[/cyan] {report.get('title')}")
-                if report.get("trumping_torrent"):
-                    for torrent in report.get("trumping_torrent", []):
-                        torrent_name = torrent.get("name", "Unknown")
-                        torrent_id = torrent.get("id", "N/A")
-                        logger.info(f"  [bold green]Already being trumped by:[/bold green] {torrent_name} (ID: {torrent_id})")
-                else:
-                    logger.info("  [yellow]The trumping torrent for this report seems to be in modq.....[/yellow]")
-            try:
-                report_summary: dict[str, Any] = {"Tracker": tracker}
-                for report in trumping_reports:
-                    trumping_names = ", ".join(str(t.get("name", "Unknown")) for t in (report.get("trumping_torrent") or []))
-                    report_summary[f"Report {report.get('id')}"] = (
-                        f"{report.get('title') or ''} (trumped by: {trumping_names})" if trumping_names else str(report.get("title") or "In moderation queue")
-                    )
-                with webui_events.field_prompt(
-                    "Existing trump reports",
-                    report_summary,
-                    hint=f"Found {len(trumping_reports)} existing trumping report(s) on {tracker} for this release.",
-                ):
-                    upload = cli_ui.ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
-            except EOFError, KeyboardInterrupt:
-                logger.info("[yellow]Prompt cancelled; treating as 'no' for safety.[/yellow]")
-                upload = False
-
-            if not upload:
-                logger.info(f"[bold red]Marking {tracker} to be skipped[/bold red]")
-                if tracker not in meta.skip_upload_trackers:
-                    meta.skip_upload_trackers.append(tracker)
-                return False
-            logger.info(f"[bold green]Proceeding with upload despite existing trumping reports on {tracker}[/bold green]")
-        else:
-            logger.debug(f"[bold green]Will make a trumpable report for this upload at {tracker}[/bold green]")
-
-        if not meta.tv_pack:
-            logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
-            try:
-                with webui_events.field_prompt(
-                    "Trump report comparison",
-                    {"Tracker": tracker, "Release": meta.name or meta.title},
-                    hint=f"{tracker} requires comparisons to be provided for trump reports. Are the comparison images in the description or are you adding links?",
-                    actions=[("d", "In the description"), ("L", "Paste links"), ("", "Skip trumping")],
-                ):
-                    where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
-            except EOFError, KeyboardInterrupt:
-                logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
-                return False
-
-            where_compare = (where_compare or "").strip()
-            if where_compare.lower() == "d":
-                meta.screenshots_in_description = True
-                return True
-            if where_compare.upper() == "L":
-                try:
-                    with webui_events.field_prompt(
-                        "Trump report comparison",
-                        {"Tracker": tracker, "Reported torrent": ""},
-                        focus="Reported torrent",
-                        hint="Comma-separated screenshot links. Leaving it blank skips the trump report.",
-                        actions=[("", "Skip trumping")],
-                    ):
-                        reported_screenshots = cli_ui.ask_string("Paste screenshot links for the reported torrent (comma-separated):", default="")
-                    with webui_events.field_prompt(
-                        "Trump report comparison",
-                        {"Tracker": tracker, "Reported torrent": reported_screenshots, "Trumping torrent": ""},
-                        focus="Trumping torrent",
-                        hint="Comma-separated screenshot links. Leaving it blank skips the trump report.",
-                        actions=[("", "Skip trumping")],
-                    ):
-                        trumping_screenshots = cli_ui.ask_string("Paste screenshot links for the trumping torrent (comma-separated):", default="")
-                except EOFError, KeyboardInterrupt:
-                    logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
-                    return False
-
-                reported_screenshots = (reported_screenshots or "").strip()
-                trumping_screenshots = (trumping_screenshots or "").strip()
-                if not reported_screenshots or not trumping_screenshots:
-                    logger.info("[yellow]No screenshot links provided. Skipping trump report creation.[/yellow]")
-                    return False
-
-                meta.screenshots_reported_torrent = [link.strip() for link in reported_screenshots.split(",") if link.strip()]
-                meta.screenshots_trumping_torrent = [link.strip() for link in trumping_screenshots.split(",") if link.strip()]
-                if not meta.screenshots_reported_torrent or not meta.screenshots_trumping_torrent:
-                    logger.info("[yellow]No valid screenshot links provided. Skipping trump report creation.[/yellow]")
-                    return False
-                return True
-            logger.info("[yellow]Skipping trump report creation as no comparison method provided.[/yellow]")
-            return False
-        logger.debug(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
-        return True
-
-    async def get_tracker_trumps(self, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], int | None]:
-        logger.debug(f"[bold green]Searching for trumps on {tracker}[/bold green]")
-        requests: list[JsonDict] = []
-        status_code: int | None = None
-        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Accept": "application/json"}
-
-        params: JsonDict = {
-            "reported_torrent_id": f"{reported_torrent_id}",
-        }
-
-        all_data: list[Any] = []
-        next_cursor: str | None = None
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                while True:
-                    try:
-                        # Add pagination cursor to params if we have one
-                        if next_cursor:
-                            params["cursor"] = next_cursor
-
-                        response = await client.get(url=url, headers=headers, params=params)
-                        status_code = response.status_code
-
-                        if response.status_code == 200:
-                            data = response.json()
-                            if not isinstance(data, dict):
-                                logger.info(f"[bold red]Unexpected response format: {type(data)}[/bold red]")
-                                return requests, status_code
-                            data_dict = cast(JsonDict, data)
-                            page_data: list[Any] = []
-                            if "data" in data_dict and isinstance(data_dict["data"], list):
-                                page_data.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                            elif "results" in data_dict and isinstance(data_dict["results"], list):
-                                page_data.extend([item for item in data_dict["results"] if isinstance(item, dict)])
-                            else:
-                                logger.info("[bold red]Unexpected response format[/bold red]")
-                                return requests, status_code
-
-                            all_data.extend(page_data)
-
-                            # Check for pagination
-                            meta_info_any = data_dict.get("meta", {})
-                            if not isinstance(meta_info_any, dict):
-                                logger.info(f"[bold red]Unexpected 'meta' format: {type(meta_info_any)}[/bold red]")
-                                break
-
-                            meta_info = cast(JsonDict, meta_info_any)
-
-                            next_cursor = cast(str | None, meta_info.get("next_cursor"))
-                            if not next_cursor:
-                                break  # Exit loop if there are no more pages
-                            # Rest between page fetches
-                            logger.info(f"[cyan]Fetched {len(page_data)} trumping reports, waiting 1 second before next page...[/cyan]")
-                            await asyncio.sleep(1)
-                        else:
-                            logger.info(f"[bold red]Failed to search trumps on {tracker}. HTTP Status: {response.status_code} - {response.text}[/bold red]")
-                            break
-
-                    except httpx.RequestError as e:
-                        logger.info(f"[bold red]HTTP Request failed: {e}[/bold red]")
-                        break
-
-                # Process all collected data
-                try:
-                    for each in all_data:
-                        # Normalize trumping_torrent to always be a list
-                        entry = cast(JsonDict, each)
-                        trumping_torrent_value = entry.get("trumping_torrent")
-                        if trumping_torrent_value is None:
-                            trumping_torrent = []
-                        elif isinstance(trumping_torrent_value, dict):
-                            trumping_torrent = [cast(JsonDict, trumping_torrent_value)]
-                        elif isinstance(trumping_torrent_value, list):
-                            trumping_torrent = cast(list[JsonDict], trumping_torrent_value)
-                        else:
-                            trumping_torrent = []
-
-                        result: JsonDict = {
-                            "id": entry.get("id"),
-                            "type": entry.get("type"),
-                            "title": entry.get("title"),
-                            "solved": entry.get("solved"),
-                            "reported_torrents": entry.get("reported_torrents", []),
-                            "trumping_torrent": trumping_torrent,
-                        }
-                        requests.append(result)
-
-                except Exception as e:
-                    logger.info(f"[bold red]Error processing response data: {e}[/bold red]")
-                    return requests, status_code
-
-        except httpx.TimeoutException:
-            logger.info("[bold red]Request timed out after 10 seconds")
-            status_code = None
-        except Exception as e:
-            logger.error(f"[bold red]Unexpected error: {e}")
-            status_code = None
-
-        logger.debug(f"Total trumping reports retrieved: {len(requests)}")
-
-        return requests, status_code
-
-    async def make_trumpable_report(self, meta: Meta, tracker: str) -> bool:
-        """Create a trump report by POSTing to the /create endpoint"""
-        logger.debug(f"[bold green]Creating trump report on {tracker}[/bold green]")
-
-        tracker_instance = self._create_tracker_instance(tracker)
-        if not tracker_instance:
-            logger.info(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
-            return False
-
-        base_url = getattr(tracker_instance, "trumping_url", None)
-        if not isinstance(base_url, str):
-            logger.info(f"[red]No trumping URL found for {tracker}[/red]")
-            return False
-
-        reported_torrent_id = meta.get(f"{tracker}_reported_torrent_id", "")
-        if not reported_torrent_id:
-            logger.info(f"[red]No reported torrent ID found in meta for trump report creation on {tracker}[/red]")
-            return False
-        # Replace /filter with /create. For LST the URL requires a numeric ID segment.
-        if tracker == "LST":
-            rt = str(reported_torrent_id).strip()
-            if not rt.isdigit():
-                logger.info(f"[red]Invalid or missing reported torrent ID for LST: {reported_torrent_id}[/red]")
-                return False
-            try:
-                rid_int = int(rt)
-            except ValueError:
-                logger.info(f"[red]Reported torrent ID for LST is not an integer: {reported_torrent_id}[/red]")
-                return False
-            create_url = base_url + f"{rid_int}/trump"
-        else:
-            create_url = base_url.replace("/filter", "/create")
-
-        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
-
-        # Read per-tracker reported_torrent_id, with fallback to legacy key for backwards compatibility
-        if not reported_torrent_id:
-            logger.info(f"[red]No reported torrent ID found for {tracker}[/red]")
-            return False
-        reported_torrent_id = str(reported_torrent_id)
-        try:
-            status_map = meta.tracker_status or {}
-            trumping_torrent_id = status_map[tracker]["torrent_id"]
-        except KeyError:
-            logger.info(f"[red]No torrent ID found in meta for trumping torrent on {tracker}[/red]")
-            logger.info("[red]Either the upload failed, or you're in debug[/red]")
-            if not meta.debug:
-                return False
-            # Set fallback for debug mode so payload construction doesn't fail
-            trumping_torrent_id: str | None = None
-
-        if meta.tv_pack:
-            message = f"{meta.ua_name} season pack trump"
-        elif meta.trump_reason == "exact_match":
-            message = f"{meta.ua_name} exact filename trump"
-        elif meta.trump_reason == "trumpable_release":
-            message = f"{meta.ua_name} trumpable release trump"
-        else:
-            message = f"{meta.ua_name} is trumping this torrent for reasons {meta.ua_name} has not correctly caught. User selected yes at a prompt."
-
-        if tracker != "LST":
-            payload: JsonDict = {"reported_torrent_id": reported_torrent_id, "trumping_torrent_id": trumping_torrent_id, "message": message}
-            if "screenshots_reported_torrent" in meta:
-                payload["screenshots_reported_torrent"] = ",".join(cast(list[str], meta.screenshots_reported_torrent))
-            if "screenshots_trumping_torrent" in meta:
-                payload["screenshots_trumping_torrent"] = ",".join(cast(list[str], meta.screenshots_trumping_torrent))
-            if "screenshots_in_description" in meta and meta.screenshots_in_description:
-                payload["message"] = f"{payload.get('message', '')} - User says comparison screenshots are in description."
-
-        else:
-            if not meta.tv_pack:
-                try:
-                    with webui_events.field_prompt(
-                        "Trump report",
-                        {"Tracker": tracker, "Report message": message, "Trumped torrent": f"https://lst.gg/torrents/{trumping_torrent_id}"},
-                        hint="Added to the report message. Leave it blank to send the report without it.",
-                        actions=[("", "Send without a reason")],
-                    ):
-                        user_message = cli_ui.ask_string("Enter a reason for the trump report on LST:")
-                except EOFError, KeyboardInterrupt:
-                    logger.info("[yellow]Prompt cancelled; no additional message provided.[/yellow]")
-                    user_message = None
-                message = message + ": " + user_message if user_message else message + ": No additional message provided by user"
-            message = message + ": https://lst.gg/torrents/" + str(trumping_torrent_id)
-            payload: JsonDict = {"message": message}
-
-        if not meta.debug:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.post(url=create_url, headers=headers, json=payload)
-                    observe_tracker_response(self.config, meta, tracker, response)
-                    if response.status_code in (200, 201):
-                        logger.info(f"[bold green]Successfully created trump report on {tracker}[/bold green]")
-                        return True
-                    logger.info(f"[bold red]Failed to create trump report. HTTP Status: {response.status_code}[/bold red]")
-                    return False
-
-            except httpx.TimeoutException:
-                logger.info("[bold red]Request timed out after 10 seconds[/bold red]")
-                return False
-            except httpx.RequestError as e:
-                logger.info(f"[bold red]HTTP Request failed: {e}[/bold red]")
-                return False
-            except Exception as e:
-                logger.error(f"[bold red]Unexpected error: {e}[/bold red]")
-                return False
-        else:
-            logger.info("[bold yellow]Debug mode enabled, skipping actual trump report creation.[/bold yellow]")
-            logger.info(f"[cyan]POST URL: {create_url}[/cyan]")
-            logger.info(f"[cyan]Payload: {payload}[/cyan]")
-            return True
-
 
 tracker_class_map: Any = LazyTrackerDict(
     {
@@ -1525,6 +1213,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "FLOOD": ("src.trackers.flood", "Flood"),
         "FUNFILE": ("src.trackers.funfile", "FunFile"),
         "GREATPOSTERWALL": ("src.trackers.GAZELLE.greatposterwall", "GreatPosterWall"),
+        "HAPPYFAPPY": ("src.trackers.LUMINANCE.happyfappy", "HappyFappy"),
         "HAWKEUNO": ("src.trackers.UNIT3D.hawkeuno", "HawkeUno"),
         "HDBITS": ("src.trackers.hdbits", "HDBits"),
         "HDSPACE": ("src.trackers.hdspace", "HDSpace"),
@@ -1534,6 +1223,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "INFINITYHD": ("src.trackers.UNIT3D.infinityhd", "InfinityHD"),
         "IPTORRENTS": ("src.trackers.iptorrents", "IPTorrents"),
         "ITATORRENTS": ("src.trackers.UNIT3D.itatorrents", "ItaTorrents"),
+        "KUFIRC": ("src.trackers.LUMINANCE.kufirc", "Kufirc"),
         "LAJIDUI": ("src.trackers.NEXUSPHP.lajidui", "Lajidui"),
         "LASTDIGITALUNDERGROUND": ("src.trackers.UNIT3D.lastdigitalunderground", "LastDigitalUnderground"),
         "LATTEAM": ("src.trackers.UNIT3D.latteam", "LatTeam"),
@@ -1574,6 +1264,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "SAMARITANO": ("src.trackers.UNIT3D.samaritano", "Samaritano"),
         "SEEDPOOL": ("src.trackers.UNIT3D.seedpool", "Seedpool"),
         "SHAREISLAND": ("src.trackers.UNIT3D.shareisland", "ShareIsland"),
+        "SIMURG": ("src.trackers.GAZELLE.simurg", "Simurg"),
         "SKIPTHECOMMERCIALS": ("src.trackers.UNIT3D.skipthecommercials", "SkipTheCommercials"),
         "SPEEDAPP": ("src.trackers.speedapp", "SpeedApp"),
         "SUIO": ("src.trackers.USENET.suio", "Suio"),
@@ -1633,22 +1324,23 @@ def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ..
         return parsed.hostname.lower() if parsed.hostname else None
 
     trackers_config = config.get("TRACKERS", {})
-    tracker_config_map = trackers_config if isinstance(trackers_config, dict) else {}
+    tracker_config_map = trackers_config if _is_str_dict(trackers_config) else {}
     tracker_hosts: dict[str, tuple[str, ...]] = {}
 
     for tracker_name, tracker_class in tracker_class_map.items():
         domains = [resolved_host for value in (getattr(tracker_class, "base_url", ""),) if (resolved_host := hostname(value))]
 
         for attribute_name in ("comment_hosts", "tracker_urls"):
-            values = getattr(tracker_class, attribute_name, ())
+            values: object = getattr(tracker_class, attribute_name, ())
             if isinstance(values, str):
                 values = (values,)
-            if isinstance(values, tuple | list):
-                domains.extend(resolved_host for value in values if (resolved_host := hostname(value)))
+            if isinstance(values, (tuple, list)):
+                seq_values: list[object] = list(values)
+                domains.extend(resolved_host for value in seq_values if (resolved_host := hostname(value)))
 
-        tracker_config = tracker_config_map.get(tracker_name, {})
-        if isinstance(tracker_config, dict):
-            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config.get(key, ""))))
+        tracker_config_raw = tracker_config_map.get(tracker_name, {})
+        if _is_str_dict(tracker_config_raw):
+            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config_raw.get(key, ""))))
 
         if domains:
             tracker_hosts[tracker_name] = tuple(dict.fromkeys(domains))

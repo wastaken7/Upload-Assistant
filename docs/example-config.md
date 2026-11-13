@@ -18,6 +18,8 @@ If an earlier automatic update restored options you deliberately removed, restor
 
 `DEFAULT.stats_enabled` controls collection of privacy-preserving daily aggregates for the Web UI Stats workspace. It defaults to `False`; setting it to `True` enables collection and display. Disabling it again hides existing statistics without deleting them.
 
+`DEFAULT.history_enabled` controls the local upload history shown on the Web UI History page. It defaults to `True`. Each processed release is recorded when it finishes, with its name, path, external IDs, every tracker's result and link, and request matches; debug runs are not recorded. Setting it to `False` stops recording without deleting stored entries. `DEFAULT.history_retention_days` deletes entries older than that many days whenever a new one is recorded; `0` (the default) keeps them forever.
+
 ## Config file shape
 
 The config is a Python dict named `config` with these top-level sections:
@@ -474,9 +476,10 @@ Typical keys:
 - `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category applied when UA adds a cross-seed torrent. When empty, the normal qBittorrent tag/category rules apply.
 - `content_layout` (str): qBittorrent content layout for every torrent added through this client. Use `"Original"`, `"Subfolder"`, or `"NoSubfolder"` (default `"Original"`).
 - `linking` (str): `"symlink"`, `"hardlink"`, or empty to disable.
-- `allow_fallback` (bool): Fallback to original path injection if linking fails.
+- `allow_fallback` (bool): Fallback to original path injection if linking fails, including when no `linked_folder` matches the content's drive.
 - `linked_folder` (list[str]): Destination folder(s) for linked content. This is the top level directory that will contain the linked content.
 - `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), matched case-insensitively. Local path is how UA sees the content, remote path is how the client sees the content.
+- `match_existing_content` (str): For a client that seeds its own copy of your files, such as a seedbox. Before adding, UA looks in this client for a complete torrent holding the same files (names and sizes) and seeds the new torrent from that torrent's folder, without path mapping or linking. `"prefer"` uses that copy when found and otherwise the path mapping; `"require"` adds the torrent to this client only when such a copy is found. Empty (default) always uses the path mapping. See [Seeding From a Second Client (Seedbox)](seeding-from-a-second-client.md).
 - `link_dir_name` (str): Optional single directory name for linked content. Path separators, parent traversal, absolute paths, and Windows drive/device names are rejected.
 - `torrent_storage_dir` (str, optional): Only needed if API searching doesn’t work. Falls back to search the client storage directory for existing torrents.
 

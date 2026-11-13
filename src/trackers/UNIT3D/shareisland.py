@@ -74,8 +74,13 @@ class ShareIsland(UNIT3D):
         if len(lang_str) == 2:
             return lang_str
         try:
-            lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
-            return lang_obj.alpha_2.lower() if lang_obj else lang_str
+            lang_obj: object = (  # pyright: ignore[reportUnknownVariableType]
+                pycountry.languages.get(name=lang_str.title())  # pyright: ignore[reportUnknownMemberType]
+                or pycountry.languages.get(alpha_2=lang_str)  # pyright: ignore[reportUnknownMemberType]
+                or pycountry.languages.get(alpha_3=lang_str)  # pyright: ignore[reportUnknownMemberType]
+            )
+            alpha_2: object = getattr(lang_obj, "alpha_2", None) if lang_obj else None
+            return alpha_2.lower() if isinstance(alpha_2, str) else lang_str
         except AttributeError, KeyError, LookupError:
             return lang_str
 
@@ -572,19 +577,22 @@ class ShareIsland(UNIT3D):
         iso_lower = iso_code.lower()
 
         # Try alpha_2 (IT, EN, etc) and convert to alpha_3
-        lang = pycountry.languages.get(alpha_2=iso_lower)
+        lang: object = pycountry.languages.get(alpha_2=iso_lower)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if lang and hasattr(lang, "alpha_3"):
-            return str(lang.alpha_3).upper()
+            alpha_3_val: object = getattr(lang, "alpha_3", "")
+            return str(alpha_3_val).upper()
 
         # Try alpha_3 (ITA, ENG, etc)
-        lang = pycountry.languages.get(alpha_3=iso_lower)
+        lang = pycountry.languages.get(alpha_3=iso_lower)  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if lang and hasattr(lang, "alpha_3"):
-            return str(lang.alpha_3).upper()
+            alpha_3_val = getattr(lang, "alpha_3", "")
+            return str(alpha_3_val).upper()
 
         # Try full language name (Italian, English, etc)
-        lang = pycountry.languages.get(name=iso_code.title())
+        lang = pycountry.languages.get(name=iso_code.title())  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if lang and hasattr(lang, "alpha_3"):
-            return str(lang.alpha_3).upper()
+            alpha_3_val = getattr(lang, "alpha_3", "")
+            return str(alpha_3_val).upper()
 
         return iso_code.upper()
 
@@ -734,7 +742,7 @@ class ShareIsland(UNIT3D):
 
         try:
             url = f"https://api.themoviedb.org/3/{media_type}/{tmdb_id}"
-            params = {"api_key": api_key, "language": "it-IT"}
+            params: dict[str, Any] = {"api_key": api_key, "language": "it-IT"}
             resp = await asyncio.to_thread(requests.get, url, params=params, timeout=5, verify=certifi.where())
             resp.encoding = "utf-8"
 

@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import cli_ui
@@ -25,6 +25,10 @@ from src.metadata_cache import is_cache_miss, tracker_metadata_cache_for
 from src.tracker_descriptions import description_fingerprint
 from src.trackermeta import TrackerMetaManager
 from src.trackersetup import tracker_class_map
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class TrackerDataManager:
@@ -72,11 +76,12 @@ class TrackerDataManager:
             sort_keys=True,
         )
         cached = await cache.get(tracker_name.lower(), "torrent", cache_key) if use_cache else None
-        if use_cache and not is_cache_miss(cached) and isinstance(cached, dict):
-            cached_metadata = cached.get("metadata")
-            if isinstance(cached_metadata, dict):
+        if use_cache and not is_cache_miss(cached) and _is_str_dict(cached):
+            cached_dict = cached
+            cached_metadata = cached_dict.get("metadata")
+            if _is_str_dict(cached_metadata):
                 meta.update(cached_metadata)
-            match = bool(cached.get("match", False))
+            match = bool(cached_dict.get("match", False))
             logger.debug(f"[cyan]{tracker_name}: using cached metadata for torrent ID {tracker_id}.[/cyan]")
             return meta, match
 
@@ -137,12 +142,13 @@ class TrackerDataManager:
             if tracker_name == "BROADCASTHENET":
                 btn_id = candidate.get_tracker_id("BROADCASTHENET") or ""
                 trackers_config = self.config.get("TRACKERS", {})
-                btn_config = trackers_config.get("BROADCASTHENET", trackers_config.get("BTN", {})) if isinstance(trackers_config, dict) else {}
-                btn_api = btn_config.get("api_key") if isinstance(btn_config, dict) else None
-                btn_api = btn_api or self.default_config.get("btn_api")
+                trackers_dict = trackers_config if _is_str_dict(trackers_config) else {}
+                btn_config_raw = trackers_dict.get("BROADCASTHENET", trackers_dict.get("BTN", {}))
+                btn_config = btn_config_raw if _is_str_dict(btn_config_raw) else {}
+                btn_api = btn_config.get("api_key") or self.default_config.get("btn_api")
                 if not isinstance(btn_api, str) or not btn_api.strip():
                     return None
-                btn_api_url = btn_config.get("api_url", "https://api.broadcasthe.net/") if isinstance(btn_config, dict) else "https://api.broadcasthe.net/"
+                btn_api_url = btn_config.get("api_url", "https://api.broadcasthe.net/")
                 imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id, str(btn_api_url))
                 if not (imdb or tvdb):
                     return None
@@ -511,18 +517,18 @@ class TrackerDataManager:
                     is_tracker_comment = False
                     comment = str(comment_data.get("comment", ""))
                     # Dynamically build tracker hosts
-                    tracker_hosts = {}
+                    tracker_hosts: dict[str, str] = {}
                     for name in api_trackers:
-                        hostname = ""
+                        hostname: str = ""
                         if name in tracker_class_map:
                             with contextlib.suppress(Exception):
                                 tracker_instance = tracker_class_map[name](self.config)
                                 base_url = getattr(tracker_instance, "base_url", "")
-                                if base_url:
+                                if isinstance(base_url, str) and base_url:
                                     hostname = urlparse(base_url).hostname or ""
                         if not hostname:
                             announce_url = self.config.get("TRACKERS", {}).get(name, {}).get("announce_url", "")
-                            if announce_url:
+                            if isinstance(announce_url, str) and announce_url:
                                 hostname = urlparse(announce_url).hostname or ""
                         if hostname:
                             tracker_hosts[name] = hostname.lower()
@@ -570,9 +576,10 @@ class TrackerDataManager:
                     cache = tracker_metadata_cache_for(meta.base_dir, self.config)
                     cache_key = json.dumps({"id": tracker_id}, sort_keys=True)
                     cached = await cache.get(tracker_name.lower(), "region_distributor", cache_key)
-                    if not is_cache_miss(cached) and isinstance(cached, dict):
-                        cached_metadata = cached.get("metadata")
-                        if isinstance(cached_metadata, dict):
+                    if not is_cache_miss(cached) and _is_str_dict(cached):
+                        cached_dict = cached
+                        cached_metadata = cached_dict.get("metadata")
+                        if _is_str_dict(cached_metadata):
                             meta.update(cached_metadata)
                         logger.debug(f"[cyan]{tracker_name}: using cached region/distributor data for torrent ID {tracker_id}.[/cyan]")
                     else:

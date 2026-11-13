@@ -12,6 +12,11 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+try:
+    import rarfile
+except ImportError:
+    rarfile = None
+
 from src.console import logger
 
 
@@ -183,22 +188,19 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
         except Exception as e:
             logger.debug(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
     elif ext == ".cbr":
-        try:
-            import rarfile
-
-            has_rarfile = True
-        except ImportError:
-            logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
-            has_rarfile = False
-
-        if has_rarfile:
+        if rarfile is not None:
             try:
                 with rarfile.RarFile(filepath, "r") as r:
-                    xml_name = next((name for name in r.namelist() if name.lower().endswith("comicinfo.xml")), None)
+                    names = [str(n) for n in r.namelist()]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    xml_name = next((name for name in names if name.lower().endswith("comicinfo.xml")), None)
                     if xml_name:
-                        xml_data = r.read(xml_name)
+                        xml_raw: object = r.read(xml_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                        if isinstance(xml_raw, (bytes, bytearray)):
+                            xml_data = bytes(xml_raw)
             except Exception as e:
                 logger.debug(f"[yellow]Debug: Error reading CBR rar archive: {e}[/yellow]")
+        else:
+            logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
 
     if not xml_data:
         return metadata
@@ -284,7 +286,7 @@ def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
 
     tempdir = None
     try:
-        tempdir, _ = mobi.extract(mobi_path)
+        tempdir, _ = mobi.extract(mobi_path)  # pyright: ignore[reportUnknownMemberType]
 
         # Search for any .opf file in the tempdir
         opf_path = None
@@ -492,7 +494,7 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
     try:
         # Disable mupdf display errors to avoid spamming console
         with contextlib.suppress(Exception):
-            pymupdf.TOOLS.mupdf_display_errors(False)
+            pymupdf.TOOLS.mupdf_display_errors(False)  # pyright: ignore[reportUnknownMemberType]
 
         with pymupdf.open(pdf_path) as doc:
             found = find_isbn_page(doc)
@@ -531,7 +533,7 @@ def date_event_from_str(event_str: str | None) -> str | None:
     return None
 
 
-def get_attr_ignore_ns(elem: ET.Element, attr_name: str) -> str | None:
+def get_attr_ignore_ns(elem: ET.Element[Any], attr_name: str) -> str | None:
     if attr_name in elem.attrib:
         return elem.attrib[attr_name]
     for k, v in elem.attrib.items():
@@ -585,7 +587,7 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                 return None
 
             # Collect refinements
-            refinements = []
+            refinements: list[dict[str, str]] = []
             for child in metadata_elem:
                 tag = child.tag.split("}")[-1]
                 if tag == "meta":
@@ -597,27 +599,27 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                         text = (child.text or "").strip()
                         refinements.append({"refId": ref_id, "refProp": prop, "refScheme": scheme, "refText": text})
 
-            def find_refinement(ref_id, prop):
+            def find_refinement(ref_id: str, prop: str) -> dict[str, str] | None:
                 for r in refinements:
                     if r["refId"] == ref_id and r["refProp"] == prop:
                         return r
                 return None
 
-            identifiers = []
-            titles = []
-            languages = []
-            contributors = []
-            creators = []
-            dates_map = {}
-            sources = []
-            m_type = None
-            coverages = []
-            descriptions = []
-            formats = []
-            publishers = []
-            relations = []
-            rights = []
-            subjects = []
+            identifiers: list[dict[str, str | None]] = []
+            titles: list[dict[str, Any]] = []
+            languages: list[str] = []
+            contributors: list[dict[str, Any]] = []
+            creators: list[dict[str, Any]] = []
+            dates_map: dict[str, str] = {}
+            sources: list[dict[str, str | None]] = []
+            m_type: str | None = None
+            coverages: list[str] = []
+            descriptions: list[dict[str, str | None]] = []
+            formats: list[str] = []
+            publishers: list[str] = []
+            relations: list[str] = []
+            rights: list[str] = []
+            subjects: list[str] = []
 
             for child in metadata_elem:
                 tag = child.tag.split("}")[-1]
@@ -671,7 +673,7 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                             with contextlib.suppress(ValueError):
                                 creator_seq = int(ref_seq["refText"])
 
-                    item = {"role": role_val, "file_as": file_as_val, "creator_seq": creator_seq, "text": text}
+                    item: dict[str, Any] = {"role": role_val, "file_as": file_as_val, "creator_seq": creator_seq, "text": text}
                     if tag == "creator":
                         creators.append(item)
                     else:
@@ -733,12 +735,12 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                     subjects.append(text)
 
             # Build formatted lines
-            lines = []
+            lines: list[str] = []
             lines.append("package")
             lines.append(f"  version: {version}")
             lines.append(f"  unique-identifier: {unique_id}")
 
-            def format_subline(key, val):
+            def format_subline(key: str, val: object) -> str:
                 if val is None or val == "":
                     return ""
                 return f"  {key}: {val}"

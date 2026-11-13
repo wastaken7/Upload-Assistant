@@ -201,6 +201,22 @@ async def test_ulcx_audio_subtitle_mediainfo_rules():
     )
     assert await tracker.get_additional_checks(meta_default_sub_english) is False
 
+    # Forced subtitles for foreign-language parts may stay default on English content
+    meta_default_forced_sub_english = make_ulcx_meta(
+        personalrelease=True,
+        language="en",
+        original_language="en",
+        mediainfo={
+            "media": {
+                "track": [
+                    {"@type": "Audio", "Format": "AAC", "Channels": "2"},
+                    {"@type": "Text", "Language": "english", "Default": "Yes", "Forced": "Yes"},
+                ]
+            }
+        },
+    )
+    assert await tracker.get_additional_checks(meta_default_forced_sub_english) is True
+
     # Default subtitles on non-personal English releases are permitted by the SHOULD rule
     meta_default_sub_non_personal = make_ulcx_meta(
         language="en",
@@ -217,9 +233,23 @@ async def test_ulcx_audio_subtitle_mediainfo_rules():
     assert await tracker.get_additional_checks(meta_default_sub_non_personal) is True
 
 
-TRUEHD_ATMOS = {"@type": "Audio", "Format": "MLP FBA", "Format_Commercial_IfAny": "Dolby TrueHD with Dolby Atmos", "Format_AdditionalFeatures": "16-ch", "Channels": "8", "Channels_Original": "Object Based"}
+TRUEHD_ATMOS = {
+    "@type": "Audio",
+    "Format": "MLP FBA",
+    "Format_Commercial_IfAny": "Dolby TrueHD with Dolby Atmos",
+    "Format_AdditionalFeatures": "16-ch",
+    "Channels": "8",
+    "Channels_Original": "Object Based",
+}
 DTS_HD_MA = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD Master Audio", "Format_AdditionalFeatures": "XLL", "Channels": "6"}
-DTS_X = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD Master Audio", "Format_AdditionalFeatures": "XLL X", "Channels": "8", "Channels_Original": "Object Based"}
+DTS_X = {
+    "@type": "Audio",
+    "Format": "DTS",
+    "Format_Commercial_IfAny": "DTS-HD Master Audio",
+    "Format_AdditionalFeatures": "XLL X",
+    "Channels": "8",
+    "Channels_Original": "Object Based",
+}
 DTS_HD_HRA = {"@type": "Audio", "Format": "DTS", "Format_Commercial_IfAny": "DTS-HD High Resolution Audio", "Format_AdditionalFeatures": "XBR", "Channels": "6"}
 AC3_CORE = {"@type": "Audio", "Format": "AC-3", "Channels": "6"}
 

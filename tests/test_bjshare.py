@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -44,6 +45,205 @@ def test_get_screenshots_converts_webp_to_png(tmp_path: Path) -> None:
     assert uploaded[0][0].startswith(b"\x89PNG\r\n\x1a\n")  # noqa: S101
 
 
+def test_get_screenshots_falls_back_to_common_host_for_failed_local_upload(tmp_path: Path) -> None:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True)
+    paths = []
+    for index in range(2):
+        path = screenshots / f"Example-{index}.png"
+        Image.new("RGB", (2, 2), "red").save(path, format="PNG")
+        paths.append(path)
+    first, second = register(tmp_path, "release", paths, "main")
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+
+    async def fake_img_host(_image_bytes: bytes, filename: str) -> str | None:
+        return None if filename == second.name else "https://tracker.example/first.png"
+
+    tracker.img_host = fake_img_host
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "image_list": [
+                {"raw_url": "https://common.example/first.png", "local_file_path": str(first)},
+                {"raw_url": "https://common.example/second.png", "local_file_path": str(second)},
+            ],
+        }
+    )
+
+    result = asyncio.run(tracker.get_screenshots(meta))
+
+    assert sorted(result) == ["https://common.example/second.png", "https://tracker.example/first.png"]  # noqa: S101
+
+
+def test_get_screenshots_falls_back_by_the_hosted_source_file_name(tmp_path: Path) -> None:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True)
+    path = screenshots / "Example-0.png"
+    Image.new("RGB", (2, 2), "red").save(path, format="PNG")
+    (registered,) = register(tmp_path, "release", [path], "main")
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+
+    async def failing_img_host(_image_bytes: bytes, _filename: str) -> None:
+        return None
+
+    tracker.img_host = failing_img_host
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            # Main screenshot hosting records the file name as source_file.
+            "image_list": [{"raw_url": "https://common.example/other.png"}, {"raw_url": "https://common.example/same.png", "source_file": registered.name}],
+        }
+    )
+
+    assert asyncio.run(tracker.get_screenshots(meta)) == ["https://common.example/same.png"]  # noqa: S101
+
+
+def _bjshare_for_description(monkeypatch, generated: list[dict]) -> BJShare:
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.config = {"DEFAULT": {}, "TRACKERS": {"BJSHARE": {}}}
+    tracker.preview_only = False
+    tracker.episode_tmdb_data = {}
+
+    async def fake_generator(_self, _meta, **kwargs):
+        generated.append(kwargs)
+        signature = kwargs["signature"] if kwargs.get("ua_signature", True) else ""
+        return "\n".join(part for part in ("Ficha técnica", signature) if part)
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.DescriptionBuilder.general_description_generator", fake_generator)
+    return tracker
+
+
+def _register_sheet(tmp_path: Path, name: str) -> Path:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    path = screenshots / name
+    path.write_bytes(b"sheet")
+    (registered,) = register(tmp_path, "release", [path], "main", details={str(path): {"kind": "xxx_contact_sheet"}})
+    return registered
+
+
+def test_description_links_animated_sheets_above_the_signature(tmp_path: Path, monkeypatch) -> None:
+    generated: list[dict] = []
+    tracker = _bjshare_for_description(monkeypatch, generated)
+    sheet = _register_sheet(tmp_path, "sheet.webp")
+    second_sheet = _register_sheet(tmp_path, "second.webp")
+    frame = tmp_path / "tmp" / "release" / "screenshots" / "frame.webp"
+    frame.write_bytes(b"frame")
+    (frame,) = register(tmp_path, "release", [frame], "main")
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": "XXX",
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [
+                {"raw_url": "https://common.example/frame.webp", "source_file": frame.name},
+                {"raw_url": "https://common.example/sheet.webp", "source_file": sheet.name},
+                {"raw_url": "https://common.example/second.webp", "source_file": second_sheet.name},
+            ],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    lines = description.splitlines()
+    assert lines[0] == "Ficha técnica"  # noqa: S101
+    # One centered block holds every sheet.
+    assert lines[1:3] == ["[align=center][img]https://common.example/sheet.webp[/img]", "[img]https://common.example/second.webp[/img][/align]"]  # noqa: S101
+    assert lines[3].startswith("[align=right][url=https://github.com/wastaken7/Upload-Assistant]")  # noqa: S101
+    assert "frame.webp" not in description  # noqa: S101
+    assert generated[0]["ua_signature"] is False  # noqa: S101
+
+
+def test_debug_description_file_holds_the_linked_sheets(tmp_path: Path, monkeypatch) -> None:
+    tracker = _bjshare_for_description(monkeypatch, [])
+    sheet = _register_sheet(tmp_path, "sheet.webp")
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": "XXX",
+            "debug": True,
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [{"raw_url": "https://common.example/sheet.webp", "source_file": sheet.name}],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    saved = (tmp_path / "tmp" / "release" / "[BJSHARE]DESCRIPTION.txt").read_text(encoding="utf-8")
+    assert saved == description  # noqa: S101
+    assert "[img]https://common.example/sheet.webp[/img]" in saved  # noqa: S101
+
+
+@pytest.mark.parametrize(("category", "sheet_name"), [("XXX", "sheet.png"), ("MOVIE", "sheet.webp")])
+def test_description_is_unchanged_without_an_animated_xxx_sheet(tmp_path: Path, monkeypatch, category: str, sheet_name: str) -> None:
+    generated: list[dict] = []
+    tracker = _bjshare_for_description(monkeypatch, generated)
+    sheet = _register_sheet(tmp_path, sheet_name)
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "category": category,
+            "ua_name": "Upload Assistant",
+            "current_version": "v1",
+            "image_list": [{"raw_url": f"https://common.example/{sheet_name}", "source_file": sheet.name}],
+        }
+    )
+
+    description = asyncio.run(tracker.build_description(meta))
+
+    assert "[img]" not in description  # noqa: S101
+    assert generated[0]["ua_signature"] is True  # noqa: S101
+
+
+def test_get_screenshots_keeps_common_host_links_when_rehosting_fails(tmp_path: Path) -> None:
+    class FailingSession:
+        async def get(self, _url, **_kwargs):
+            raise httpx.ConnectError("offline")
+
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.session = FailingSession()
+    urls = ["https://common.example/menu.png", "https://common.example/first.png", "https://common.example/second.png"]
+    meta = Meta(
+        {
+            "base_dir": str(tmp_path),
+            "uuid": "release",
+            "menu_images": [{"raw_url": urls[0]}],
+            "image_list": [{"raw_url": urls[1]}, {"raw_url": urls[2]}],
+        }
+    )
+
+    assert asyncio.run(tracker.get_screenshots(meta)) == urls  # noqa: S101
+
+
+def test_get_cover_falls_back_to_tmdb_link_when_image_host_fails() -> None:
+    class PosterSession:
+        async def get(self, _url, **_kwargs):
+            return SimpleNamespace(raise_for_status=lambda: None, content=b"poster")
+
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    tracker.session = PosterSession()
+    tracker.main_tmdb_data = {"poster_path": "/poster.jpg"}
+
+    async def failing_img_host(_image_bytes: bytes, _filename: str) -> None:
+        return None
+
+    tracker.img_host = failing_img_host
+
+    assert asyncio.run(tracker.get_cover(Meta({"category": "MOVIE"}))) == "https://image.tmdb.org/t/p/w500/poster.jpg"  # noqa: S101
+
+
 class FakeSession:
     def __init__(self, response=None):
         self.calls: list[dict[str, str]] = []
@@ -61,15 +261,12 @@ class FakeCookieValidator:
         return None
 
 
-def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True):
+def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True, episode=2, unattended=True, torrent_rows=None):
     tracker = object.__new__(BJShare)
     response = FakeResponse()
-    response.text = (
-        '<a href="logout.php?auth=abcdef"></a><div class="main_column">'
-        f'<table class="torrent_table details">{header_html}'
-        '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example">'
-        '<td class="number_column nobr">1 GiB</td></tr></table></div>'
-    )
+    if torrent_rows is None:
+        torrent_rows = '<tr id="torrent123" data-torrentname="Fictional.Adventure.S01.1080p-Example"><td class="number_column nobr">1 GiB</td></tr>'
+    response.text = f'<a href="logout.php?auth=abcdef"></a><div class="main_column"><table class="torrent_table details">{header_html}{torrent_rows}</table></div>'
     tracker.session = FakeSession(response)
     tracker.cookie_validator = FakeCookieValidator()
     meta = SimpleNamespace(
@@ -88,8 +285,10 @@ def audio_search(category, upload_audio, header_html, *, season=1, tv_pack=True)
         is_disc="",
         season_int=season,
         tv_pack=tv_pack,
-        episode_int=0 if tv_pack else 2,
+        episode_int=0 if tv_pack else episode,
         skipping=None,
+        unattended=unattended,
+        unattended_confirm=False,
     )
     return tracker, meta
 
@@ -144,6 +343,81 @@ def test_search_existing_audio_rules_normalize_case_and_whitespace(category):
     label = "Dual Áudio" if category == "TV" else "Torrents Dual Áudios"
     header = audio_header(category, "Dual Áudio").replace(label, "  " + "\n  ".join(label.upper().split()) + "  ")
     tracker, meta = audio_search(category, "Legendado", header)
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert meta.skipping == "BJSHARE"  # noqa: S101
+
+
+def series_release(release, audios, *, torrent_id, season_class="season_01"):
+    """Rows as a series page lists one release: the release cell spans all of its audio versions."""
+    rows = ""
+    for index, audio in enumerate(audios):
+        release_cell = f'<td rowspan="{2 * len(audios)}" class="{season_class}"><div class="year">2026</div><a href="#">{release}</a></td>' if index == 0 else ""
+        rows += (
+            f'<tr>{release_cell}<td colspan="5" class="edition_info audio_header {season_class}"><strong>{audio}</strong></td></tr>'
+            f'<tr id="torrent{torrent_id + index}" class="torrent_row group_torrent {season_class}" data-torrentname="Fictional.Adventure.{release}.1080p-Example">'
+            '<td>➟ [MKV]</td><td class="number_column nobr">1 GiB</td></tr>'
+        )
+    return rows
+
+
+SERIES_SEASON_HEADER = '<tr class="group_torrent season_header"><td class="edition_info season_header">Temporada 01</td></tr>'
+
+
+@pytest.mark.parametrize("episode, blocked", [(1, True), (2, False), (3, False)])
+def test_search_existing_audio_rules_match_episode_on_series_page(episode, blocked):
+    rows = SERIES_SEASON_HEADER + series_release("S01E02", ["Legendado"], torrent_id=200) + series_release("S01E01", ["Dual Áudio", "Legendado"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=False, episode=episode, torrent_rows=rows)
+
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    assert meta.skipping == ("BJSHARE" if blocked else None)  # noqa: S101
+    assert bool(dupes) is not blocked  # noqa: S101
+
+
+def test_search_existing_audio_rules_season_pack_covers_episode_upload():
+    rows = SERIES_SEASON_HEADER + series_release("Temporada 1", ["Dual Áudio"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=False, episode=5, torrent_rows=rows)
+
+    assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
+    assert meta.skipping == "BJSHARE"  # noqa: S101
+
+
+@pytest.mark.parametrize("existing_release, blocked", [("S01E01", False), ("Temporada 1", True)])
+def test_search_existing_audio_rules_season_pack_upload_ignores_episodes(existing_release, blocked):
+    rows = SERIES_SEASON_HEADER + series_release(existing_release, ["Dual Áudio"], torrent_id=100)
+    tracker, meta = audio_search("TV", "Legendado", "", tv_pack=True, torrent_rows=rows)
+
+    asyncio.run(tracker.search_existing(meta))
+
+    assert meta.skipping == ("BJSHARE" if blocked else None)  # noqa: S101
+
+
+@pytest.mark.parametrize("answer", [True, False])
+def test_search_existing_audio_conflict_asks_attended_user(monkeypatch, answer):
+    questions: list[str] = []
+
+    async def fake_prompt(_func, question, **_kwargs):
+        questions.append(question)
+        return answer
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.prompt_in_thread", fake_prompt)
+    monkeypatch.setattr("sys.stdin", SimpleNamespace(closed=False))
+    tracker, meta = audio_search("TV", "Legendado", audio_header("TV", "Dual Áudio"), unattended=False)
+
+    dupes = asyncio.run(tracker.search_existing(meta))
+
+    assert len(questions) == 1  # noqa: S101
+    assert meta.skipping == (None if answer else "BJSHARE")  # noqa: S101
+    assert bool(dupes) is answer  # noqa: S101
+
+
+def test_search_existing_audio_conflict_does_not_ask_unattended(monkeypatch):
+    async def fail_prompt(*_args, **_kwargs):
+        raise AssertionError("unattended runs must not prompt")
+
+    monkeypatch.setattr("src.trackers.GAZELLE.bjshare.prompt_in_thread", fail_prompt)
+    tracker, meta = audio_search("TV", "Legendado", audio_header("TV", "Dual Áudio"), unattended=True)
 
     assert asyncio.run(tracker.search_existing(meta)) == []  # noqa: S101
     assert meta.skipping == "BJSHARE"  # noqa: S101

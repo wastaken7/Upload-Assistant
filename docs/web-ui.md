@@ -14,6 +14,7 @@ For a minimal first run, see the [WebUI Quick Start](web-ui-basic.md). Docker an
 - [Configuration workspace](#configuration-workspace)
 - [Security and administration](#security-and-administration)
 - [Statistics](#statistics)
+- [History](#history)
 - [Appearance, Help, and Changelog](#appearance-help-and-changelog)
 - [Mobile layout](#mobile-layout)
 - [Troubleshooting](#troubleshooting)
@@ -27,14 +28,6 @@ python upload.py "/path/to/media" --webui 127.0.0.1:5000
 ```
 
 Open <http://127.0.0.1:5000> in a browser. The address defaults to `127.0.0.1:5000`; include `HOST:PORT` only when overriding it.
-
-### Screenshot mode
-
-To capture the current interface for documentation, sign in normally and open the Upload page with `?screenshot=1`, for example `http://127.0.0.1:5000/?screenshot=1`.
-
-This browser-only demo shows the fictional **The Automation Menace (1968)** release with frozen FFmpeg, mkbrr, Usenet, spectrogram, and HDR progress. The **GUI** output view shows the run paused at a fictional dupe prompt, with a slot recommendation, a warning and tracker results. It does not start an upload, run external tools, load your files or tracker configuration, or send API actions. Existing uploads in other tabs continue normally. Authentication is still required.
-
-Use **Choose poster** and **Choose backdrop** to select your fictional artwork (PNG, JPEG, or WebP, up to 4 MiB per image). The backdrop appears behind the poster. Both images stay in your browser and are remembered there independently when storage is available. The demo includes ten subtitle languages with different flags. Choose the theme and resize the panels normally, then click **Hide controls (H)** before taking the screenshot. Press **H** outside a text field to bring the controls back. **Exit demo**, or removing the query parameter, returns to the normal app.
 
 ### Browse roots
 
@@ -98,7 +91,7 @@ The sign-in and recovery pages use the color theme, light/dark mode, and corner 
 
 The desktop interface has three main areas:
 
-1. **Application rail:** switches between Upload, Configuration, and Stats and opens Changelog, Help, Appearance, or Log out.
+1. **Application rail:** switches between Upload, Configuration, Stats, and History and opens Changelog, Help, Appearance, or Log out.
 2. **Workspace navigation:** File Browser on the Upload page or the settings navigation on the Configuration page.
 3. **Main workspace:** upload controls, execution output, configuration fields, or administration tools.
 
@@ -284,7 +277,7 @@ An **API keys** indicator appears in the application rail when configured keys n
 
 UA also learns expiry dates from normal UNIT3D searches, uploads and shared tracker metadata/check requests. Both the CLI and WebUI upload console warn once per selected tracker/key per run. Cached dates are checked when trackers are selected, and new observations can warn during the run. Warnings are advisory and do not block uploads or replace normal authentication checks.
 
-Expiry metadata is stored in `data/api_key_expiry.sqlite3` under the user-state directory. Records contain a hash identifying the tracker, site and key, plus expiry and observation times; the API key itself is not stored there. Changing the key makes the old record inapplicable. These dates are observations, not a guarantee that a key has not subsequently been revoked.
+Expiry metadata is stored in the application database, `data/upload_assistant.sqlite3` under the user-state directory. Records contain a hash identifying the tracker, site and key, plus expiry and observation times; the API key itself is not stored there. Changing the key makes the old record inapplicable. These dates are observations, not a guarantee that a key has not subsequently been revoked.
 
 UA reads the ISO 8601 `X-Api-Key-Expires-At` response header and can also interpret an explicit `api_key.expires_at` value in a JSON response. LST documents that omitting the header on an authenticated response means no expiry. On other trackers, an omitted header means expiry is unknown; explicit JSON `null` means no expiry. Authentication errors, invalid dates and failed requests do not erase an earlier observation. Unknown and non-expiring keys do not generate warnings.
 
@@ -399,11 +392,42 @@ Use **Display** in the Stats toolbar to choose real activity or debug simulation
 
 The dashboard includes upload success and pioneering rates by destination, a route Sankey, media categories and technical profiles, a resolution×video/HDR matrix, torrents and NZBs created or reused, cache hit rates, logical external operations, known payload bytes sent through NNTP and successful image uploads, and CLI versus WebUI usage. **Successful media time** shows the total uploaded runtime and its Movie, TV, Sports, XXX, Audiobook, and Music distribution. Each successfully processed item is counted once globally even when it was uploaded to several destinations; selecting a tracker shows the runtime successfully uploaded to that destination. Unknown runtimes and content without a meaningful duration, such as ebooks and games, are excluded. The timeline switches between event counts, processed/uploaded volume, or both scales. Clicking a destination filters content metrics across the dashboard; cache and external-operation metrics remain global and are labeled accordingly. Dolby Vision profiles and compatible HDR layers are retained in combined buckets. The dashboard also shows unique uploaded volume, duplicate prevention, an estimate of hashing I/O avoided by reused base torrents, a 52-week activity heatmap, and comparisons with the previous equal-length period. WEB items are grouped by their identified streaming service, with unidentified WEB sources shown as **Unknown**. Personal releases are compared with standard releases and include aggregate results, success rate, category, and unique volume. Operations whose payload size is not measured display an em dash instead of a misleading zero. Distribution sections show local SVG donut charts with their exact sortable tables available in an expandable area directly below each chart. A logical external operation represents one adapter action; redirects and internal retries do not create additional hits.
 
+The dashboard also measures where time and effort go:
+
+- **Hashing throughput** is the volume hashed into new torrents divided by the hashing time (waiting for a free hashing slot is not counted). **Hashing I/O avoided** uses it to estimate how much hashing time reused base torrents saved. A base torrent counts as reused when it came from a torrent client, whichever stage found it.
+- **Time per stage** shows the average and total time of each run stage (preparation, confirmation, dupe checks, screenshots and image uploads, torrent creation, upload and request search), plus the average time of a whole item. Confirmation and dupe checks include the time spent waiting for your answers.
+- **Upload problems** groups failed and skipped routes by a short category, such as _Authentication_, _Rate limited_, _Timeout_, _Server error_, _Rejected by tracker_, _Duplicate_, _Banned group_, _Missing fields_ or _Too few trackers_. The category is derived from the tracker's response; the response text itself is never stored. The same categories appear in the **Uploads by destination** table.
+- **External operations** also counts requests to metadata providers (TMDB, IMDb, TVDB, TVmaze, IGDB, AniList, MusicBrainz, Discogs, Open Library, Google Books, Audible and similar). Each request keeps the provider name, outcome and duration, plus the day, count, source, mode and media category. No URL, query or media ID is kept. A provider's "not found" answer counts as a successful request.
+- **Image hosts** shows each host's success rate, average time per image and volume, and how often uploads moved on to the next configured host. Each image counts as one operation.
+- **After upload** counts cross-seeds added to a torrent client (once per tracker), exact and partial request matches, and trump reports sent.
+
+Hashing throughput, stage times and image hosts describe the whole installation, so they stay global when a tracker is selected.
+
 Open the **⋯** actions menu to download the current filtered response as JSON, export the daily timeline as CSV, or reset statistics. Export runs locally in the browser and does not add another server-side data store. Tracker reliability labels are derived from the displayed success rate: they summarize aggregate outcomes and are not an uptime monitor.
 
-Statistics are daily aggregates. Upload Assistant does not store release names, paths, release-group names or tags, external media IDs, URLs, or credentials in the statistics database. Personal releases are stored only as a `personal` or `standard` aggregate. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
+Statistics are daily aggregates. Upload Assistant does not store release names, paths, release-group names or tags, external media IDs, URLs, or credentials in the statistics tables. Personal releases are stored only as a `personal` or `standard` aggregate. Collection begins when the feature is installed; existing cache files and logs are not scanned or backfilled, though later accesses to an existing cache count as new hits or misses.
 
-The database is stored at `data/stats.sqlite3` below the user-state directory. Collection is disabled by default; set `DEFAULT.stats_enabled` to `True` to opt in. While disabled, the dashboard is blocked and does not return or display previously collected aggregates. Stored aggregates remain intact and become visible again if collection is re-enabled. **Reset statistics** in the actions menu requires typing `RESET` and removes only statistics; it never removes cache entries, configuration, torrents, or NZBs.
+Statistics are stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Versions before the shared database used `data/stats.sqlite3` and `data/api_key_expiry.sqlite3`; their contents are copied into the new file once, when it is created, and the old files are then no longer read or written. A file that cannot be read (for example, a damaged one or an unsupported older statistics format) is skipped, so keep the old files, or a backup of them, until you have checked that your statistics appear on the Stats page. Collection is disabled by default; set `DEFAULT.stats_enabled` to `True` to opt in. While disabled, the dashboard is blocked and does not return or display previously collected aggregates. Stored aggregates remain intact and become visible again if collection is re-enabled. **Reset statistics** in the actions menu requires typing `RESET` and removes only statistics; it never removes cache entries, configuration, torrents, or NZBs.
+
+## History
+
+Open **History** from the application workspace navigation to see every release processed on this installation, newest first. An entry is added when an item finishes, including items that failed, were skipped at a prompt, were unsupported, or did not reach any tracker. Runs started with `--debug` are not recorded.
+
+Each entry keeps the release name, path, size, category and release details, its external IDs (IMDb, TMDb, TVDB, TVmaze, MAL, IGDB, Douban, Discogs, ISBN, and others) with links to their pages where one exists, every tracker's final result with its message, duration, and torrent link, the possible dupes and slot recommendation shown for each tracker, and request matches with their rewards. CLI and Web UI runs are both recorded.
+
+Search matches the release name, title, release group, and path, and the release's external IDs. IMDb (`tt0123456`), TMDb (`movie/42`, `tv/42`), ISBN, ASIN, and Open Library IDs match as typed, without regard to case or hyphens. For any ID, put the provider first: `imdb:`, `tmdb:`, `tvdb:`, `tvmaze:`, `mal:`, `douban:`, `igdb:`, `discogs:` (or `discogs_release:` and `discogs_master:`), `isbn:`, `asin:`, `openlibrary:`, `tpdb:`, or `blvckout:`, for example `tvdb:12345` or `tmdb:42` (movie or TV). ThePornDB IDs are stored as `scenes/ID`, `movies/ID` or `jav/ID`; `tpdb:ID` matches any of them, and `tpdb:scenes/ID` only that kind. Without a prefix, a number matches TVDB, TVmaze, MAL, Douban, IGDB, and Discogs IDs only through the release's text, so a year such as `2020` does not match those IDs; a number that is a whole ISBN or ASIN (for example `9780000000001`) still matches it. With `discogs:`, a kind in the value (`discogs:master/45` or a Discogs URL) searches only that kind. Filters narrow the list by category, tracker, tracker result (for example, every release that failed on one tracker), entries with request matches, and a date range in the browser's local time. The outcome buttons show how many entries match the other filters. Select an entry to see its details, copy its path, delete it, or choose **Upload again** to open the Upload page with its path in the queue. **CSV** and **JSON** download every entry matching the current filters (up to 100,000), with IDs, tracker results, links, and request matches; in the CSV, cells that a spreadsheet would run as a formula are prefixed with an apostrophe. **Clear history** requires typing `CLEAR` and removes only history entries; statistics, caches, configuration, torrents, and NZBs are untouched.
+
+### Saved IDs and answers
+
+Upload Assistant also remembers, per release, the external IDs you confirmed and the answers you gave to its questions (for example, adult tags or a game's platform). The next time the same release is processed, even from a renamed folder or after its `tmp` folder was deleted, those IDs are used as if they had been passed with `--imdb`, `--tmdb`, `--tvdb`, `--tvmaze`, `--mal`, `--douban`, `--igdb`, the Discogs options, `--isbn`, `--asin`, `--openlibrary`, `--tpdb`, or `--blvckout`, and the answers are not asked again. The log names each reused ID.
+
+- A release is recognised by the relative paths and sizes of its files (files under 1 MiB, such as NFOs, are ignored when larger files exist), so adding or replacing a media file makes it a new release.
+- IDs are remembered only after you answer **yes** to "Is this correct?", or after an upload with them succeeds. IDs found automatically in an unattended run that uploaded nothing, or found after the confirmation (for example by tracker checks) in a run that uploaded nothing, are not remembered. A confirmed run without any IDs keeps the ones saved earlier.
+- IDs are reused only when the release still has the same category (a release first guessed as a movie takes the TV category it was confirmed with) and no ID was given on the command line. They replace IDs found automatically, such as from scene or tracker data. Saved IDs are used together or not at all, so a corrected `--imdb` is never paired with an old `--tmdb`. Answers given with `--answer` also win over saved ones.
+- Debug runs are remembered too, so IDs confirmed during a `--debug` run are reused by the real upload. This does not depend on `history_enabled`.
+- Pass `--no-saved-ids` to search for the IDs again; correcting an ID at the confirmation prompt replaces the saved one.
+
+Recording is controlled by `DEFAULT.history_enabled`, which is on by default. Turning it off stops new entries without deleting stored ones. Set `DEFAULT.history_retention_days` to delete entries older than that many days each time a new one is recorded; the default, `0`, keeps them forever. The history is stored in the application database, `data/upload_assistant.sqlite3` below the user-state directory. Unlike the statistics tables, it contains release names, paths, and links, so treat a copy of that file like your upload logs.
 
 ## Appearance, Help, and Changelog
 

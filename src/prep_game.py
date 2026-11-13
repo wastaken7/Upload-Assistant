@@ -10,7 +10,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -109,8 +109,14 @@ def extract_version_from_nfo(nfo_path: str) -> str | None:
     return None
 
 
+SWITCH2_NAME_PATTERN = re.compile(r"\b(?:switch\s*2|nsw?2)\b")
+
+
 def map_to_clean_code(p_name: str) -> str:
     p_name_norm = p_name.lower()
+    # Checked first: the generic "switch" entries below also match "Switch 2".
+    if SWITCH2_NAME_PATTERN.search(p_name_norm):
+        return "SWITCH2"
     nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
     reverse_map = {
         "playstation 5": "PS5",
@@ -163,7 +169,7 @@ def clean_game_search_title(value: str) -> str:
     title = re.sub(r"(?i)\b(?:update|patch|build|version)\b.*", "", title)
     title = re.sub(r"(?i)\bv\d+.*", "", title)
     tags_to_remove = (
-        r"(?:nsw|switch|nds|3ds|ps1|ps2|ps3|ps4|ps5|psp|psvita|vita|wii|wiiu|xbox|xbox360|x360|xone|xsx|pc|"
+        r"(?:nsw2|ns2|switch2|switch 2|nsw|switch|nds|3ds|ps1|ps2|ps3|ps4|ps5|psp|psvita|vita|wii|wiiu|xbox|xbox360|x360|xone|xsx|pc|"
         r"multi\d*|eng|english|fre|french|ger|german|spa|spanish|ita|italian|jpn|japanese|por|portuguese|bra|brazilian|"
         r"proper|repack|readnfo|internal|dvd|rip|iso|god|jb|psn|eshop|cracked|unlocked|crackfix)"
     )
@@ -180,10 +186,17 @@ def _normalized_game_title(value: Any) -> str:
 
 
 def _gazelle_candidate_platforms(candidate: dict[str, Any]) -> list[str]:
-    artists = candidate.get("Artists", [])
-    if not isinstance(artists, list):
+    raw_artists = candidate.get("Artists", [])
+    if not isinstance(raw_artists, list):
         return []
-    return [map_to_clean_code(str(item.get("name", ""))) for item in artists if isinstance(item, dict) and item.get("name")]
+    result: list[str] = []
+    for item in cast(list[Any], raw_artists):
+        if isinstance(item, dict):
+            item_dict = cast(dict[str, Any], item)
+            name_val = item_dict.get("name")
+            if name_val:
+                result.append(map_to_clean_code(str(name_val)))
+    return result
 
 
 def _rank_gazelle_candidates(candidates: list[dict[str, Any]], title: str, year: Any, platform: str) -> list[dict[str, Any]]:
@@ -239,7 +252,9 @@ def select_gazelle_candidate(candidates: list[dict[str, Any]], title: str, meta:
     for candidate in displayed:
         name = str(candidate.get("Name") or candidate.get("groupname") or "Unknown")
         year = str(candidate.get("Year") or candidate.get("year") or "")
-        platforms = ", ".join(str(item.get("name")) for item in candidate.get("Artists", []) if isinstance(item, dict) and item.get("name"))
+        artists_val = candidate.get("Artists", [])
+        artist_list = cast(list[Any], artists_val) if isinstance(artists_val, list) else []
+        platforms = ", ".join(str(cast(dict[str, Any], item).get("name")) for item in artist_list if isinstance(item, dict) and cast(dict[str, Any], item).get("name"))
         group_id = str(candidate.get("ID") or candidate.get("id") or "?")
         choices.append(f"{name}{f' ({year})' if year else ''}{f' [{platforms}]' if platforms else ''} [GGN {group_id}]")
     skip_choice = "Skip - Don't use a GazelleGames match"
@@ -304,7 +319,8 @@ def apply_gazelle_metadata(meta: Meta, metadata: dict[str, Any], manual: dict[st
         values = metadata.get(field)
         if isinstance(values, list) and values:
             current = getattr(meta, field)
-            merged = list(dict.fromkeys([*(current if isinstance(current, list) else []), *values]))
+            current_list = cast(list[Any], current) if isinstance(current, list) else []
+            merged: list[Any] = list(dict.fromkeys([*current_list, *values]))
             if merged != current:
                 setattr(meta, field, merged)
                 applied.add(field)
@@ -312,9 +328,10 @@ def apply_gazelle_metadata(meta: Meta, metadata: dict[str, Any], manual: dict[st
         values = metadata.get(field)
         if isinstance(values, dict) and values:
             current = getattr(meta, field)
-            merged = {**values, **(current if isinstance(current, dict) else {})}
-            if merged != current:
-                setattr(meta, field, merged)
+            current_dict = cast(dict[str, Any], current) if isinstance(current, dict) else {}
+            merged_dict: dict[str, Any] = {**values, **current_dict}
+            if merged_dict != current:
+                setattr(meta, field, merged_dict)
                 applied.add(field)
     available = metadata.get("available_platforms")
     if available and not manual.get("platform", False):
@@ -347,7 +364,7 @@ async def get_7z_path(base_dir: str, config: dict[str, Any] | None = None) -> st
 
 
 async def list_archive_contents_with_7z(archive_path: str, binary_path: str) -> list[str]:
-    contents = []
+    contents: list[str] = []
     try:
         cmd = [binary_path, "l", "-slt", archive_path]
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
@@ -371,8 +388,8 @@ async def detect_platform_from_files(
     config: dict[str, Any] | None = None,
 ) -> str | None:
     # Normalize paths to lowercase and use forward slashes
-    files_lower = []
-    basenames_lower = []
+    files_lower: list[str] = []
+    basenames_lower: list[str] = []
     for f in filelist:
         p = f.replace("\\", "/").lower()
         files_lower.append(p)
@@ -399,9 +416,16 @@ async def detect_platform_from_files(
 
     # --- 1. Extension and specific file/folder pattern checks ---
 
-    # Switch
+    # Switch 2 (checked first: a Switch 2 release can also carry Switch files)
+    if any(b.endswith(".nup") for b in basenames_lower):
+        return "SWITCH2"
+
+    # Switch (Switch 2 games can ship in the same formats; the release name tells them apart)
     switch_exts = (".nsp", ".xci", ".nca", ".szs", ".nsz", ".xcz")
     if any(b.endswith(switch_exts) for b in basenames_lower):
+        release_name = Path(path_to_check or (filelist[0] if filelist else "")).name.lower()
+        if SWITCH2_NAME_PATTERN.search(re.sub(r"[._\-\[\]]", " ", release_name)):
+            return "SWITCH2"
         return "SWITCH"
 
     # 3DS
@@ -495,6 +519,8 @@ async def detect_platform_from_files(
             "XONE": ["xone", "xbox one", "xboxone"],
             "X360": ["x360", "xbox 360", "xbox360"],
             "XBOX": ["xbox"],
+            # Before SWITCH: "\bswitch\b" also matches "switch 2".
+            "SWITCH2": ["nsw2", "ns2", "switch 2", "switch2"],
             "SWITCH": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
             "3DS": ["3ds", f"{nin_term} 3ds"],
             "NDS": ["nds", f"{nin_term} ds", f"{nin_term}ds", f"{nin_term} ds"],
@@ -601,24 +627,30 @@ async def enrich_game_from_steam(
                 await cache.set("steam", "appdetails", cache_key, res_data, negative=True)
             else:
                 res_data = {}
-        if isinstance(res_data, dict) and res_data and steam_id in res_data and res_data[steam_id].get("success"):
-            app_data = res_data[steam_id]["data"]
+        res_dict = cast(dict[str, Any], res_data) if isinstance(res_data, dict) else {}
+        if res_dict and steam_id in res_dict:
+            app_entry = res_dict[steam_id]
+            if isinstance(app_entry, dict):
+                app_entry_dict = cast(dict[str, Any], app_entry)
+                if app_entry_dict.get("success"):
+                    app_data = cast(dict[str, Any], app_entry_dict.get("data", {}))
 
-            if any(t in target_trackers for t in trackers):
-                desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
-                desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
-                desc_unescaped = html.unescape(desc_clean)
-                if desc_unescaped and not meta.manual_overview:
-                    meta.localized_overviews = {"brazilian": desc_unescaped}
+                    if any(t in target_trackers for t in trackers):
+                        desc = str(app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or "")
+                        desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
+                        desc_unescaped = html.unescape(desc_clean)
+                        if desc_unescaped and not meta.manual_overview:
+                            meta.localized_overviews = {"brazilian": desc_unescaped}
 
-            pc_reqs = app_data.get("pc_requirements", {})
-            if isinstance(pc_reqs, dict):
-                minimum = pc_reqs.get("minimum", "")
-                recommended = pc_reqs.get("recommended", "")
-                if minimum:
-                    meta.requirements_minimum = minimum
-                if recommended:
-                    meta.requirements_recommended = recommended
+                    raw_pc_reqs = app_data.get("pc_requirements", {})
+                    if isinstance(raw_pc_reqs, dict):
+                        pc_reqs = cast(dict[str, Any], raw_pc_reqs)
+                        minimum = str(pc_reqs.get("minimum", ""))
+                        recommended = str(pc_reqs.get("recommended", ""))
+                        if minimum:
+                            meta.requirements_minimum = minimum
+                        if recommended:
+                            meta.requirements_recommended = recommended
     except Exception as error:
         logger.info(f"[yellow]Steam: Error fetching app details: {error}[/yellow]")
     return steam_id
@@ -627,7 +659,8 @@ async def enrich_game_from_steam(
 def _unique_names(items: Any) -> list[str]:
     if not isinstance(items, list):
         return []
-    return list(dict.fromkeys(str(item.get("name", "")).strip() for item in items if isinstance(item, dict) and str(item.get("name", "")).strip()))
+    raw_list = [cast(dict[str, Any], item) for item in cast(list[Any], items) if isinstance(item, dict)]
+    return list(dict.fromkeys(str(item.get("name", "")).strip() for item in raw_list if str(item.get("name", "")).strip()))
 
 
 def _merge_meta_list(meta: Meta, field: str, values: list[str]) -> None:
@@ -646,34 +679,35 @@ def _igdb_multiplayer_modes(items: Any) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     if not isinstance(items, list):
         return result
-    for item in items:
+    for item in cast(list[Any], items):
         if not isinstance(item, dict):
             continue
-        platform_data = item.get("platform")
-        platform = str(platform_data.get("name", "")).strip() if isinstance(platform_data, dict) else ""
-        platform = platform or "All platforms"
+        item_dict = cast(dict[str, Any], item)
+        platform_data = item_dict.get("platform")
+        platform_dict = cast(dict[str, Any], platform_data) if isinstance(platform_data, dict) else {}
+        platform = str(platform_dict.get("name", "")).strip() or "All platforms"
         capabilities: list[str] = []
-        if item.get("campaigncoop"):
+        if item_dict.get("campaigncoop"):
             capabilities.append("Campaign co-op")
-        if item.get("dropin"):
+        if item_dict.get("dropin"):
             capabilities.append("Drop-in/out multiplayer")
-        if item.get("lancoop"):
+        if item_dict.get("lancoop"):
             capabilities.append("LAN co-op")
-        if item.get("offlinecoop"):
-            maximum = item.get("offlinecoopmax")
+        if item_dict.get("offlinecoop"):
+            maximum = item_dict.get("offlinecoopmax")
             capabilities.append(f"Offline co-op (up to {maximum})" if isinstance(maximum, int) and maximum > 0 else "Offline co-op")
-        offline_max = item.get("offlinemax")
+        offline_max = item_dict.get("offlinemax")
         if isinstance(offline_max, int) and offline_max > 0:
             capabilities.append(f"Offline multiplayer (up to {offline_max})")
-        if item.get("onlinecoop"):
-            maximum = item.get("onlinecoopmax")
+        if item_dict.get("onlinecoop"):
+            maximum = item_dict.get("onlinecoopmax")
             capabilities.append(f"Online co-op (up to {maximum})" if isinstance(maximum, int) and maximum > 0 else "Online co-op")
-        online_max = item.get("onlinemax")
+        online_max = item_dict.get("onlinemax")
         if isinstance(online_max, int) and online_max > 0:
             capabilities.append(f"Online multiplayer (up to {online_max})")
-        if item.get("splitscreen"):
+        if item_dict.get("splitscreen"):
             capabilities.append("Split-screen")
-        if item.get("splitscreenonline"):
+        if item_dict.get("splitscreenonline"):
             capabilities.append("Online split-screen")
         if capabilities:
             result[platform] = list(dict.fromkeys([*result.get(platform, []), *capabilities]))
@@ -698,15 +732,18 @@ def apply_igdb_extended_metadata(meta: Meta, game: dict[str, Any]) -> None:
     _merge_meta_list(meta, "keywords", keywords)
 
     age_ratings = dict(meta.game_age_ratings) if isinstance(meta.game_age_ratings, dict) else {}
-    for entry in game.get("age_ratings", []) if isinstance(game.get("age_ratings"), list) else []:
-        if not isinstance(entry, dict):
-            continue
-        organization = entry.get("organization")
-        category = entry.get("rating_category")
-        organization_name = str(organization.get("name", "")).strip() if isinstance(organization, dict) else ""
-        rating_name = str(category.get("rating", "")).strip() if isinstance(category, dict) else ""
-        if organization_name and rating_name:
-            age_ratings.setdefault(organization_name, rating_name)
+    raw_age_ratings = game.get("age_ratings", [])
+    if isinstance(raw_age_ratings, list):
+        for entry in cast(list[Any], raw_age_ratings):
+            if not isinstance(entry, dict):
+                continue
+            entry_dict = cast(dict[str, Any], entry)
+            organization = cast(dict[str, Any], entry_dict.get("organization")) if isinstance(entry_dict.get("organization"), dict) else {}
+            category = cast(dict[str, Any], entry_dict.get("rating_category")) if isinstance(entry_dict.get("rating_category"), dict) else {}
+            organization_name = str(organization.get("name", "")).strip()
+            rating_name = str(category.get("rating", "")).strip()
+            if organization_name and rating_name:
+                age_ratings.setdefault(organization_name, rating_name)
     meta.game_age_ratings = age_ratings
 
     ratings = dict(meta.game_ratings) if isinstance(meta.game_ratings, dict) else {}
@@ -715,7 +752,10 @@ def apply_igdb_extended_metadata(meta: Meta, game: dict[str, Any]) -> None:
         ("IGDB Critics", "aggregated_rating", "aggregated_rating_count"),
     ):
         try:
-            score = float(game.get(score_key))
+            raw_score = game.get(score_key)
+            if raw_score is None:
+                continue
+            score = float(raw_score)
         except TypeError, ValueError:
             continue
         if math.isfinite(score) and 0 <= score <= 100:
@@ -732,61 +772,68 @@ def apply_igdb_extended_metadata(meta: Meta, game: dict[str, Any]) -> None:
     meta.game_multiplayer_modes = multiplayer
 
     release_dates = list(meta.game_release_dates) if isinstance(meta.game_release_dates, list) else []
-    for entry in game.get("release_dates", []) if isinstance(game.get("release_dates"), list) else []:
-        if not isinstance(entry, dict):
-            continue
-        date = ""
-        if type(entry.get("date")) is int:
-            with contextlib.suppress(OSError, OverflowError, ValueError):
-                date = datetime.datetime.fromtimestamp(entry["date"], datetime.UTC).strftime("%Y-%m-%d")
-        date = date or str(entry.get("human") or "").strip()
-        if not date:
-            continue
-        platform_data = entry.get("platform")
-        region_data = entry.get("release_region")
-        status_data = entry.get("status")
-        normalized = {
-            key: value
-            for key, value in {
-                "date": date,
-                "platform": str(platform_data.get("name", "")).strip() if isinstance(platform_data, dict) else "",
-                "region": str(region_data.get("region", "")).strip() if isinstance(region_data, dict) else "",
-                "status": str(status_data.get("name", "")).strip() if isinstance(status_data, dict) else "",
-            }.items()
-            if value
-        }
-        if normalized not in release_dates:
-            release_dates.append(normalized)
+    raw_release_dates = game.get("release_dates", [])
+    if isinstance(raw_release_dates, list):
+        for entry in cast(list[Any], raw_release_dates):
+            if not isinstance(entry, dict):
+                continue
+            entry_dict = cast(dict[str, Any], entry)
+            date = ""
+            raw_date = entry_dict.get("date")
+            if isinstance(raw_date, int):
+                with contextlib.suppress(OSError, OverflowError, ValueError):
+                    date = datetime.datetime.fromtimestamp(raw_date, datetime.UTC).strftime("%Y-%m-%d")
+            date = date or str(entry_dict.get("human") or "").strip()
+            if not date:
+                continue
+            platform_data = cast(dict[str, Any], entry_dict.get("platform")) if isinstance(entry_dict.get("platform"), dict) else {}
+            region_data = cast(dict[str, Any], entry_dict.get("release_region")) if isinstance(entry_dict.get("release_region"), dict) else {}
+            status_data = cast(dict[str, Any], entry_dict.get("status")) if isinstance(entry_dict.get("status"), dict) else {}
+            normalized = {
+                key: value
+                for key, value in {
+                    "date": date,
+                    "platform": str(platform_data.get("name", "")).strip(),
+                    "region": str(region_data.get("region", "")).strip(),
+                    "status": str(status_data.get("name", "")).strip(),
+                }.items()
+                if value
+            }
+            if normalized not in release_dates:
+                release_dates.append(normalized)
     meta.game_release_dates = release_dates
 
-    parent = game.get("parent_game")
-    if not meta.game_parent_title and isinstance(parent, dict):
+    parent = cast(dict[str, Any], game.get("parent_game")) if isinstance(game.get("parent_game"), dict) else {}
+    if not meta.game_parent_title and parent:
         meta.game_parent_title = str(parent.get("name", "")).strip()
-    game_type = game.get("game_type")
-    if not meta.game_type and isinstance(game_type, dict):
+    game_type = cast(dict[str, Any], game.get("game_type")) if isinstance(game.get("game_type"), dict) else {}
+    if not meta.game_type and game_type:
         meta.game_type = str(game_type.get("type", "")).strip()
-    game_status = game.get("game_status")
-    if not meta.game_status and isinstance(game_status, dict):
+    game_status = cast(dict[str, Any], game.get("game_status")) if isinstance(game.get("game_status"), dict) else {}
+    if not meta.game_status and game_status:
         meta.game_status = str(game_status.get("status", "")).strip()
     if not meta.game_release_edition:
         meta.game_release_edition = str(game.get("version_title") or "").strip()
 
     websites = game.get("websites", [])
     if not meta.game_official_url and isinstance(websites, list):
-        for website in websites:
+        for website in cast(list[Any], websites):
             if not isinstance(website, dict):
                 continue
-            website_type = website.get("type")
-            type_name = str(website_type.get("type", "")).casefold() if isinstance(website_type, dict) else ""
+            web_dict = cast(dict[str, Any], website)
+            website_type = web_dict.get("type")
+            type_dict = cast(dict[str, Any], website_type) if isinstance(website_type, dict) else {}
+            type_name = str(type_dict.get("type", "")).casefold()
             if website_type == 1 or type_name == "official":
-                meta.game_official_url = _valid_web_url(website.get("url"))
+                meta.game_official_url = _valid_web_url(web_dict.get("url"))
                 if meta.game_official_url:
                     break
     if not meta.youtube:
-        videos = game.get("videos", [])
-        if isinstance(videos, list):
-            trailer = next((video for video in videos if isinstance(video, dict) and video.get("video_id") and "trailer" in str(video.get("name", "")).casefold()), None)
-            trailer = trailer or next((video for video in videos if isinstance(video, dict) and video.get("video_id")), None)
+        raw_videos = game.get("videos", [])
+        if isinstance(raw_videos, list):
+            video_list = [cast(dict[str, Any], v) for v in cast(list[Any], raw_videos) if isinstance(v, dict)]
+            trailer = next((video for video in video_list if video.get("video_id") and "trailer" in str(video.get("name", "")).casefold()), None)
+            trailer = trailer or next((video for video in video_list if video.get("video_id")), None)
             if trailer:
                 meta.youtube = f"https://www.youtube.com/watch?v={trailer['video_id']}"
 
@@ -922,10 +969,11 @@ async def gather_game_prep(
             selected = select_gazelle_candidate(candidates, title_query, meta)
             if selected:
                 group_id = selected.get("ID") or selected.get("id")
-                group = await gazellegames_manager.fetch_group(group_id, base_dir=base_dir, api_key=ggn_api_key, config=config)
-                if group:
-                    ggn_payload = {"group": {**selected, **group}}
-                    logger.info(f"{GGN_COLOR}: title match found: {group.get('name', title_query)}")
+                if group_id is not None:
+                    group = await gazellegames_manager.fetch_group(str(group_id), base_dir=base_dir, api_key=ggn_api_key, config=config)
+                    if group:
+                        ggn_payload = {"group": {**selected, **group}}
+                        logger.info(f"{GGN_COLOR}: title match found: {group.get('name', title_query)}")
 
         if ggn_payload:
             ggn_metadata = gazellegames_manager.normalize_metadata(ggn_payload, exact_torrent=exact_match)
@@ -953,7 +1001,7 @@ async def gather_game_prep(
         return
 
     igdb = IGDBAPI(client_id, client_secret, base_dir)
-    selected_game = None
+    selected_game: dict[str, Any] | None = None
     selected_from_search = False
 
     igdb_manual = meta.igdb_manual
@@ -967,7 +1015,7 @@ async def gather_game_prep(
 
     # Auto-detect Steam ID from local NFO files if not manually specified
     if not steam_manual and not igdb_manual:
-        nfo_files = []
+        nfo_files: list[str] = []
         # Check files in filelist
         for f in meta.filelist:
             if f.lower().endswith(".nfo"):
@@ -1021,18 +1069,26 @@ async def gather_game_prep(
             logger.info(f"[yellow]IGDB: No game found with Steam ID '{steam_manual}'. Falling back to search.[/yellow]")
 
     if not selected_game:
-        results = await igdb.search_game(title_query)
-        if not results:
+        search_results = await igdb.search_game(title_query)
+        if not search_results:
             logger.info(f"[yellow]IGDB: No games found matching '{title_query}'[/yellow]")
             return
+        results: list[dict[str, Any]] = search_results
 
         # Sort results based on platform match if platform is known/detected
         if meta.platform and results:
             target_platform = meta.platform.upper().strip()
-            matching_results = []
-            other_results = []
+            matching_results: list[dict[str, Any]] = []
+            other_results: list[dict[str, Any]] = []
             for r in results:
-                raw_plats = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
+                raw_platforms_list = cast(list[Any], r.get("platforms")) if isinstance(r.get("platforms"), list) else []
+                raw_plats: list[str] = []
+                for p in raw_platforms_list:
+                    if isinstance(p, dict):
+                        p_dict = cast(dict[str, Any], p)
+                        p_name = p_dict.get("name")
+                        if p_name:
+                            raw_plats.append(str(p_name))
                 mapped_plats = [map_to_clean_code(p) for p in raw_plats]
                 if target_platform in mapped_plats:
                     matching_results.append(r)
@@ -1046,14 +1102,21 @@ async def gather_game_prep(
             selected_from_search = True
         else:
             # Prompt user to select
-            choices = []
+            choices: list[str] = []
             for r in results:
                 release_date = r.get("first_release_date")
                 year = ""
-                if release_date:
+                if isinstance(release_date, (int, float)):
                     year = f" ({datetime.datetime.fromtimestamp(release_date, datetime.UTC).year})"
 
-                platforms = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
+                raw_p_list = cast(list[Any], r.get("platforms")) if isinstance(r.get("platforms"), list) else []
+                platforms: list[str] = []
+                for p in raw_p_list:
+                    if isinstance(p, dict):
+                        p_dict = cast(dict[str, Any], p)
+                        p_name = p_dict.get("name")
+                        if p_name:
+                            platforms.append(str(p_name))
                 platforms_str = f" [{', '.join(platforms)}]" if platforms else ""
 
                 choices.append(f"{r.get('name')}{year}{platforms_str}")
@@ -1085,19 +1148,25 @@ async def gather_game_prep(
         selected_game = detailed_game
         selected_is_detailed = True
 
+    if not selected_game:
+        logger.info("[yellow]Skipped IGDB metadata selection.[/yellow]")
+        return
+
+    game_data: dict[str, Any] = selected_game
+
     # Cache selected game details
     if selected_is_detailed:
-        await igdb.cache_game_details(selected_game)
+        await igdb.cache_game_details(game_data)
 
     # Populate metadata
-    if selected_game.get("url"):
-        meta.igdb_url = selected_game["url"]
-    name = selected_game.get("name")
+    if game_data.get("url"):
+        meta.igdb_url = str(game_data["url"])
+    name = game_data.get("name")
     if name and not cli_overrides["title"] and "title" not in ggn_fields:
-        meta.title = name
+        meta.title = str(name)
 
-    release_date = selected_game.get("first_release_date")
-    if release_date:
+    release_date = game_data.get("first_release_date")
+    if isinstance(release_date, (int, float)):
         dt = datetime.datetime.fromtimestamp(release_date, datetime.UTC)
         meta.igdb_first_release_date = dt.strftime("%d/%m/%Y")
         if not cli_overrides["year"] and "year" not in ggn_fields:
@@ -1106,27 +1175,28 @@ async def gather_game_prep(
             meta.search_year = year_val
 
     # IGDB rating data (0-100 scale)
-    igdb_rating = selected_game.get("rating")
-    igdb_rating_count = selected_game.get("rating_count")
-    if igdb_rating is not None:
+    igdb_rating = game_data.get("rating")
+    igdb_rating_count = game_data.get("rating_count")
+    if isinstance(igdb_rating, (int, float)):
         meta.igdb_rating = round(float(igdb_rating), 1)
-    if igdb_rating_count is not None:
+    if isinstance(igdb_rating_count, (int, float)):
         meta.igdb_rating_count = int(igdb_rating_count)
 
-    apply_igdb_extended_metadata(meta, selected_game)
-    if selected_game.get("id") is not None and not meta.game_time_to_beat:
-        meta.game_time_to_beat = await igdb.fetch_time_to_beat(selected_game["id"])
+    apply_igdb_extended_metadata(meta, game_data)
+    if game_data.get("id") is not None and not meta.game_time_to_beat:
+        meta.game_time_to_beat = await igdb.fetch_time_to_beat(game_data["id"])
 
     # Overview / Storyline
-    summary = selected_game.get("summary")
-    storyline = selected_game.get("storyline")
-    overview = summary or storyline or ""
+    summary = game_data.get("summary")
+    storyline = game_data.get("storyline")
+    overview = str(summary or storyline or "")
     if overview and not cli_overrides["overview"] and "overview" not in ggn_fields:
         meta.overview = overview
 
     # Cover image (poster)
-    cover_info = selected_game.get("cover", {})
-    cover_url = cover_info.get("url")
+    cover_info = game_data.get("cover", {})
+    cover_dict = cast(dict[str, Any], cover_info) if isinstance(cover_info, dict) else {}
+    cover_url = str(cover_dict.get("url") or "")
     if cover_url:
         if cover_url.startswith("//"):
             cover_url = "https:" + cover_url
@@ -1134,13 +1204,27 @@ async def gather_game_prep(
         meta.artwork_url = cover_url
 
     # Genres
-    genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
+    genres: list[str] = []
+    raw_genres = cast(list[Any], game_data.get("genres")) if isinstance(game_data.get("genres"), list) else []
+    for g in raw_genres:
+        if isinstance(g, dict):
+            g_dict = cast(dict[str, Any], g)
+            g_name = g_dict.get("name")
+            if g_name:
+                genres.append(str(g_name))
     if genres and not cli_overrides["genres"] and "genres" not in ggn_fields:
         meta.genres = genres
 
     # Platforms
     if not cli_overrides["platform"] and "platform" not in ggn_fields:
-        raw_platforms = [p.get("name") for p in selected_game.get("platforms", []) if p.get("name")]
+        raw_platforms: list[str] = []
+        raw_platforms_data = cast(list[Any], game_data.get("platforms")) if isinstance(game_data.get("platforms"), list) else []
+        for p in raw_platforms_data:
+            if isinstance(p, dict):
+                p_dict = cast(dict[str, Any], p)
+                p_name = p_dict.get("name")
+                if p_name:
+                    raw_platforms.append(str(p_name))
         platforms_mapped = [map_to_clean_code(p) for p in raw_platforms]
         platforms = list(dict.fromkeys(platforms_mapped))
 
@@ -1152,7 +1236,7 @@ async def gather_game_prep(
             if raw_platforms:
                 nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
-                platform_mapping = {
+                platform_mapping: dict[str, list[str]] = {
                     "playstation 5": ["ps5", "playstation 5", "playstation5"],
                     "playstation 4": ["ps4", "playstation 4", "playstation4"],
                     "playstation 3": ["ps3", "playstation 3", "playstation3"],
@@ -1177,7 +1261,7 @@ async def gather_game_prep(
                 normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
                 for idx, p_name in enumerate(raw_platforms):
                     p_name_norm = p_name.lower()
-                    aliases = []
+                    aliases: list[str] = []
                     for map_key, map_aliases in platform_mapping.items():
                         if map_key in p_name_norm or p_name_norm in map_key:
                             aliases.extend(map_aliases)
@@ -1197,15 +1281,20 @@ async def gather_game_prep(
                 logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
-    developers = []
-    publishers = []
-    for comp_info in selected_game.get("involved_companies", []):
-        company = comp_info.get("company", {})
-        comp_name = company.get("name")
+    developers: list[str] = []
+    publishers: list[str] = []
+    raw_comp = cast(list[Any], game_data.get("involved_companies")) if isinstance(game_data.get("involved_companies"), list) else []
+    for comp_info in raw_comp:
+        if not isinstance(comp_info, dict):
+            continue
+        comp_dict = cast(dict[str, Any], comp_info)
+        company = comp_dict.get("company", {})
+        c_dict = cast(dict[str, Any], company) if isinstance(company, dict) else {}
+        comp_name = str(c_dict.get("name", "")).strip()
         if comp_name:
-            if comp_info.get("developer"):
+            if comp_dict.get("developer"):
                 developers.append(comp_name)
-            if comp_info.get("publisher"):
+            if comp_dict.get("publisher"):
                 publishers.append(comp_name)
 
     if developers and not cli_overrides["developer"] and "developer" not in ggn_fields:
@@ -1216,26 +1305,40 @@ async def gather_game_prep(
     # Extract Steam URL
     steam_url = None
     # 1. Check websites (Type 13 = Steam)
-    for web in selected_game.get("websites", []):
-        if web.get("type") == 13:
-            steam_url = web.get("url")
-            break
+    raw_websites = cast(list[Any], game_data.get("websites")) if isinstance(game_data.get("websites"), list) else []
+    for web in raw_websites:
+        if isinstance(web, dict):
+            w_dict = cast(dict[str, Any], web)
+            if w_dict.get("type") == 13:
+                steam_url = str(w_dict.get("url") or "")
+                break
     # 2. Check external_games (Source 1 = Steam)
     if not steam_url:
-        for ext in selected_game.get("external_games", []):
-            if ext.get("external_game_source") == 1:
-                steam_url = ext.get("url")
-                if not steam_url and ext.get("uid"):
-                    steam_url = f"https://store.steampowered.com/app/{ext.get('uid')}"
-                break
+        raw_ext = cast(list[Any], game_data.get("external_games")) if isinstance(game_data.get("external_games"), list) else []
+        for ext in raw_ext:
+            if isinstance(ext, dict):
+                ext_dict = cast(dict[str, Any], ext)
+                if ext_dict.get("external_game_source") == 1:
+                    steam_url = str(ext_dict.get("url") or "")
+                    if not steam_url and ext_dict.get("uid"):
+                        steam_url = f"https://store.steampowered.com/app/{ext_dict.get('uid')}"
+                    break
     if steam_url and "steam_url" not in ggn_fields:
         meta.steam_url = steam_url
 
     # Extract Languages
-    languages = {}
-    for support in selected_game.get("language_supports", []):
-        lang_name = support.get("language", {}).get("name")
-        support_type = support.get("language_support_type", {}).get("name")
+    languages: dict[str, list[str]] = {}
+    raw_lang_supports = cast(list[Any], game_data.get("language_supports")) if isinstance(game_data.get("language_supports"), list) else []
+    for support in raw_lang_supports:
+        if not isinstance(support, dict):
+            continue
+        s_dict = cast(dict[str, Any], support)
+        lang_obj = s_dict.get("language")
+        type_obj = s_dict.get("language_support_type")
+        lang_dict = cast(dict[str, Any], lang_obj) if isinstance(lang_obj, dict) else {}
+        type_dict = cast(dict[str, Any], type_obj) if isinstance(type_obj, dict) else {}
+        lang_name = str(lang_dict.get("name", "")).strip()
+        support_type = str(type_dict.get("name", "")).strip()
         if lang_name and support_type:
             if lang_name not in languages:
                 languages[lang_name] = []
@@ -1245,22 +1348,26 @@ async def gather_game_prep(
         meta.languages = languages
 
     # Extract available platforms
-    platforms = []
-    for platform in selected_game.get("platforms", []):
-        platform_name = platform.get("name")
-        if platform_name:
-            platforms.append(platform_name)
+    platforms: list[str] = []
+    raw_avail_platforms = cast(list[Any], game_data.get("platforms")) if isinstance(game_data.get("platforms"), list) else []
+    for platform in raw_avail_platforms:
+        if isinstance(platform, dict):
+            platform_dict = cast(dict[str, Any], platform)
+            platform_name = str(platform_dict.get("name", "")).strip()
+            if platform_name:
+                platforms.append(platform_name)
     if "available_platforms" not in ggn_fields:
         meta.available_platforms = platforms
 
     await enrich_game_from_steam(meta, base_dir, config, already_enriched_id=steam_enriched_id)
 
     # Extract Screenshots from IGDB
-    igdb_screenshots = selected_game.get("screenshots", [])
+    raw_igdb_screenshots = cast(list[Any], game_data.get("screenshots")) if isinstance(game_data.get("screenshots"), list) else []
+    igdb_screenshots: list[dict[str, Any]] = [cast(dict[str, Any], s) for s in raw_igdb_screenshots if isinstance(s, dict)]
     if igdb_screenshots:
-        image_list = []
+        image_list: list[dict[str, Any]] = []
         for screenshot in igdb_screenshots:
-            url = screenshot.get("url")
+            url = str(screenshot.get("url") or "")
             if url:
                 if url.startswith("//"):
                     url = "https:" + url
@@ -1276,7 +1383,7 @@ async def gather_game_prep(
             tmp_dir = Path(base_dir) / "tmp" / meta.uuid
             Path(tmp_dir).mkdir(parents=True, exist_ok=True)
             image_data_file = Path(tmp_dir) / "image_data.json"
-            image_data = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
+            image_data: dict[str, Any] = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
             try:
                 async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:
                     await img_file.write(json.dumps(image_data, indent=4))
@@ -1284,7 +1391,7 @@ async def gather_game_prep(
             except Exception as e:
                 logger.info(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
-    meta.igdb_id = selected_game.get("id", 0)
+    meta.igdb_id = int(game_data.get("id", 0) or 0)
 
     _update_console_game(meta)
 

@@ -1,4 +1,5 @@
 """Duplicate review totals follow real prompts without changing their decisions."""
+
 import asyncio
 import json
 import threading
@@ -9,6 +10,7 @@ import pytest
 from src import webui_events
 from src.meta import Meta
 from src.slot_rules.models import SlotDecision, Verdict
+from src.trump_reports import TrumpSupport
 from src.uphelper import UploadHelper
 
 
@@ -23,16 +25,23 @@ def gui(monkeypatch):
 def events(capsys):
     """Read progress events alongside the prompts they describe."""
     prefix = webui_events.event_prefix("review-progress-test")
-    return [json.loads(line[len(prefix):]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
+    return [json.loads(line[len(prefix) :]) for line in capsys.readouterr().out.splitlines() if line.startswith(prefix)]
 
 
 class Tracker:
     """A local tracker stub with the existing season-pack rejection policy."""
+
     reject_episode_if_season_pack_exists = True
 
     async def get_name(self, meta):
         """Keep the synthetic release name unchanged."""
         return meta.name
+
+
+class TrumpTracker(Tracker):
+    """A local tracker stub that accepts trump reports."""
+
+    trump_support = TrumpSupport(searchable=False)
 
 
 def helper_with_answers(monkeypatch, ask=None):
@@ -92,12 +101,15 @@ async def test_slow_searches_update_the_total_while_the_first_review_waits(gui, 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("debug", [False, True])
-@pytest.mark.parametrize("case,manual", [
-    ("automatic_skip", False),
-    ("manual_review", True),
-    ("clear", False),
-    ("slot_conflict", True),
-])
+@pytest.mark.parametrize(
+    "case,manual",
+    [
+        ("automatic_skip", False),
+        ("manual_review", True),
+        ("clear", False),
+        ("slot_conflict", True),
+    ],
+)
 async def test_completed_season_pack_checks_resolve_while_another_review_waits(gui, monkeypatch, capsys, case, manual, debug):
     """Finished pack checks stop discovery immediately, counting only manual reviews."""
     waiting = threading.Event()
@@ -150,16 +162,19 @@ async def test_completed_season_pack_checks_resolve_while_another_review_waits(g
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode,dupes,manual", [
-    ({}, [], False),
-    ({}, ["existing release"], True),
-    ({"unattended": True}, ["existing release"], False),
-    ({"unattended": True, "unattended_confirm": True}, ["existing release"], True),
-    ({"dupe": True}, ["existing release"], False),
-    ({"ask_dupe": True}, ["existing release"], False),
-    ({"season_pack_exists": True}, ["existing season"], False),
-    ({"dupe": True, "filename_match": "exact", "file_count_match": True}, ["existing release"], True),
-])
+@pytest.mark.parametrize(
+    "mode,dupes,manual",
+    [
+        ({}, [], False),
+        ({}, ["existing release"], True),
+        ({"unattended": True}, ["existing release"], False),
+        ({"unattended": True, "unattended_confirm": True}, ["existing release"], True),
+        ({"dupe": True}, ["existing release"], False),
+        ({"ask_dupe": True}, ["existing release"], False),
+        ({"season_pack_exists": True}, ["existing season"], False),
+        ({"dupe": True, "filename_match": "exact", "file_count_match": True}, ["existing release"], True),
+    ],
+)
 async def test_only_trackers_with_manual_prompts_are_counted(gui, monkeypatch, capsys, mode, dupes, manual):
     """Automatic approvals, unattended decisions and season-pack skips add no reviews."""
     helper = helper_with_answers(monkeypatch)
@@ -179,16 +194,33 @@ async def test_only_trackers_with_manual_prompts_are_counted(gui, monkeypatch, c
 async def test_slot_override_and_two_trump_questions_count_once_per_tracker(gui, monkeypatch, capsys):
     """A slot-only conflict and a multi-question trump flow are both manual reviews."""
     helper = helper_with_answers(monkeypatch)
+    helper.tracker_class_map = {**helper.tracker_class_map, "SECOND": lambda **_kwargs: TrumpTracker()}
     slot = SlotDecision(Verdict.BLOCK, "Slot filled", "FIRST", date(2026, 10, 15))
     with webui_events.dupe_review_scope(["FIRST", "SECOND"]):
         await helper.dupe_check([], Meta(category="MOVIE", name="Example"), "FIRST", slot)
-        await helper.dupe_check([{"name": "Trumpable release", "trumpable": True}], Meta(category="MOVIE", name="Example", trumpable_id=1), "SECOND")
+        await helper.dupe_check([{"name": "Trumpable release", "id": 1, "trumpable": True, "trump_target": True}], Meta(category="MOVIE", name="Example"), "SECOND")
     output = events(capsys)
     prompts = [event for event in output if event["kind"] == "prompt" and event["action"] == "open"]
     assert len(prompts) == 3
     final = [event for event in output if event["kind"] == "dupe_review"][-1]
     assert final["started"] == ["FIRST", "SECOND"]
     assert final["trackers"] == ["FIRST", "SECOND"]
+
+
+@pytest.mark.asyncio
+async def test_slot_trump_without_a_reportable_release_is_not_a_review(gui, monkeypatch, capsys):
+    """A slot trump whose releases have no torrent ID asks nothing, so it adds no review."""
+    helper = helper_with_answers(monkeypatch)
+    helper.tracker_class_map = {**helper.tracker_class_map, "SECOND": lambda **_kwargs: TrumpTracker()}
+    slot = SlotDecision(Verdict.ALLOW, "Replaces", "SECOND", date(2026, 10, 15), conflicts=[{"name": "Release without an ID"}], trump=True)
+    with webui_events.dupe_review_scope(["SECOND"]):
+        is_dupe, _meta = await helper.dupe_check([], Meta(category="MOVIE", name="Example"), "SECOND", slot)
+        webui_events.dupe_review_ready("SECOND", finished=True)
+    output = events(capsys)
+    assert is_dupe is False
+    assert not [event for event in output if event["kind"] == "prompt" and event["action"] == "open"]
+    # Never counted, not even until the check finished.
+    assert all(event["trackers"] == [] for event in output if event["kind"] == "dupe_review")
 
 
 @pytest.mark.asyncio
@@ -222,6 +254,7 @@ async def test_bdinfo_questions_name_their_tracker_and_keep_the_same_review_inde
 @pytest.mark.asyncio
 async def test_concurrent_batches_keep_their_review_lists_separate(gui, capsys):
     """Context propagation never mixes independent tracker batches."""
+
     async def batch(tracker):
         """Interleave one independent batch with another on the event loop."""
         with webui_events.dupe_review_scope([tracker]):

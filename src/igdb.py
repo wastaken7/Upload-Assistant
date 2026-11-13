@@ -3,13 +3,22 @@ import contextlib
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 
 import aiofiles
 import httpx
 
 from src.console import logger
 from src.metadata_cache import cache_for, is_cache_miss
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
+
 
 IGDB_SEARCH_FIELDS = "id, name, first_release_date, platforms.name"
 IGDB_GAME_FIELDS = ", ".join(
@@ -76,12 +85,12 @@ IGDB_GAME_FIELDS = ", ".join(
 
 
 class IGDBAPI:
-    def __init__(self, client_id: str, client_secret: str, base_dir: str = ""):
+    def __init__(self, client_id: str, client_secret: str, base_dir: str = "") -> None:
         self.client_id = client_id
         self.client_secret = client_secret
         self.base_dir = base_dir
         self.token_file = Path(base_dir) / "tmp" / "igdb_cache" / "igdb_token.json" if base_dir else ""
-        self.access_token = None
+        self.access_token: str | None = None
 
     async def get_access_token(self) -> str | None:
         # Try loading cached token
@@ -123,7 +132,7 @@ class IGDBAPI:
 
         cache = cache_for(self.base_dir)
         cached_data = await cache.get("igdb", "search_v2", clean_title)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, list):
+        if not is_cache_miss(cached_data) and _is_obj_list(cached_data):
             logger.info(f"[cyan]IGDB: Using cached search results for '{title}'[/cyan]")
             return cached_data
 
@@ -159,7 +168,7 @@ class IGDBAPI:
 
         cache = cache_for(self.base_dir)
         cached_data = await cache.get("igdb", "game_v3", igdb_id_str)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             logger.info(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
             return cached_data
 
@@ -178,8 +187,8 @@ class IGDBAPI:
                 resp = await client.post(url, headers=headers, content=query)
                 if resp.status_code == 200:
                     data = resp.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        game_data = data[0]
+                    if _is_obj_list(data) and len(data) > 0:
+                        game_data: dict[str, Any] | None = data[0]
                         if game_data is not None:
                             await cache.set("igdb", "game_v3", igdb_id_str, game_data)
                         return game_data
@@ -199,7 +208,7 @@ class IGDBAPI:
 
         cache = cache_for(self.base_dir)
         cached_data = await cache.get("igdb", "steam_v3", steam_id_str)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             logger.info(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
             return cached_data
 
@@ -218,8 +227,8 @@ class IGDBAPI:
                 resp = await client.post(url, headers=headers, content=query)
                 if resp.status_code == 200:
                     data = resp.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        game_data = data[0]
+                    if _is_obj_list(data) and len(data) > 0:
+                        game_data: dict[str, Any] | None = data[0]
                         if game_data is not None:
                             await cache.set("igdb", "steam_v3", steam_id_str, game_data)
                         return game_data
@@ -245,7 +254,7 @@ class IGDBAPI:
 
         cache = cache_for(self.base_dir)
         cached_data = await cache.get("igdb", "time_to_beat_v1", game_id_str)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             return {key: int(value) for key, value in cached_data.items() if key in {"hastily", "normally", "completely"} and isinstance(value, int)}
 
         token = await self.get_access_token()
@@ -262,7 +271,7 @@ class IGDBAPI:
                 logger.info(f"[red]IGDB: Time-to-beat request failed. Status: {resp.status_code}[/red]")
                 return {}
             data = resp.json()
-            item = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else {}
+            item: dict[str, Any] = data[0] if _is_obj_list(data) and data and _is_str_dict(data[0]) else {}
             result = {key: int(item[key]) for key in ("hastily", "normally", "completely") if isinstance(item.get(key), int) and item[key] > 0}
             await cache.set("igdb", "time_to_beat_v1", game_id_str, result, negative=not result)
             return result

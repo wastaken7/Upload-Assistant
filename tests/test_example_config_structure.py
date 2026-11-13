@@ -2,7 +2,6 @@ import ast
 from pathlib import Path
 from typing import Any, cast
 
-
 EXAMPLE_CONFIG_PATH = Path(__file__).parents[1] / "data" / "example_config.py"
 
 
@@ -45,11 +44,7 @@ def test_unit3d_tracker_templates_define_anon() -> None:
     from src.trackersetup import get_tracker_framework
 
     trackers = load_example_config()["TRACKERS"]
-    unit3d = sorted(
-        name
-        for name, settings in trackers.items()
-        if isinstance(settings, dict) and get_tracker_framework(name) == "UNIT3D"
-    )
+    unit3d = sorted(name for name, settings in trackers.items() if isinstance(settings, dict) and get_tracker_framework(name) == "UNIT3D")
 
     assert unit3d, "expected UNIT3D-family trackers in the example config"
     missing = [name for name in unit3d if not isinstance(trackers[name].get("anon"), bool)]

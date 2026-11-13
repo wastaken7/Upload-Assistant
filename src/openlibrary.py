@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 import httpx
 
@@ -10,12 +10,20 @@ from src.metadata_cache import MetadataCache, cache_for, is_cache_miss
 openlibrary_color_str = "[#e1d8c1]OpenLibrary[/#e1d8c1]"
 
 
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[Any]]:
+    return isinstance(val, list)
+
+
 class OpenLibraryManager:
     async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache: MetadataCache) -> str:
         """Fetch an author name from a key such as /authors/OL26320A."""
         author_id = author_key.split("/")[-1]
         cached_data = await cache.get("openlibrary", "author", author_id)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             return str(cached_data.get("name", ""))
 
         url = f"https://openlibrary.org/authors/{author_id}.json"
@@ -43,7 +51,7 @@ class OpenLibraryManager:
 
         cache = cache_for(base_dir)
         cached_data = await cache.get("openlibrary", "work", work_id)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             if cached_data.get("not_found"):
                 logger.info(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
                 return None
@@ -67,14 +75,14 @@ class OpenLibraryManager:
 
                         description = data.get("description")
                         if description:
-                            value = description.get("value", "") if isinstance(description, dict) else str(description)
+                            value = str(description.get("value", "")) if _is_str_dict(description) else str(description)
                             metadata["overview"] = re.sub(r"<[^>]+>", "", value).strip()
 
                         covers = data.get("covers")
-                        if covers and isinstance(covers, list) and isinstance(covers[0], int) and covers[0] > 0:
+                        if covers and _is_obj_list(covers) and isinstance(covers[0], int) and covers[0] > 0:
                             metadata["artwork_url"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
 
-                        author_names = []
+                        author_names: list[str] = []
                         for author_entry in data.get("authors", []):
                             author_obj = author_entry.get("author")
                             if author_obj and "key" in author_obj:
@@ -85,7 +93,7 @@ class OpenLibraryManager:
                             metadata["author"] = ", ".join(author_names)
 
                         subjects = data.get("subjects")
-                        if subjects and isinstance(subjects, list):
+                        if subjects and _is_obj_list(subjects):
                             subject_list = [str(subject) for subject in subjects[:10] if subject]
                             metadata["keywords"] = list(subject_list)
                             metadata["genres"] = list(subject_list)
@@ -113,7 +121,7 @@ class OpenLibraryManager:
 
         cache = cache_for(base_dir)
         cached_data = await cache.get("openlibrary", "isbn", clean_isbn)
-        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+        if not is_cache_miss(cached_data) and _is_str_dict(cached_data):
             if cached_data.get("not_found"):
                 logger.info(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
                 return None
@@ -133,13 +141,13 @@ class OpenLibraryManager:
                     if book_data:
                         details = book_data.get("details", {})
                         works = details.get("works", [])
-                        work_key = works[0].get("key", "") if works and isinstance(works, list) else ""
+                        work_key: str = works[0].get("key", "") if works and _is_obj_list(works) else ""
 
                         if work_key:
                             metadata = await self.search_by_work_id(work_key.split("/")[-1], base_dir)
                             if metadata:
                                 publishers = details.get("publishers")
-                                if publishers and isinstance(publishers, list) and not metadata.get("publisher"):
+                                if publishers and _is_obj_list(publishers) and not metadata.get("publisher"):
                                     metadata["publisher"] = ", ".join(publishers)
                                 self._add_year(metadata, details.get("publish_date"))
                                 metadata["isbn"] = clean_isbn
@@ -180,11 +188,11 @@ class OpenLibraryManager:
 
         subtitle = details.get("subtitle")
         metadata: dict[str, Any] = {"title": f"{title}: {subtitle}" if subtitle else title, "isbn": isbn}
-        author_names = [author.get("name") for author in details.get("authors", []) if author.get("name")]
+        author_names: list[str] = [author.get("name") for author in details.get("authors", []) if author.get("name")]
         if author_names:
             metadata["author"] = ", ".join(author_names)
         publishers = details.get("publishers")
-        if publishers and isinstance(publishers, list):
+        if publishers and _is_obj_list(publishers):
             metadata["publisher"] = ", ".join(publishers)
         self._add_year(metadata, details.get("publish_date"))
         thumbnail_url = book_data.get("thumbnail_url")

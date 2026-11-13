@@ -151,6 +151,8 @@ const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const OUTPUT_MODE_KEY = "ua_webui_output_mode";
 const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
 const RUN_GUI_COLLAPSED_ITEMS_KEY = "ua_webui_run_gui_collapsed_items";
+const RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY =
+  "ua_webui_run_gui_collapsed_option_groups";
 const REVIEW_PANELS_IN_MODAL_KEY = "ua_webui_review_panels_in_modal";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
@@ -479,9 +481,9 @@ const getStoredCollapsedSections = () => {
   }
 };
 
-const getStoredCollapsedRunGuiItems = () => {
+const getStoredCollapsedRunGuiItems = (key = RUN_GUI_COLLAPSED_ITEMS_KEY) => {
   try {
-    const stored = JSON.parse(storage.get(RUN_GUI_COLLAPSED_ITEMS_KEY) || "[]");
+    const stored = JSON.parse(storage.get(key) || "[]");
     return Array.isArray(stored)
       ? stored.filter((key) => typeof key === "string")
       : [];
@@ -676,6 +678,7 @@ const argumentSections = [
       { flag: "--tvmaze", placeholder: "ID" },
       { flag: "--mal", placeholder: "ID" },
       { flag: "--douban", placeholder: "ID" },
+      "--no-saved-ids",
       "--no-metadata-cache",
     ],
   },
@@ -881,6 +884,18 @@ const argumentSections = [
       { flag: "--steam", placeholder: "APP_ID_OR_URL" },
       { flag: "--overview", placeholder: "SYNOPSIS" },
       { flag: "--genres", placeholder: "GENRE1,GENRE2" },
+    ],
+  },
+  {
+    id: "xxx",
+    title: "XXX",
+    entries: [
+      { flag: "--tpdb", placeholder: "scenes/ID" },
+      { flag: "--blvckout", placeholder: "ID" },
+      { flag: "--publisher", placeholder: "STUDIO" },
+      { flag: "--cast", placeholder: "NAME1,NAME2" },
+      { flag: "--keywords", placeholder: "TAG1,TAG2" },
+      { flag: "--overview", placeholder: "SYNOPSIS" },
     ],
   },
   {
@@ -1096,6 +1111,7 @@ const argumentViews = [
     icon: "shapes",
     description: "Sports, fan resyncs and adult releases",
     sections: [
+      "xxx",
       ...VIDEO_ARGUMENT_SECTIONS.filter((id) => id !== "analysis"),
       ...COMMON_ARGUMENT_SECTIONS,
     ],
@@ -1398,6 +1414,8 @@ const ChangelogIcon = () => <WebUiIcon name="changelog" />;
 
 const StatsIcon = () => <WebUiIcon name="stats" />;
 
+const HistoryIcon = () => <WebUiIcon name="history" />;
+
 const UploadRailIcon = () => <WebUiIcon name="upload" />;
 
 const LogoutIcon = () => <WebUiIcon name="logout" />;
@@ -1412,6 +1430,7 @@ const WorkspaceSwitcher = ({
     { id: "upload", label: "Upload", href: `${appBase}/` },
     { id: "config", label: "Configuration", href: `${appBase}/config` },
     { id: "stats", label: "Stats", href: `${appBase}/stats` },
+    { id: "history", label: "History", href: `${appBase}/history` },
   ];
 
   return (
@@ -1468,6 +1487,12 @@ const ApplicationRail = ({
       label: "Stats",
       href: `${appBase}/stats`,
       icon: <StatsIcon />,
+    },
+    {
+      id: "history",
+      label: "History",
+      href: `${appBase}/history`,
+      icon: <HistoryIcon />,
     },
   ];
 
@@ -2942,6 +2967,14 @@ function AudionutsUAGUI() {
   const [collapsedRunGuiItems, setCollapsedRunGuiItems] = useState(
     () => new Set(getStoredCollapsedRunGuiItems()),
   );
+  // Option groups on the confirm screen ("media", "upload") the user folded.
+  const [collapsedRunGuiOptionGroups, setCollapsedRunGuiOptionGroups] =
+    useState(
+      () =>
+        new Set(
+          getStoredCollapsedRunGuiItems(RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY),
+        ),
+    );
   // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
   const [runGui, setRunGui] = useState(initialRunGuiState);
   const [executionScreenshots, setExecutionScreenshots] = useState(
@@ -3121,6 +3154,13 @@ function AudionutsUAGUI() {
       JSON.stringify(Array.from(collapsedRunGuiItems)),
     );
   }, [collapsedRunGuiItems]);
+
+  useEffect(() => {
+    storage.set(
+      RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY,
+      JSON.stringify(Array.from(collapsedRunGuiOptionGroups)),
+    );
+  }, [collapsedRunGuiOptionGroups]);
 
   // A new question opens at the top of the GUI panel, so its Yes/No buttons
   // are always in the same place even if the panel was scrolled down.
@@ -3386,6 +3426,9 @@ function AudionutsUAGUI() {
   const isSendingInputRef = useRef(false);
   const activeTabIdRef = useRef("tab-1");
   const uploadTabCounterRef = useRef(1);
+  // Saved drafts that did not fit in the tab limit when the page loaded; kept
+  // in storage so a later load restores them once tabs are free.
+  const unrestoredDraftsRef = useRef([]);
   const tabRuntimeRef = useRef(null);
   if (tabRuntimeRef.current === null) {
     const firstTab = createUploadTabRuntime();
@@ -7035,6 +7078,12 @@ function AudionutsUAGUI() {
    * browser had prepared, so closing or reloading the page loses neither.
    */
   const restoreUploadSessions = async () => {
+    // History's "Upload again" hands over a release path for this page load.
+    // Take it before waiting for the server, and fill the first tab (the one
+    // shown now) right away, so later edits are kept and restoring sessions
+    // or drafts does not replace that tab.
+    const handoffPath = window.UAUploadHandoff?.take() || "";
+    if (handoffPath) handlePathInputChange(handoffPath);
     let sessions = [];
     try {
       const response = await apiFetch(`${API_BASE}/sessions`, {
@@ -7065,6 +7114,7 @@ function AudionutsUAGUI() {
 
     const firstTab = getTabRuntime("tab-1");
     const replaceFirstTab =
+      !handoffPath &&
       firstTab &&
       !firstTab.run.isExecuting &&
       !firstTab.sessionRecord &&
@@ -7099,13 +7149,13 @@ function AudionutsUAGUI() {
         String(session.label_detail || ""),
       );
     });
-    const restoredDrafts = drafts
-      .slice(0, room - restoredSessions.length)
-      .map((draft) => {
-        const runtime = createUploadTabRuntime();
-        runtime.view.form = { ...createUploadTabForm(), ...draft.form };
-        return newTab(runtime);
-      });
+    const draftRoom = Math.max(0, room - restoredSessions.length);
+    unrestoredDraftsRef.current = drafts.slice(draftRoom);
+    const restoredDrafts = drafts.slice(0, draftRoom).map((draft) => {
+      const runtime = createUploadTabRuntime();
+      runtime.view.form = { ...createUploadTabForm(), ...draft.form };
+      return newTab(runtime);
+    });
     const restored = [...restoredSessions, ...restoredDrafts];
 
     if (restored.length && replaceFirstTab) {
@@ -7151,7 +7201,7 @@ function AudionutsUAGUI() {
         },
       });
     });
-    saveUploadTabDrafts(drafts);
+    saveUploadTabDrafts([...drafts, ...unrestoredDraftsRef.current]);
   }, [
     uploadTabsRestored,
     uploadTabs,
@@ -9387,10 +9437,10 @@ function AudionutsUAGUI() {
                           ? "Generating a new XXX cover"
                           : "Generate a new XXX cover"
                       }
-                      className="ua-processing-cover-action ua-accent-action absolute right-3 top-3 inline-flex flex-shrink-0 items-center gap-1.5 rounded-full p-2.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
+                      className="ua-processing-cover-action ua-accent-action absolute right-3 top-3 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full p-0 disabled:cursor-wait disabled:opacity-60"
                       title="Generate another cover from a different video frame"
                     >
-                      <span aria-hidden="true">
+                      <span aria-hidden="true" className="flex">
                         {coverAction === "regenerate" ? (
                           <SpinnerIcon />
                         ) : (
@@ -9912,6 +9962,11 @@ function AudionutsUAGUI() {
         </p>
       ))}
       {slot.rules && <p className="ua-run-gui-muted text-xs">{slot.rules}</p>}
+      {slot.rulesUrl && (
+        <p className="text-xs">
+          {renderRunGuiLink(slot.rulesUrl, `${slot.tracker} rules page`)}
+        </p>
+      )}
     </div>
   );
 
@@ -10247,57 +10302,86 @@ function AudionutsUAGUI() {
     ].map(([group, label]) => {
       const items = options.filter((option) => option.group === group);
       if (!items.length) return null;
+      const collapsed = collapsedRunGuiOptionGroups.has(group);
+      const changedCount = items.filter(
+        (option) => option.key in changed,
+      ).length;
+      const toggle = () =>
+        setCollapsedRunGuiOptionGroups((prev) => {
+          const next = new Set(prev);
+          if (!next.delete(group)) next.add(group);
+          return next;
+        });
       return (
         <div key={group}>
-          {renderRunGuiSectionLabel(label)}
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {items.map((option) => {
-              const value =
-                option.key in changed ? changed[option.key] : option.value;
-              if (option.type === "choice") {
-                const choices = Array.isArray(option.choices)
-                  ? option.choices
-                  : [];
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand" : "Collapse"}
+            className="flex items-center gap-1"
+          >
+            {renderRunGuiSectionLabel(label)}
+            {collapsed && changedCount > 0 && (
+              <span className="ua-run-gui-count rounded-full px-1.5 text-[0.68rem] font-semibold">
+                {changedCount} changed
+              </span>
+            )}
+            <LucideIcon
+              name={collapsed ? "chevron-down" : "chevron-up"}
+              className="ua-run-gui-muted h-3.5 w-3.5"
+            />
+          </button>
+          {!collapsed && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {items.map((option) => {
+                const value =
+                  option.key in changed ? changed[option.key] : option.value;
+                if (option.type === "choice") {
+                  const choices = Array.isArray(option.choices)
+                    ? option.choices
+                    : [];
+                  return (
+                    <label
+                      key={option.key}
+                      className="ua-run-gui-choice flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm"
+                    >
+                      {option.label}
+                      <select
+                        value={value}
+                        onChange={(event) => update(option, event.target.value)}
+                        disabled={disabled}
+                        className="ua-run-gui-input rounded border px-1.5 py-0.5 text-sm disabled:opacity-50"
+                      >
+                        {choices.map((choice) => (
+                          <option key={choice} value={choice}>
+                            {choice}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
                 return (
                   <label
                     key={option.key}
-                    className="ua-run-gui-choice flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm"
+                    title={option.locked || option.hint || undefined}
+                    data-selected={value === true}
+                    className="ua-run-gui-choice flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60"
                   >
+                    <input
+                      type="checkbox"
+                      checked={value === true}
+                      onChange={() => update(option, value !== true)}
+                      disabled={disabled || Boolean(option.locked)}
+                      className="h-4 w-4 shrink-0"
+                    />
                     {option.label}
-                    <select
-                      value={value}
-                      onChange={(event) => update(option, event.target.value)}
-                      disabled={disabled}
-                      className="ua-run-gui-input rounded border px-1.5 py-0.5 text-sm disabled:opacity-50"
-                    >
-                      {choices.map((choice) => (
-                        <option key={choice} value={choice}>
-                          {choice}
-                        </option>
-                      ))}
-                    </select>
                   </label>
                 );
-              }
-              return (
-                <label
-                  key={option.key}
-                  title={option.locked || option.hint || undefined}
-                  data-selected={value === true}
-                  className="ua-run-gui-choice flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60"
-                >
-                  <input
-                    type="checkbox"
-                    checked={value === true}
-                    onChange={() => update(option, value !== true)}
-                    disabled={disabled || Boolean(option.locked)}
-                    className="h-4 w-4 shrink-0"
-                  />
-                  {option.label}
-                </label>
-              );
-            })}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       );
     });

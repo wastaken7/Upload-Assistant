@@ -88,8 +88,8 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           labels: ${{ needs.prepare.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.variant }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}-${{ matrix.arch }}
+          # No GitHub Actions cache: release builds run from the new tag, and a
+          # cache saved under one tag cannot be restored by the next tag's build.
           provenance: false
           outputs: type=image,name=${{ env.REGISTRY }}/${{ needs.prepare.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
 

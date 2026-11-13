@@ -260,7 +260,7 @@ class DiscParse:
                             logger.debug(f"[yellow]  No m2ts files found for {file_name}")
                             continue
 
-                        items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
+                        items: list[dict[str, Any]] = [{"file": file, "size": file_sizes[file]} for file in file_counts]
                         total_size = sum(file_sizes.values())
                         valid_playlists.append(
                             {
@@ -351,7 +351,7 @@ class DiscParse:
                             if bdinfo_command is None:
                                 logger.info(f"[bold red]go-bdinfo not found. Place it under {base_dir}/bin/bdinfo/ or install a system bdinfo binary[/bold red]")
                                 continue
-                            bdinfo_executable = [bdinfo_command, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                            bdinfo_executable: list[str] = [bdinfo_command, str(disc_path), "--playlist", str(playlist["file"]), "--reportfilename", str(playlist_report_path)]
                             returncode = await self._run_bdinfo_with_progress(bdinfo_executable, f"bdinfo-scan-{folder_id}")
 
                             if returncode != 0:
@@ -635,8 +635,8 @@ class DiscParse:
                 try:
                     ifo_file = f"VTS_{vob_set[0][:2]}_0.IFO"
 
-                    vob_set_mi = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
-                    vob_set_mi = json.loads(vob_set_mi)
+                    vob_set_mi_raw = MediaInfo.parse(str(disc_path / ifo_file), output="JSON")
+                    vob_set_mi = json.loads(str(vob_set_mi_raw))
                     tracks = vob_set_mi.get("media", {}).get("track", [])
 
                     if len(tracks) > 1:
@@ -667,8 +667,8 @@ class DiscParse:
             each["vob"] = vob = str(disc_path / f"VTS_{set}_1.VOB")
             each["ifo"] = ifo = str(disc_path / f"VTS_{set}_0.IFO")
 
-            vob_mi_output = MediaInfo.parse(vob, output="STRING", full=False).replace("\r\n", "\n")
-            ifo_mi_output = MediaInfo.parse(ifo, output="STRING", full=False).replace("\r\n", "\n")
+            vob_mi_output = str(MediaInfo.parse(vob, output="STRING", full=False)).replace("\r\n", "\n")
+            ifo_mi_output = str(MediaInfo.parse(ifo, output="STRING", full=False)).replace("\r\n", "\n")
             each["vob_mi"] = vob_mi_output
             each["ifo_mi"] = ifo_mi_output
             each["vob_mi_full"] = vob_mi_output
@@ -814,7 +814,7 @@ class DiscParse:
                         raise FileNotFoundError(f"Selected .EVO file {selected_evo_path} does not exist.")
 
                     # Parse MediaInfo for the largest .EVO file
-                    original_mediainfo = MediaInfo.parse(selected_evo_path, output="STRING", full=False)
+                    original_mediainfo = str(MediaInfo.parse(selected_evo_path, output="STRING", full=False))
 
                     modified_mediainfo = re.sub(r"File size\s+:\s+[^\r\n]+", f"File size                                : {total_size / (1024**3):.2f} GiB", original_mediainfo)
                     modified_mediainfo = re.sub(

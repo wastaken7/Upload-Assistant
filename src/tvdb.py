@@ -42,7 +42,8 @@ def _normalized_series_title(value: str) -> str:
 
 def _as_dict_list(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, list):
-        return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+        items_list = cast(list[object], value)
+        return [cast(dict[str, Any], item) for item in items_list if isinstance(item, dict)]
     return []
 
 
@@ -96,7 +97,8 @@ async def _series_translation_metadata(
             translation_name = name.strip()
         aliases_value = translation.get("aliases")
         if isinstance(aliases_value, list):
-            translation_aliases = [str(alias).strip() for alias in aliases_value if str(alias).strip()]
+            aliases_list = cast(list[object], aliases_value)
+            translation_aliases = [str(alias).strip() for alias in aliases_list if str(alias).strip()]
     except Exception as translation_error:
         logger.debug(f"[yellow]Could not retrieve TVDB English series translation: {translation_error}[/yellow]")
 
@@ -147,7 +149,7 @@ class TVDB:
                 logger.error(f"[red]TVDB login failed: {e}[/red]")
                 return False
 
-    async def _request(self, method: str, endpoint: str, *, include_links: bool = False, **kwargs) -> Any:
+    async def _request(self, method: str, endpoint: str, *, include_links: bool = False, **kwargs: Any) -> Any:
         if not self.token:
             success = await self.login()
             if not success:
@@ -163,7 +165,7 @@ class TVDB:
                 resp = await self._client.request(method, endpoint, **kwargs)
 
             resp.raise_for_status()
-            payload = resp.json()
+            payload = cast(dict[str, Any], resp.json())
             if not isinstance(payload, dict) or "data" not in payload:
                 raise ValueError("TVDB response did not contain data")
             return payload if include_links else payload["data"]
@@ -171,51 +173,60 @@ class TVDB:
             logger.debug(f"[red]TVDB API request failed: {e}[/red]")
             raise
 
-    async def search(self, query, **kwargs) -> list[dict[str, Any]]:
+    async def search(self, query: str | set[str] | Any, **kwargs: Any) -> list[dict[str, Any]]:
         # Handle the case where `{filename}` is passed as a set
         if isinstance(query, set):
             query = next(iter(query))
-        params = {"query": query}
+        params: dict[str, Any] = {"query": query}
         params.update(kwargs)
         res = await self._request("GET", "/search", params=params)
         if not isinstance(res, list):
             raise TypeError("TVDB search response data was not a list")
-        return res
+        return cast(list[dict[str, Any]], res)
 
     async def search_by_remote_id(self, remoteid: str) -> list[dict[str, Any]]:
         res = await self._request("GET", f"/search/remoteid/{remoteid}")
         if not isinstance(res, list):
             raise TypeError("TVDB remote ID search response data was not a list")
-        return res
+        return cast(list[dict[str, Any]], res)
 
-    async def get_series_extended(self, id: int, **kwargs) -> dict[str, Any]:
+    async def get_series_extended(self, id: int, **kwargs: Any) -> dict[str, Any]:
         res = await self._request("GET", f"/series/{id}/extended", params=kwargs)
         if not isinstance(res, dict):
             raise TypeError("TVDB extended series response data was not a dictionary")
-        return res
+        return cast(dict[str, Any], res)
 
-    async def get_series_episodes(self, id: int, season_type="default", page=0, lang=None, *, include_links: bool = False, **kwargs) -> dict[str, Any]:
+    async def get_series_episodes(
+        self,
+        id: int,
+        season_type: str = "default",
+        page: int = 0,
+        lang: str | None = None,
+        *,
+        include_links: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         url = f"/series/{id}/episodes/{season_type}"
         if lang:
             url += f"/{lang}"
-        params = {"page": page}
+        params: dict[str, Any] = {"page": page}
         params.update(kwargs)
         res = await self._request("GET", url, params=params, include_links=include_links)
         if not isinstance(res, dict):
             raise TypeError("TVDB series episodes response data was not a dictionary")
-        return res
+        return cast(dict[str, Any], res)
 
-    async def get_episode_extended(self, id: int, **kwargs) -> dict[str, Any]:
+    async def get_episode_extended(self, id: int, **kwargs: Any) -> dict[str, Any]:
         res = await self._request("GET", f"/episodes/{id}/extended", params=kwargs)
         if not isinstance(res, dict):
             raise TypeError("TVDB extended episode response data was not a dictionary")
-        return res
+        return cast(dict[str, Any], res)
 
-    async def get_series_translation(self, id: int, lang: str, **kwargs) -> dict[str, Any]:
+    async def get_series_translation(self, id: int, lang: str, **kwargs: Any) -> dict[str, Any]:
         res = await self._request("GET", f"/series/{id}/translations/{lang}", params=kwargs)
         if not isinstance(res, dict):
             raise TypeError("TVDB series translation response data was not a dictionary")
-        return res
+        return cast(dict[str, Any], res)
 
 
 async def close_tvdb() -> None:
@@ -241,10 +252,14 @@ def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
     # Fallback to importing data.config if not found in the passed config
     if not tvdb_api_key:
         with contextlib.suppress(Exception):
-            from data.config import config as imported_config
+            import importlib
 
+            data_config = importlib.import_module("data.config")
+            imported_config = getattr(data_config, "config", None)
             if isinstance(imported_config, dict):
-                tvdb_api_key = imported_config.get("DEFAULT", {}).get("tvdb_api", "")
+                default_sec = cast(dict[str, Any], imported_config).get("DEFAULT")
+                if isinstance(default_sec, dict):
+                    tvdb_api_key = cast(dict[str, Any], default_sec).get("tvdb_api", "")
 
     if not isinstance(tvdb_api_key, str) or not tvdb_api_key.strip():
         if not _tvdb_error_reported:
@@ -295,14 +310,20 @@ class TvdbData:
         try:
             for page in range(100):
                 payload = await client.get_series_episodes(series_id, season=season, page=page, include_links=True)
-                data = payload.get("data")
-                links = payload.get("links")
-                if not isinstance(data, dict) or not isinstance(data.get("episodes"), list) or not isinstance(links, dict):
+                data_obj = payload.get("data")
+                links_obj = payload.get("links")
+                if not isinstance(data_obj, dict) or not isinstance(links_obj, dict):
                     raise ValueError("TVDB season response is missing episodes or pagination information")
-                episodes = data["episodes"]
-                for episode in episodes:
-                    if not isinstance(episode, dict):
+                data = cast(dict[str, Any], data_obj)
+                links = cast(dict[str, Any], links_obj)
+                episodes_raw = data.get("episodes")
+                if not isinstance(episodes_raw, list):
+                    raise ValueError("TVDB season response is missing episodes list")
+                episodes = cast(list[object], episodes_raw)
+                for episode_item in episodes:
+                    if not isinstance(episode_item, dict):
                         raise ValueError("Invalid TVDB episode record")
+                    episode = cast(dict[str, Any], episode_item)
                     episode_season = _coerce_int(episode.get("seasonNumber"))
                     number = _coerce_int(episode.get("number"))
                     if episode_season is None or number is None:
@@ -331,8 +352,9 @@ class TvdbData:
         cache = cache_for(base_dir="", config=self.config)
         cache_key = f"{filename}_{year}" if year else filename
         cached = await cache.get("tvdb", "search", cache_key)
+        results: list[dict[str, Any]] | None
         if not is_cache_miss(cached) and (cached is None or isinstance(cached, list)):
-            results = cached
+            results = cast(list[dict[str, Any]] | None, cached)
         else:
             results = await client.search(filename, year=year, type="series", lang="eng")
             await cache.set("tvdb", "search", cache_key, results, negative=not bool(results))
@@ -346,14 +368,21 @@ class TvdbData:
             search_year = str(year or "")
             matches: list[dict[str, Any]] = []
             for result in results:
-                titles = [result.get("name"), result.get("name_translated")]
+                titles: list[str] = [str(t) for t in (result.get("name"), result.get("name_translated")) if t]
                 aliases = result.get("aliases")
                 if isinstance(aliases, list):
-                    titles.extend(alias.get("name") if isinstance(alias, dict) else alias for alias in aliases)
+                    aliases_list = cast(list[object], aliases)
+                    for alias in aliases_list:
+                        if isinstance(alias, dict):
+                            alias_name = cast(dict[str, Any], alias).get("name")
+                            if alias_name:
+                                titles.append(str(alias_name))
+                        elif alias:
+                            titles.append(str(alias))
                 translations = result.get("translations")
                 if isinstance(translations, dict):
-                    titles.extend(translations.values())
-                names = [title for title in titles if isinstance(title, str) and _normalized_series_title(title) == search_title]
+                    titles.extend(str(v) for v in cast(dict[str, Any], translations).values() if v)
+                names = [title for title in titles if _normalized_series_title(title) == search_title]
                 if not search_title or not names:
                     continue
                 if search_year and str(result.get("year") or "") != search_year and not any(name.rstrip().endswith(f"({search_year})") for name in names):
@@ -630,7 +659,8 @@ class TvdbData:
             cache_key = f"translation_{series_id_int}"
             cached = await cache.get("tvdb", "series_extended", cache_key)
             if not is_cache_miss(cached) and isinstance(cached, dict):
-                return cached.get("series_title") or fallback_name
+                title_val = cast(dict[str, Any], cached).get("series_title")
+                return str(title_val).strip() if title_val else fallback_name
 
             try:
                 series_info = await client.get_series_extended(series_id_int)

@@ -16,6 +16,7 @@ from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, urlparse
 
 import aiofiles
+import bencodepy
 import httpx
 from torf import TorfError, Torrent
 
@@ -417,7 +418,7 @@ class BroadcasTheNet:
         return True
 
     async def get_tvdb_series_name(self, meta: Meta) -> str | None:
-        episode_data = meta.get("tvdb_episode_data")
+        episode_data = meta.tvdb_episode_data
         if isinstance(episode_data, dict) and episode_data.get("series_name"):
             return str(episode_data["series_name"]).strip() or None
 
@@ -455,11 +456,14 @@ class BroadcasTheNet:
                 try:
                     result = await self._api("getTorrents", {"search": filters, "results": 1, "offset": 0})
                     payload = result.get("result")
-                    torrents = payload.get("torrents") if isinstance(payload, dict) else None
-                    if isinstance(torrents, dict) and torrents:
-                        first = next(iter(torrents.values()))
-                        if isinstance(first, dict):
-                            series_name = str(first.get("Series") or "").strip() or None
+                    if isinstance(payload, dict):
+                        payload_dict = cast(dict[str, Any], payload)
+                        torrents = payload_dict.get("torrents")
+                        if isinstance(torrents, dict) and torrents:
+                            first = next(iter(cast(dict[str, object], torrents).values()))
+                            if isinstance(first, dict):
+                                first_dict = cast(dict[str, object], first)
+                                series_name = str(first_dict.get("Series") or "").strip() or None
                 except Exception as exc:
                     logger.debug(f"{self.tracker}: Could not fetch series name from BTN: {exc}")
 
@@ -568,10 +572,12 @@ class BroadcasTheNet:
             raise UploadError("BTN API error: invalid response", "red")
         data_dict = cast(dict[str, Any], data)
         if data_dict.get("error"):
-            error = data_dict["error"]
-            if isinstance(error, dict) and error.get("code") == -32004:
-                raise UploadError("BTN API rejected this host IP. Approve the IP in your BTN notices, then retry.", "red")
-            raise UploadError(f"BTN API error: {error}", "red")
+            error_val = data_dict["error"]
+            if isinstance(error_val, dict):
+                error_dict = cast(dict[str, Any], error_val)
+                if error_dict.get("code") == -32004:
+                    raise UploadError("BTN API rejected this host IP. Approve the IP in your BTN notices, then retry.", "red")
+            raise UploadError(f"BTN API error: {error_val}", "red")
         return data_dict
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
@@ -595,16 +601,19 @@ class BroadcasTheNet:
                 payload = result.get("result")
                 if not isinstance(payload, dict):
                     raise UploadError("BTN duplicate lookup returned no result", "red")
-                total = int(payload["results"])
-                torrents = payload.get("torrents", {})
-                if not isinstance(torrents, dict):
+                payload_dict = cast(dict[str, Any], payload)
+                total = int(payload_dict["results"])
+                torrents_obj = payload_dict.get("torrents", {})
+                if not isinstance(torrents_obj, dict):
                     raise UploadError("BTN duplicate lookup returned invalid torrents", "red")
+                torrents = cast(dict[str, Any], torrents_obj)
                 if not torrents and offset < total:
                     raise UploadError("BTN duplicate lookup stopped before all results were returned", "red")
-                for torrent_id, item in torrents.items():
-                    if torrent_id in seen_ids or not isinstance(item, dict):
+                for torrent_id, item_obj in torrents.items():
+                    if torrent_id in seen_ids or not isinstance(item_obj, dict):
                         raise UploadError("BTN duplicate lookup returned repeated or invalid torrents", "red")
-                    seen_ids.add(torrent_id)
+                    item = cast(dict[str, Any], item_obj)
+                    seen_ids.add(str(torrent_id))
                     group_id = str(item.get("GroupID") or item.get("groupId") or "")
                     dupes.append(
                         {
@@ -651,11 +660,12 @@ class BroadcasTheNet:
             for filters in search_filter_list:
                 result = await self._api("getTorrents", {"search": filters, "results": 1000, "offset": 0})
                 payload = result.get("result")
-                torrents = payload.get("torrents") if isinstance(payload, dict) else None
-                if not isinstance(torrents, dict) or not torrents:
+                torrents_raw = cast(dict[str, Any], payload).get("torrents") if isinstance(payload, dict) else None
+                if not isinstance(torrents_raw, dict) or not torrents_raw:
                     continue
+                torrents = cast(dict[str, Any], torrents_raw)
 
-                items = [(str(t_id), item) for t_id, item in torrents.items() if isinstance(item, dict)]
+                items: list[tuple[str, dict[str, Any]]] = [(str(t_id), cast(dict[str, Any], item)) for t_id, item in torrents.items() if isinstance(item, dict)]
                 if not items:
                     continue
 
@@ -717,12 +727,24 @@ class BroadcasTheNet:
         return (match.group(1), "") if match else ("", "")
 
     @staticmethod
-    def _registered_torrent(content: bytes) -> bytes:
+    def _registered_torrent(content: bytes, announce_url: str = "") -> bytes:
         try:
             Torrent.read_stream(content)
         except (TorfError, ValueError) as exc:
             raise UploadError("BTN returned an invalid torrent after upload", "red") from exc
-        return content
+        if not announce_url:
+            return content
+        # Swap only the top-level tracker URLs; the info dict, and so the info hash, must stay BTN's.
+        bencode_module = cast(Any, bencodepy)
+        metainfo = cast(dict[bytes, Any], bencode_module.decode(content))
+        if bencode_module.encode(metainfo) != content:
+            # Re-encoding a non-canonical file could alter the info dict bytes and break seeding.
+            logger.warning("BTN: kept the tracker's announce URL because the torrent cannot be rewritten safely.")
+            return content
+        metainfo[b"announce"] = announce_url.encode()
+        if b"announce-list" in metainfo:
+            metainfo[b"announce-list"] = [[announce_url.encode()]]
+        return cast(bytes, bencode_module.encode(metainfo))
 
     @staticmethod
     def _mapping(meta: Meta) -> tuple[str, str, str, str]:
@@ -796,17 +818,20 @@ class BroadcasTheNet:
     def _get_season_year(self, meta: Meta) -> str:
         season_int = int(meta.season_int or 0)
 
-        tvdb_data = meta.get("tvdb_episode_data")
+        tvdb_data = meta.tvdb_episode_data
         if isinstance(tvdb_data, dict):
-            episodes = tvdb_data.get("episodes")
+            episodes = cast(dict[str, Any], tvdb_data).get("episodes")
             if isinstance(episodes, list):
-                for ep in episodes:
-                    if isinstance(ep, dict) and int(ep.get("seasonNumber") or 0) == season_int:
-                        if ep.get("year"):
-                            return str(ep["year"]).strip()
-                        aired = str(ep.get("aired") or "").strip()
-                        if len(aired) >= 4 and aired[:4].isdigit():
-                            return aired[:4]
+                episodes_list = cast(list[object], episodes)
+                for ep_item in episodes_list:
+                    if isinstance(ep_item, dict):
+                        ep = cast(dict[str, Any], ep_item)
+                        if int(ep.get("seasonNumber") or 0) == season_int:
+                            if ep.get("year"):
+                                return str(ep["year"]).strip()
+                            aired = str(ep.get("aired") or "").strip()
+                            if len(aired) >= 4 and aired[:4].isdigit():
+                                return aired[:4]
 
         if meta.get("tvdb_episode_year") and str(meta.tvdb_episode_year).strip().isdigit():
             return str(meta.tvdb_episode_year).strip()
@@ -816,20 +841,39 @@ class BroadcasTheNet:
             if year_part.isdigit():
                 return year_part
 
-        if isinstance(meta.get("tmdb_season_data"), dict):
-            air_date = str(meta.tmdb_season_data.get("air_date") or "")
+        tmdb_season_data = meta.tmdb_season_data
+        if isinstance(tmdb_season_data, dict):
+            air_date = str(tmdb_season_data.get("air_date") or "")
             if len(air_date) >= 4 and air_date[:4].isdigit():
                 return air_date[:4]
 
-        if isinstance(meta.get("imdb_info"), dict):
-            seasons = meta.imdb_info.get("seasons_summary") or []
-            if isinstance(seasons, list):
-                for s in seasons:
-                    if isinstance(s, dict) and int(s.get("season") or 0) == season_int:
-                        year = str(s.get("year") or "").strip()
-                        if year.isdigit():
-                            return year
+        imdb_info = meta.imdb_info
+        if isinstance(imdb_info, dict):
+            seasons_raw = cast(dict[str, Any], imdb_info).get("seasons_summary")
+            if isinstance(seasons_raw, list):
+                seasons_list = cast(list[object], seasons_raw)
+                for s_item in seasons_list:
+                    if isinstance(s_item, dict):
+                        s = cast(dict[str, Any], s_item)
+                        if int(s.get("season") or 0) == season_int:
+                            year = str(s.get("year") or "").strip()
+                            if year.isdigit():
+                                return year
 
+        for episode_data in (meta.tmdb_episode_data, meta.tvmaze_episode_data):
+            if isinstance(episode_data, dict):
+                episode_dict = cast(dict[str, Any], episode_data)
+                # TVDb can renumber the episode after this data was fetched; skip stale data.
+                if str(episode_dict.get("season_number", season_int)) != str(season_int) or str(episode_dict.get("episode_number", meta.episode_int)) != str(meta.episode_int):
+                    continue
+                air_date = str(episode_dict.get("air_date") or "")
+                if len(air_date) >= 4 and air_date[:4].isdigit():
+                    return air_date[:4]
+
+        # The series premiere year only matches the first season; for later
+        # seasons an unknown year is better than a wrong one.
+        if season_int > 1:
+            return ""
         return str(meta.year or meta.get("search_year") or "").strip()
 
     def _verify_autofill(self, data: dict[str, str], meta: Meta, expected_series: str, upload_type: str) -> list[str]:
@@ -1004,7 +1048,7 @@ class BroadcasTheNet:
                 download = await client.get(f"{self.base_url}/torrents.php?action=download&id={torrent_id}")
                 download.raise_for_status()
                 async with aiofiles.open(torrent_path, "wb") as handle:
-                    await handle.write(self._registered_torrent(download.content))
+                    await handle.write(self._registered_torrent(download.content, str(self.settings.get("announce_url") or "").strip()))
         except (httpx.HTTPError, OSError, UploadError) as exc:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: {exc}"
             logger.info(f"{self.tracker}: [red]{exc}[/red]")

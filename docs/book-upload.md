@@ -149,6 +149,21 @@ The following trackers support the `BOOK` category with custom metadata mapping 
 - **LST**: Supports books with OpenLibrary integration, submitting the OpenLibrary Work ID and ISBN alongside the torrent upload.
 - **LATTEAM**: Supports ebooks, audiobooks, comics, and magazines. For audiobooks, appends the narration language to the torrent name (e.g., `(Narracion en Castellano)`). Also supports volume/issue and edition info in the name.
 - **SAMARITANO**: Brazilian tracker (UNIT3D). Maps books to `LIVROS`, audiobooks to `AUDIOBOOK`, and comics/manga to `HQS_E_MANGAS`.
+- **SIMURG**: Library tracker (Gazelle API) for e-books (EPUB, PDF, MOBI, AZW3, DJVU), audiobooks (MP3, M4B, FLAC, Other) and comics & manga (CBR, CBZ, PDF). See [Simurg](#9-simurg) below.
 - **SPEEDAPP**: Supports the `BOOK` category as a unified type (category ID 6), without subcategory splitting.
 - **TORRENTLEECH**: Supports standard book metadata mapping.
 - **YUSCENE**: Supports ebooks and audiobooks as distinct UNIT3D categories.
+
+---
+
+## 9. Simurg
+
+Configure `TRACKERS["SIMURG"]` with an API token (Settings > API > API Keys on the site) and your announce URL from the upload page. The token is sent as `Authorization: token ...`.
+
+- **Accepted uploads**: e-books, audiobooks and comics & manga, in English, Turkish or Japanese. One format per torrent. Magazines are refused because the site needs structured issue metadata the adapter does not collect; upload those with the site's form. Newspapers are not accepted.
+- **Duplicate check**: one `browse` search by title, then up to three Release lookups to read each torrent's format, source and file list. Requests are spaced at least 2.5 seconds apart to stay inside the site's limit of 5 requests per 10 seconds.
+- **Asked at upload time**: the source label (Retail, Scan, OCR, Convert or Other; audiobooks: Retail, Scene, WEB, Scan or Other), the audiobook type when the files do not say Unabridged or Abridged, and the comic type unless it is manga. The source is never guessed. In unattended mode, answer with `--answer simurg.source=Retail` and similar, or the upload to Simurg is skipped.
+- **Publication**: Simurg requires reusing the Publication of the same work. The adapter searches existing Publications and asks which one to use (`simurg.destination`): `new`, a Publication ID, or `release:<ID>` to add another format to an existing Release. A single Publication with the same title and author is offered as the default; unattended runs use it, and skip Simurg when the choice is unclear.
+- **New Releases** need genre tags (`--genres`) and, for a new Publication, a synopsis (`--overview`). Format, source and retailer words are dropped from the tags.
+- **Cover**: the hosted artwork or another public image link; links to source trackers are not used.
+- **After upload**: the site's own `.torrent` is downloaded and seeded. The upload request is sent only once; if it times out, check your uploads on the site before trying again. `--debug` prints the payload without uploading.

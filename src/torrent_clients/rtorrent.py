@@ -34,7 +34,7 @@ _bencode_bwrite = cast(Callable[[Any, str], None], bencode_any.bwrite)
 class RtorrentClientMixin:
     config: dict[str, Any]
 
-    async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
+    async def is_valid_torrent(self, meta: Meta, torrent_path: str | Path, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         raise NotImplementedError
 
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, Any]:
@@ -425,7 +425,7 @@ class RtorrentClientMixin:
 
                 if valid:
                     try:
-                        await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid, meta.source_size)
+                        await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid)
                         logger.debug("[green]Created BASE.torrent from existing torrent")
                     except Exception as e:
                         logger.info(f"[bold red]Error creating BASE.torrent: {e}")

@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -29,6 +29,14 @@ from src.tracker_images import (
 )
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_host_collection(val: object) -> TypeIs[tuple[object, ...] | list[object] | set[object]]:
+    return isinstance(val, tuple | list | set)
 
 
 @dataclass(frozen=True)
@@ -64,12 +72,8 @@ def has_restricted_image_hosts(
         if isinstance(policy, ImageHostPolicy) and policy.approved_image_hosts:
             return True
 
-        approved_hosts = getattr(tracker_class, "approved_image_hosts", None)
-        if (
-            callable(getattr(tracker_class, "check_image_hosts", None))
-            and isinstance(approved_hosts, tuple | list | set)
-            and any(isinstance(host, str) for host in approved_hosts)
-        ):
+        approved_hosts: object = getattr(tracker_class, "approved_image_hosts", None)
+        if callable(getattr(tracker_class, "check_image_hosts", None)) and _is_host_collection(approved_hosts) and any(isinstance(host, str) for host in approved_hosts):
             return True
 
     return False
@@ -94,14 +98,14 @@ def select_common_image_host(
             approved_sets.append(set(policy.approved_image_hosts))
             continue
 
-        approved_hosts = getattr(tracker_class, "approved_image_hosts", None)
-        if callable(getattr(tracker_class, "check_image_hosts", None)) and isinstance(approved_hosts, tuple | list | set):
+        approved_hosts: object = getattr(tracker_class, "approved_image_hosts", None)
+        if callable(getattr(tracker_class, "check_image_hosts", None)) and _is_host_collection(approved_hosts):
             approved_sets.append({host for host in approved_hosts if isinstance(host, str)})
 
     if not approved_sets:
         return None
 
-    common_hosts = set.intersection(*approved_sets)
+    common_hosts: set[str] = set(approved_sets[0]).intersection(*approved_sets[1:])
     if not common_hosts:
         return None
 
@@ -153,7 +157,7 @@ class RehostImagesManager:
         img_host_index: int = 1,
         approved_image_hosts: list[str] | None = None,
         required_image_tags: list[str] | None = None,
-    ) -> tuple[list[dict[str, str]], bool, bool]:
+    ) -> tuple[list[dict[str, Any]], bool, bool]:
         images, retry_mode, images_reuploaded = await _check_hosts(
             meta,
             tracker,
@@ -177,7 +181,7 @@ class RehostImagesManager:
             )
         return images, retry_mode, images_reuploaded
 
-    async def check_policy(self, meta: Meta, tracker: str, policy: ImageHostPolicy, required_image_tags: list[str] | None = None) -> tuple[list[dict[str, str]], bool, bool]:
+    async def check_policy(self, meta: Meta, tracker: str, policy: ImageHostPolicy, required_image_tags: list[str] | None = None) -> tuple[list[dict[str, Any]], bool, bool]:
         """Apply a tracker's declarative image-host policy."""
         return await self.check_hosts(
             meta,
@@ -195,7 +199,7 @@ class RehostImagesManager:
         url_host_mapping: dict[str, str],
         approved_image_hosts: list[str] | None = None,
         img_host_index: int = 1,
-    ) -> tuple[list[dict[str, str]], bool, bool]:
+    ) -> tuple[list[dict[str, Any]], bool, bool]:
         return await _handle_image_upload(
             meta,
             tracker,
@@ -217,7 +221,7 @@ async def check_tracker_image_hosts(meta: Meta, tracker_class: Any) -> None:
         return
 
     policy = getattr(tracker_class, "image_host_policy", None)
-    rehost_manager = getattr(tracker_class, "rehost_images_manager", None)
+    rehost_manager: Any = getattr(tracker_class, "rehost_images_manager", None)
     check_hosts = getattr(tracker_class, "check_image_hosts", None)
     uses_policy = isinstance(policy, ImageHostPolicy) and rehost_manager is not None
     if not uses_policy and not callable(check_hosts):
@@ -226,7 +230,7 @@ async def check_tracker_image_hosts(meta: Meta, tracker_class: Any) -> None:
     # Trackers upload concurrently, and rehosting switches meta.imghost and the
     # capture settings on the shared meta while it runs: take turns.
     async with release_image_lock(meta):
-        if uses_policy:
+        if uses_policy and rehost_manager is not None and isinstance(policy, ImageHostPolicy):
             required_tags = (
                 ["tonemapped"] if getattr(tracker_class, "requires_tonemapped_hdr_screenshots", False) and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")) else []
             )
@@ -235,7 +239,8 @@ async def check_tracker_image_hosts(meta: Meta, tracker_class: Any) -> None:
             else:
                 await rehost_manager.check_policy(meta, tracker_class.tracker, policy)
         elif callable(check_hosts):
-            await check_hosts(meta)
+            result: Any = check_hosts(meta)
+            await result
 
 
 def _image_host(raw_url: str, url_host_mapping: Mapping[str, str]) -> str:
@@ -364,8 +369,8 @@ async def _check_additional_image_collections(
 
             updated_images = list(collection)
             pending: list[tuple[int, dict[str, Any], Path]] = []
-            for index, item in enumerate(collection):
-                if not isinstance(item, dict):
+            for index, item in enumerate(cast(list[object], collection)):
+                if not _is_str_dict(item):
                     continue
                 raw_url = _as_str(item.get("raw_url"))
                 if raw_url and _image_host(raw_url, url_host_mapping) in approved_hosts:
@@ -421,7 +426,7 @@ async def _check_hosts(
     uploadscreens_manager: UploadScreensManager | None = None,
     tracker_config: Mapping[str, Any] | None = None,
     required_image_tags: list[str] | None = None,
-) -> tuple[list[dict[str, str]], bool, bool]:
+) -> tuple[list[dict[str, Any]], bool, bool]:
     if default_config is None:
         raise ValueError("default_config is required")
     if takescreens_manager is None:
@@ -486,7 +491,7 @@ async def _check_hosts(
         reuploaded_images_path = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json"
     else:
         reuploaded_images_path = screenshots_dir(meta.base_dir, meta.uuid) / "reuploaded_images.json"
-    reuploaded_images: list[dict[str, str]] = []
+    reuploaded_images: list[dict[str, Any]] = []
 
     if Path(reuploaded_images_path).exists():
         try:
@@ -494,11 +499,11 @@ async def _check_hosts(
                 content = await f.read()
                 loaded = json.loads(content)
                 if isinstance(loaded, list):
-                    reuploaded_images = cast(list[dict[str, str]], loaded)
+                    reuploaded_images = cast(list[dict[str, Any]], loaded)
         except Exception as e:
             logger.error(f"[red]Failed to load reuploaded images: {e}")
 
-    valid_reuploaded_images: list[dict[str, str]] = []
+    valid_reuploaded_images: list[dict[str, Any]] = []
     for image in reuploaded_images:
         raw_url = _as_str(image.get("raw_url"))
         if not raw_url:
@@ -609,7 +614,7 @@ async def _handle_image_upload(
     uploadscreens_manager: UploadScreensManager | None = None,
     tracker_config: Mapping[str, Any] | None = None,
     required_image_tags: list[str] | None = None,
-) -> tuple[list[dict[str, str]], bool, bool]:
+) -> tuple[list[dict[str, Any]], bool, bool]:
     if default_config is None:
         raise ValueError("default_config is required")
     if takescreens_manager is None:
@@ -726,7 +731,7 @@ async def _handle_image_upload(
         logger.debug(f"  {i + 1}. {Path(screenshot).name}")
 
     if not meta.skip_imghost_upload:
-        uploaded_images: list[dict[str, str]] = []
+        uploaded_images: list[dict[str, Any]] = []
 
         # Add a max retry limit to prevent infinite loop
         configured_indices = sorted(int(match.group(1)) for key in default_config if (match := re.fullmatch(r"img_host_(\d+)", key)) and _as_str(default_config.get(key)))
@@ -736,6 +741,8 @@ async def _handle_image_upload(
         current_position = next((i for i, index in enumerate(configured_indices) if index >= img_host_index), len(configured_indices))
         selected_host = False
         current_upload_index = img_host_index
+        # Hosts the tracker does not accept are skipped in order; that is the normal fallback, not an error.
+        skipped_hosts: list[str] = []
         while current_position < len(configured_indices):
             current_upload_index = configured_indices[current_position]
             current_img_host_key = f"img_host_{current_upload_index}"
@@ -746,7 +753,7 @@ async def _handle_image_upload(
                 continue
 
             if current_img_host not in approved_image_hosts:
-                logger.info(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
+                skipped_hosts.append(current_img_host)
                 retry_mode = True
                 images_reuploaded = True
                 current_position += 1
@@ -756,9 +763,14 @@ async def _handle_image_upload(
             logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
             break
 
+        if skipped_hosts:
+            logger.debug(f"{tracker}: skipped image hosts it does not accept: {', '.join(skipped_hosts)}")
         if not selected_host:
-            logger.info("[red]No approved image host was selected; skipping upload.")
+            accepted = ", ".join(approved_image_hosts) or "none"
+            logger.info(f"[red]{tracker}: none of the configured image hosts is accepted (accepted: {accepted}); skipping the image upload.[/red]")
             return [], True, images_reuploaded
+        if skipped_hosts:
+            logger.info(f"{tracker}: using image host '{meta.imghost}', the first configured host it accepts.")
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(meta, multi_screens, current_upload_index, 0, multi_screens, all_screenshots, {}, retry_mode)
         if policy_enabled:

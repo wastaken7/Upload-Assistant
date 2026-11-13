@@ -1,9 +1,17 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeIs
 
 from src.meta import Meta
 from src.trackers.NEXUSPHP import NEXUSPHP
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
 
 
 class QingWa(NEXUSPHP):
@@ -26,7 +34,17 @@ class QingWa(NEXUSPHP):
     @staticmethod
     def _main_audio_count(meta: Meta) -> int:
         count = 0
-        for track in meta.mediainfo.get("media", {}).get("track", []) or []:
+        media = meta.mediainfo.get("media")
+        tracks_raw = media.get("track") if _is_str_dict(media) else None
+        if _is_obj_list(tracks_raw):
+            tracks = tracks_raw
+        elif _is_str_dict(tracks_raw):
+            tracks = [tracks_raw]
+        else:
+            tracks = []
+        for track in tracks:
+            if not _is_str_dict(track):
+                continue
             if track.get("@type") != "Audio":
                 continue
             label = " ".join(str(track.get(field) or "") for field in ("Title", "title", "TrackTitle", "ServiceKind")).lower()
@@ -136,8 +154,9 @@ class QingWa(NEXUSPHP):
 
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         data = await super().get_data(meta, preview)
-        localized = getattr(self, "tmdb_data", {})
-        candidates = [localized.get("title"), localized.get("name"), meta.aka, meta.original_title]
+        tmdb_obj: object = getattr(self, "tmdb_data", None)
+        localized = tmdb_obj if _is_str_dict(tmdb_obj) else {}
+        candidates: list[object] = [localized.get("title"), localized.get("name"), meta.aka, meta.original_title]
         names: list[str] = []
         for candidate in candidates:
             if not candidate:

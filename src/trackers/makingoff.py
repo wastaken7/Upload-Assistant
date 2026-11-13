@@ -2003,7 +2003,7 @@ class MakingOff:
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
         """The forum topic as it is known before screenshots, for the Web UI to show and edit."""
-        data = {"title": await self.get_name(meta), "node_id": await self.get_forum_id(meta), "prefix": self._topic_prefix_category(meta)}
+        data: dict[str, object] = {"title": await self.get_name(meta), "node_id": await self.get_forum_id(meta), "prefix": self._topic_prefix_category(meta)}
         specs = {"title": payload_preview.text("Topic title"), "node_id": payload_preview.readonly("Subforum ID"), "prefix": payload_preview.readonly("Topic prefix")}
         deferred = {"message": payload_preview.DESCRIPTION_NOTE, "tags": "Taken from the post at upload time"}
         return payload_preview.describe(self.tracker, data, specs, deferred=deferred, name_key="title")

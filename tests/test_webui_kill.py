@@ -65,9 +65,16 @@ def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
         controller.wait(timeout=5)
 
         deadline = time.monotonic() + 5
-        while psutil.pid_exists(worker_pid) and time.monotonic() < deadline:
+
+        def _is_running(pid: int) -> bool:
+            try:
+                return psutil.pid_exists(pid) and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+            except psutil.NoSuchProcess, psutil.AccessDenied:
+                return False
+
+        while _is_running(worker_pid) and time.monotonic() < deadline:
             time.sleep(0.05)
-        assert not psutil.pid_exists(worker_pid)
+        assert not _is_running(worker_pid)
     finally:
         with server.active_processes_lock:
             server.active_processes.pop("kill-tree-test", None)

@@ -41,7 +41,7 @@ def get_book_labels(language: str) -> dict[str, str]:
         raise ValueError(f"Unsupported description language: {language}") from error
 
 
-GAME_LABELS = {
+GAME_LABELS: dict[str, dict[str, Any]] = {
     "en": {
         "technical_details": "Technical Details",
         "overview": "Overview",
@@ -148,7 +148,7 @@ GAME_LABELS = {
     },
 }
 
-MUSIC_LABELS = {
+MUSIC_LABELS: dict[str, dict[str, Any]] = {
     "en": {
         "details": "Music Details",
         "artist": "Artist",
@@ -218,6 +218,31 @@ MUSIC_LABELS = {
             "discogs_release": "Lançamento Discogs",
             "discogs_master": "Master Discogs",
         },
+    },
+}
+
+XXX_LABELS = {
+    "en": {
+        "details": "Details",
+        "studio": "Studio",
+        "network": "Network",
+        "release_date": "Release Date",
+        "performers": "Performers",
+        "tags": "Tags",
+        "duration": "Duration",
+        "minutes": "min",
+        "synopsis": "Synopsis",
+    },
+    "pt-BR": {
+        "details": "Detalhes",
+        "studio": "Estúdio",
+        "network": "Rede",
+        "release_date": "Data de Lançamento",
+        "performers": "Elenco",
+        "tags": "Tags",
+        "duration": "Duração",
+        "minutes": "min",
+        "synopsis": "Sinopse",
     },
 }
 

@@ -229,6 +229,12 @@ def test_aither_honors_manual_year_for_tv() -> None:
     assert _name(_tv(manual_year=2015)) == "Synthetic Show 2015 S01 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
+def test_aither_ignores_sonarr_year_when_tvdb_name_has_none() -> None:
+    meta = _tv(arr_year=2025, search_year="2025", year=2025, tvdb_episode_data={"series_name": "Synthetic Show"})
+
+    assert _name(meta) == "Synthetic Show S01 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
+
+
 def test_aither_places_language_before_cut() -> None:
     meta = _movie(edition="Extended", repack="REPACK", audio_languages=["Japanese"], original_language="ja")
 
@@ -325,8 +331,18 @@ def test_aither_falls_back_to_generic_name_for_unknown_type() -> None:
     assert _name(meta) == "Synthetic Feature 2024 Generic Name"
 
 
+def _trump(tracker: str, reason: str) -> dict[str, dict[str, object]]:
+    return {tracker: {"tracker": tracker, "reported_id": "7", "reported_name": "Older release", "reason": reason}}
+
+
 def test_aither_appends_trump_marker() -> None:
-    assert _name(_movie(trump_reason="exact_match")) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+    assert _name(_movie(trump_plans=_trump("AITHER", "exact_match"))) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP - TRUMP"
+
+
+@pytest.mark.parametrize("plans", [_trump("AITHER", "slot_rules"), _trump("LST", "exact_match")])
+def test_aither_trump_marker_needs_its_own_exact_trump(plans: dict[str, dict[str, object]]) -> None:
+    """Only an exact-files trump on Aither itself renames the Aither upload."""
+    assert _name(_movie(trump_plans=plans)) == "Synthetic Feature 2024 1080p NF WEB-DL DD+ 5.1 H.264-TESTGROUP"
 
 
 @pytest.mark.parametrize(("is_disc", "checked"), [("BDMV", False), ("DVD", False), ("HDDVD", True), ("", True)])
@@ -344,3 +360,65 @@ def test_aither_language_requirement_exempts_only_bdmv_and_dvd(monkeypatch: pyte
 
     assert bool(calls) is checked
     assert passed is not checked
+
+
+class _ReportPage:
+    def __init__(self, body: object) -> None:
+        self.status_code = 200
+        self.body = body
+
+    def json(self) -> object:
+        return self.body
+
+
+def _find_reports(monkeypatch: pytest.MonkeyPatch, pages: list[object]) -> tuple[list[dict[str, object]] | None, list[dict[str, str]]]:
+    """Search trump reports against canned pages; returns the result and each request's params."""
+    requests: list[dict[str, str]] = []
+    remaining = list(pages)
+
+    class Client:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> Client:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, _url: str, headers: dict[str, str], params: dict[str, str]) -> _ReportPage:
+            del headers
+            requests.append(dict(params))
+            return _ReportPage(remaining.pop(0))
+
+    monkeypatch.setattr("src.trackers.UNIT3D.aither.httpx.AsyncClient", Client)
+    monkeypatch.setattr("src.trackers.UNIT3D.aither.asyncio.sleep", AsyncMock())
+    tracker = Aither({"DEFAULT": {}, "TRACKERS": {"AITHER": {"api_key": "fake-key"}}})
+    return asyncio.run(tracker.find_trump_reports(Meta(), "7")), requests
+
+
+def test_aither_empty_report_search_means_no_reports(monkeypatch: pytest.MonkeyPatch) -> None:
+    reports, _requests = _find_reports(monkeypatch, [{"data": [], "meta": {"next_cursor": None}}])
+
+    assert reports == []
+
+
+def test_aither_report_search_follows_cursors(monkeypatch: pytest.MonkeyPatch) -> None:
+    pages = [
+        {"data": [{"id": 1, "title": "First", "trumping_torrent": {"name": "Upload"}}], "meta": {"next_cursor": "abc"}},
+        {"data": [{"id": 2, "title": "Second"}], "meta": {"next_cursor": None}},
+    ]
+
+    reports, requests = _find_reports(monkeypatch, pages)
+
+    assert [report["id"] for report in reports or []] == [1, 2]
+    assert [params.get("cursor") for params in requests] == [None, "abc"]
+
+
+def test_aither_report_search_stops_when_a_cursor_repeats(monkeypatch: pytest.MonkeyPatch) -> None:
+    page = {"data": [{"id": 1, "title": "Same page"}], "meta": {"next_cursor": "abc"}}
+
+    reports, requests = _find_reports(monkeypatch, [page, page, page])
+
+    assert reports is None
+    assert len(requests) == 2

@@ -80,6 +80,65 @@ def test_upload_screens_manager_records_an_attempted_failure() -> None:
     asyncio.run(exercise())
 
 
+def test_upload_screens_manager_counts_one_api_operation_per_image() -> None:
+    async def fake_upload(*args, **kwargs):
+        meta = args[1]
+        return_dict = args[7]
+        meta.imghost = "ptscreens"
+        return_dict["_stats_image_upload_attempts"] = 3
+        return_dict["_stats_image_upload_successes"] = 2
+        return_dict["_stats_image_upload_bytes"] = 8192
+        return meta.image_list, len(meta.image_list)
+
+    async def exercise() -> None:
+        meta = _image_upload_meta()
+        recorder = AsyncMock()
+        with (
+            patch("src.uploadscreens._upload_screens", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=recorder),
+        ):
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "imgbox"}}).upload_screens(meta, 3, 1, 0, 3, [], {})
+        events = {call.kwargs["outcome"]: call.kwargs for call in recorder.await_args_list}
+        assert events["success"]["count"] == 2
+        assert events["success"]["bytes_count"] == 8192
+        assert events["error"]["count"] == 1
+        assert events["error"]["bytes_count"] == 0
+
+    asyncio.run(exercise())
+
+
+def test_upload_screens_manager_attributes_a_fallback_chain_to_each_host() -> None:
+    async def fake_upload(*args, **kwargs):
+        meta = args[1]
+        return_dict = args[7]
+        meta.imghost = "imaginaryhost"
+        return_dict["_stats_image_upload_attempts"] = 5
+        return_dict["_stats_image_upload_successes"] = 3
+        return_dict["_stats_image_upload_hosts"] = {"fictionalhost": [3, 1, 100], "imaginaryhost": [2, 2, 300]}
+        return_dict["_stats_image_host_fallbacks"] = [("fictionalhost", "imaginaryhost")]
+        return meta.image_list, len(meta.image_list)
+
+    async def exercise() -> None:
+        meta = _image_upload_meta()
+        recorder = AsyncMock()
+        with (
+            patch("src.uploadscreens._upload_screens", new=fake_upload),
+            patch("src.uploadscreens.record_event_async", new=recorder),
+        ):
+            await UploadScreensManager({"DEFAULT": {"img_host_1": "fictionalhost"}}).upload_screens(meta, 3, 1, 0, 3, [], {})
+        events = [
+            (call.args[0], call.kwargs["service"], call.kwargs.get("operation"), call.kwargs["outcome"], call.kwargs.get("count", 1)) for call in recorder.await_args_list
+        ]
+        assert events == [
+            ("api", "fictionalhost", "image_upload", "success", 1),
+            ("api", "fictionalhost", "image_upload", "error", 2),
+            ("api", "imaginaryhost", "image_upload", "success", 2),
+            ("image_fallback", "fictionalhost", "imaginaryhost", "success", 1),
+        ]
+
+    asyncio.run(exercise())
+
+
 def test_image_start_limiter_staggers_concurrent_starts() -> None:
     async def exercise() -> list[float]:
         limiter = _build_image_start_limiter(0.02)
@@ -257,6 +316,9 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
     assert len(image_list) == 2
     assert calls == [("image-1.png", "imgbox"), ("image-2.png", "imgbox"), ("image-2.png", "ptscreens")]
     assert stats_counters["_stats_image_upload_bytes"] == 2 * len(b"image")
+    # Each host is credited with its own attempts, successes and bytes.
+    assert stats_counters["_stats_image_upload_hosts"] == {"imgbox": [2, 1, len(b"image")], "ptscreens": [1, 1, len(b"image")]}
+    assert stats_counters["_stats_image_host_fallbacks"] == [("imgbox", "ptscreens")]
 
 
 def test_upload_screens_handles_infinite_concurrency(tmp_path: Path) -> None:

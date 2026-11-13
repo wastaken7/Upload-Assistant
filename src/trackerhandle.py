@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import cli_ui
 from rich.markup import escape
@@ -23,12 +23,84 @@ from src.qbitwait import Wait
 from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
 from src.slot_rules.models import Verdict
 from src.slot_rules.registry import evaluate_slots
-from src.stats import record_event_async
+from src.stats import exception_error_reason, record_event_async
 from src.torrent_provision import provision_tracker_torrents
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
 type StatusDict = dict[str, Any]
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+async def recheck_dupes_after_wait(meta: Meta, config: dict[str, Any], tracker_name: str, t_class: Any, reason: str) -> bool:
+    """Repeat a tracker's duplicate search after a wait; return False when a new duplicate blocks the upload.
+
+    Only releases that were not in the first search count, so a duplicate the
+    user already accepted does not stop the upload.
+    """
+    logger.info(f"[yellow]{tracker_name}: Redoing dupe check after {reason} wait...[/yellow]")
+    title_key = f"{tracker_name}_title_releases"
+    try:
+        if tracker_name not in {"PASSTHEPOPCORN"}:
+            new_dupes = cast(list[Any], await t_class.search_existing(meta))
+        else:
+            ptp = PassThePopcorn(config=config)
+            group_id = meta.ptp_groupid
+            new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
+    except Exception as e:
+        logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after {reason} wait: {e}[/bold red]")
+        status = meta.tracker_status.setdefault(tracker_name, {})
+        status["status_message"] = f"Skipped: Error redoing dupe check after {reason} wait: {e}"
+        return False
+
+    def is_known(dupe: Any, known: Sequence[Any]) -> bool:
+        for known_dupe in known:
+            if _is_str_dict(dupe) and _is_str_dict(known_dupe):
+                if dupe.get("name") == known_dupe.get("name") and dupe.get("size") == known_dupe.get("size"):
+                    return True
+            elif isinstance(dupe, str) and isinstance(known_dupe, str) and dupe == known_dupe:
+                return True
+        return False
+
+    initial_dupes = cast(list[Any], meta.initial_dupes.get(tracker_name, []))
+    real_new_dupes = [d for d in new_dupes if not is_known(d, initial_dupes)]
+    # Whole-title searches also refresh the slot-rule evidence, which can hold
+    # releases the basic duplicate search leaves out (other HDR layers, codecs).
+    initial_title_releases = meta.initial_title_releases.get(tracker_name)
+    refreshed_title_releases = meta.get(title_key)
+    new_title_releases = (
+        [release for release in cast(list[Any], refreshed_title_releases) if not is_known(release, cast(list[Any], initial_title_releases))]
+        if isinstance(initial_title_releases, list) and isinstance(refreshed_title_releases, list)
+        else []
+    )
+    if not real_new_dupes and not new_title_releases:
+        return True
+
+    slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
+    if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
+        logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
+        return True
+    if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
+        logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
+        return False
+    if not real_new_dupes:
+        # The first check asks about a REVIEW conflict in interactive runs and keeps
+        # the basic result in unattended ones. Nobody may be present after a wait,
+        # so a conflict that would have been asked about skips the upload instead.
+        interactive = (not meta.unattended or meta.unattended_confirm) and not meta.ask_dupe
+        if slot_decision is not None and slot_decision.verdict is Verdict.REVIEW and slot_decision.conflicts and meta.dupe is False and interactive:
+            logger.info(f"[red]{tracker_name}: a release that needs a slot review appeared during the wait. Automatically skipping upload.[/red]")
+            return False
+        return True
+    dupe_checker = DupeChecker(config)
+    real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
+    if real_new_dupes:
+        logger.info(f"[red]New dupe found on {tracker_name} during wait! Automatically skipping upload.[/red]")
+        return False
+    return True
 
 
 async def process_trackers(
@@ -76,9 +148,7 @@ async def process_trackers(
     )
 
     def publish_tracker_result(tracker: str, tracker_class: Any, status: Mapping[str, Any], is_success: bool) -> None:
-        """Send the result to the Web UI's GUI mode, whatever the terminal print settings are."""
-        if not webui_events.enabled():
-            return
+        """Send the result to the Web UI's GUI mode and the upload history, whatever the terminal print settings are."""
         duration = meta.get(f"{tracker}_upload_duration")
         duration_value = float(duration) if isinstance(duration, (int, float)) else None
         if not is_success:
@@ -117,12 +187,12 @@ async def process_trackers(
             tracker_label = f"{tracker.ljust(tracker_label_width)}:"
             message: str | None = None
             if is_success:
-                result_parts = []
+                result_parts: list[str] = []
                 status_message = str(status.get("status_message", ""))
                 has_status_message = bool(status_message) and "data error" not in status_message
-                link_url = ""
+                link_url = str(status.get("torrent_link") or "")
 
-                if "torrent_id" in status:
+                if not link_url and "torrent_id" in status:
                     torrent_url = str(getattr(tracker_class, "torrent_url", ""))
                     link_url = f"{torrent_url}{status['torrent_id']}"
 
@@ -176,6 +246,7 @@ async def process_trackers(
         async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
             if t_class and getattr(t_class, "is_usenet", False):
                 return True
+            waited_for_bandwidth = False
             if bandwidth_control:
                 logger.info(f"\n[yellow]{tracker_name}: Checking bandwidth...[/yellow]")
                 waiter = Wait(config)
@@ -190,48 +261,10 @@ async def process_trackers(
                     bw_time = 0
 
                 if bw_thresh > 0 and bw_time > 0:
-                    waited = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
-                    if waited:
-                        logger.info(f"[yellow]{tracker_name}: Redoing dupe check after bandwidth wait...[/yellow]")
-                        try:
-                            if tracker_name not in {"PASSTHEPOPCORN"}:
-                                new_dupes = cast(list[Any], await t_class.search_existing(meta))
-                            else:
-                                ptp = PassThePopcorn(config=config)
-                                group_id = meta.ptp_groupid
-                                new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
-                        except Exception as e:
-                            logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after bandwidth wait: {e}[/bold red]")
-                            status = meta.tracker_status.setdefault(tracker_name, {})
-                            status["status_message"] = f"Skipped: Error redoing dupe check after bandwidth wait: {e}"
-                            return False
-
-                        initial_dupes = meta.initial_dupes.get(tracker_name, [])
-
-                        def is_in_initial(dupe: Any) -> bool:
-                            for initial_dupe in initial_dupes:
-                                if isinstance(dupe, dict) and isinstance(initial_dupe, dict):
-                                    if dupe.get("name") == initial_dupe.get("name") and dupe.get("size") == initial_dupe.get("size"):
-                                        return True
-                                elif isinstance(dupe, str) and isinstance(initial_dupe, str) and dupe == initial_dupe:
-                                    return True
-                            return False
-
-                        real_new_dupes = [d for d in new_dupes if not is_in_initial(d)]
-
-                        if real_new_dupes:
-                            slot_decision = await evaluate_slots(new_dupes, meta, tracker_name, config)
-                            if slot_decision is not None and slot_decision.verdict is Verdict.ALLOW:
-                                logger.info(f"[green]{tracker_name}: new releases appeared during the wait, but slot rules still allow this upload.[/green]")
-                                return True
-                            if slot_decision is not None and slot_decision.verdict is Verdict.BLOCK:
-                                logger.info(f"[red]{tracker_name}: a release that fills this slot appeared during the wait. Automatically skipping upload.[/red]")
-                                return False
-                            dupe_checker = DupeChecker(config)
-                            real_new_dupes = cast(list[Any], await dupe_checker.filter_dupes(real_new_dupes, meta, tracker_name))
-                            if real_new_dupes:
-                                logger.info(f"[red]New dupe found on {tracker_name} during wait! Automatically skipping upload.[/red]")
-                                return False
+                    waited_for_bandwidth = await waiter.wait_for_bandwidth(bw_thresh, bw_time)
+            if waited_for_bandwidth or meta.upload_waited:
+                reason = "bandwidth" if waited_for_bandwidth else "scheduled"
+                return await recheck_dupes_after_wait(meta, config, tracker_name, t_class, reason)
             return True
 
         if tracker in api_trackers:
@@ -243,7 +276,7 @@ async def process_trackers(
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
                             status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            status["status_message"] = "Skipped due to new dupe found after waiting to upload"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
@@ -253,6 +286,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return
@@ -267,7 +301,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -284,7 +319,7 @@ async def process_trackers(
                     try:
                         if not await check_bandwidth_and_dupes(tracker, tracker_class):
                             status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
+                            status["status_message"] = "Skipped due to new dupe found after waiting to upload"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
                         await check_tracker_image_hosts(meta, tracker_class)
@@ -294,6 +329,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return
@@ -308,7 +344,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -365,6 +402,11 @@ async def process_trackers(
                 try:
                     ptp = PassThePopcorn(config=config)
                     group_id = meta.ptp_groupid
+                    if meta.upload_waited and not await recheck_dupes_after_wait(meta, config, tracker, ptp, "scheduled"):
+                        status = meta.tracker_status.setdefault(ptp.tracker, {})
+                        status["status_message"] = "Skipped due to new dupe found after waiting to upload"
+                        print_tracker_result(tracker, ptp, status, False)
+                        return
                     await check_tracker_image_hosts(meta, ptp)
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
@@ -375,6 +417,7 @@ async def process_trackers(
                         finally:
                             meta[f"{tracker}_upload_duration"] = time.monotonic() - upload_start_time
                     except Exception as e:
+                        meta.tracker_status.setdefault(tracker, {})["error_reason"] = exception_error_reason(e)
                         logger.info(f"[red]Upload failed: {escape(str(e))}[/red]")
                         logger.info(traceback.format_exc(), extra={"markup": False})
                         return

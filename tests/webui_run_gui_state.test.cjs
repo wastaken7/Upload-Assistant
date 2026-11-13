@@ -476,6 +476,7 @@ test("slot checks keep their full detail and only hex size colours", () => {
       ],
       notes: ["Check the source", 7],
       rules: "Rules as of 2026-10-01 (20 days ago).",
+      rules_url: "https://tracker.invalid/rules",
     }),
   );
   const slot = state.slots["1:FAKE"];
@@ -488,6 +489,7 @@ test("slot checks keep their full detail and only hex size colours", () => {
   ]);
   assert.deepEqual(plain(slot.notes), ["Check the source"]);
   assert.equal(slot.rules, "Rules as of 2026-10-01 (20 days ago).");
+  assert.equal(slot.rulesUrl, "https://tracker.invalid/rules");
 });
 
 test("handled items and trackers move from Needs attention to Results", () => {

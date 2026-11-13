@@ -107,6 +107,36 @@ def test_list_screenshots_includes_registered_webp_contact_sheets(release_dir):
     assert [item.path for item in items] == [webp]
 
 
+def test_replacing_a_contact_sheet_renders_a_new_sheet_of_its_video(release_dir, monkeypatch):
+    video = release_dir.parent.parent / "Studio.Scene.2.mp4"
+    video.write_bytes(b"video")
+    details = {"kind": "xxx_contact_sheet", "source": str(video), "settings": {"rows": 1, "columns": 2, "animated": True, "animation_seconds": 5.0}}
+    sheet_path = release_dir / "screenshots" / "sheet.webp"
+    sheet_path.write_bytes(b"old sheet")
+    (sheet,) = register(release_dir.parent.parent, release_dir.name, [sheet_path], "main", details={str(sheet_path): details})
+    calls = []
+
+    async def fake_regenerate(base_dir, folder_id, path, _meta):
+        calls.append(path)
+        path.write_bytes(b"new sheet")
+        return path
+
+    async def fail_frame_capture(*_args, **_kwargs):
+        raise AssertionError("a contact sheet must not become a single frame")
+
+    monkeypatch.setattr("src.screenshot_review.regenerate_xxx_contact_sheet", fake_regenerate)
+    monkeypatch.setattr("src.screenshot_review._capture_fresh_frame", fail_frame_capture)
+    item = next(item for item in list_screenshots(release_dir, {}) if item.path == sheet)
+    meta_data = {"category": "XXX", "base_dir": str(release_dir.parent.parent), "uuid": release_dir.name, "filelist": [str(video)]}
+
+    replaced = asyncio.run(replace_screenshot(release_dir, meta_data, item.id))
+
+    assert calls == [sheet]
+    assert replaced.path == sheet
+    assert sheet.read_bytes() == b"new sheet"
+    assert image_version(release_dir, item.id, 0) == 1
+
+
 def test_list_screenshots_uses_manifest_order_for_jpeg_and_webp_frames(release_dir):
     _register_images(release_dir, ["first.jpg", "second.webp"])
 
@@ -364,9 +394,7 @@ def test_discarding_remote_images_keeps_ids_stable_in_any_order(tmp_path: Path) 
 
 def test_discarding_replaced_remote_image_drops_pending_replacement(release_dir):
     replacement = _register_images(release_dir, ["replacement.png"])[0]
-    (release_dir / "screenshot_review.json").write_text(
-        json.dumps({"remote_replacements": {"remote-0": replacement.name}, "generations": {"remote-0": 1}}), encoding="utf-8"
-    )
+    (release_dir / "screenshot_review.json").write_text(json.dumps({"remote_replacements": {"remote-0": replacement.name}, "generations": {"remote-0": 1}}), encoding="utf-8")
     meta_data = {"image_list": _hosted("one", "two")}
 
     remaining = delete_screenshot(release_dir, meta_data, "remote-0")

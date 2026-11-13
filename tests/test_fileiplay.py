@@ -177,7 +177,15 @@ def test_data_sends_ids_matching_the_category(tmp_path: Path) -> None:
 
 
 def test_data_without_tmdb_category_sends_poster_and_no_ids(tmp_path: Path) -> None:
-    meta = Meta(category="GAME", base_dir=str(tmp_path), uuid="abc", name="Fictional Game", tmdb_id=5, artwork_url="https://img.example/cover.jpg", steam_url="https://store.steampowered.com/app/4242/Fictional_Game/")
+    meta = Meta(
+        category="GAME",
+        base_dir=str(tmp_path),
+        uuid="abc",
+        name="Fictional Game",
+        tmdb_id=5,
+        artwork_url="https://img.example/cover.jpg",
+        steam_url="https://store.steampowered.com/app/4242/Fictional_Game/",
+    )
 
     data = asyncio.run(FileIPlay(CONFIG).get_data(meta, attach_screenshots=False, preview=True))
 
@@ -234,7 +242,15 @@ def test_search_existing_parses_torznab(monkeypatch: pytest.MonkeyPatch) -> None
         assert request.url.params["q"] == "Fictional Film 2001"
         assert request.url.params["apikey"] == "test-integration-key"
         assert "Authorization" not in request.headers
-        items = [{"title": "Fictional.Film.2001.1080p.WEB.h264-FAKEGRP", "guid": "https://fileiplay.org/torrents/77/fictional", "link": "https://fileiplay.org/dl?apikey=secret", "size": "2048", "files": "3"}]
+        items = [
+            {
+                "title": "Fictional.Film.2001.1080p.WEB.h264-FAKEGRP",
+                "guid": "https://fileiplay.org/torrents/77/fictional",
+                "link": "https://fileiplay.org/dl?apikey=secret",
+                "size": "2048",
+                "files": "3",
+            }
+        ]
         return httpx.Response(200, text=_torznab(items))
 
     _mock_client(monkeypatch, handler)
@@ -356,7 +372,9 @@ def test_upload_fails_when_published_torrent_is_unavailable(tmp_path: Path, monk
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/v1/torrents":
-            return httpx.Response(201, json={"data": {"id": 123, "info_hash": "abc", "url": "https://fileiplay.org/torrents/123/fictional"}, "meta": {"warnings": ["TMDB lookup failed"]}})
+            return httpx.Response(
+                201, json={"data": {"id": 123, "info_hash": "abc", "url": "https://fileiplay.org/torrents/123/fictional"}, "meta": {"warnings": ["TMDB lookup failed"]}}
+            )
         return httpx.Response(200, text=_torznab([]))
 
     requests = _mock_client(monkeypatch, handler)

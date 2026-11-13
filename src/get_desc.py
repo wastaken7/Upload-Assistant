@@ -7,6 +7,7 @@ import math
 import os
 import re
 import urllib.parse
+from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, ClassVar, cast
@@ -15,7 +16,8 @@ from urllib.parse import ParseResult, urlsplit
 import aiofiles
 import httpx
 import langcodes
-from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, Tag
+from bs4.element import NavigableString
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 
@@ -24,7 +26,7 @@ from src.audible import build_audible_author_url, resolve_audible_url
 from src.bbcode import BBCODE
 from src.bluray_com import ensure_release_subheader
 from src.console import logger
-from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
+from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, XXX_LABELS, get_book_labels, get_labels
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
@@ -149,7 +151,7 @@ def _clean_description_text(value: Any) -> str:
     return text.replace(r"\"", '"').replace(r"\/", "/")
 
 
-def _book_overview_to_bbcode(value: str) -> str:
+def book_overview_to_bbcode(value: str) -> str:
     """Preserve useful HTML formatting in book synopses from any source."""
     soup = BeautifulSoup(_clean_description_text(value), "html.parser")
 
@@ -436,19 +438,22 @@ class DescriptionBuilder:
         if not tag:
             return None
 
-        default_config = self.config.get("DEFAULT", {})
+        default_config: object = self.config.get("DEFAULT", {})
         config_sources = (self.tracker_config, default_config)
         for config_source in config_sources:
             if not isinstance(config_source, dict):
                 continue
-            tag_overrides = config_source.get("tag_overrides", {})
-            if not isinstance(tag_overrides, dict):
+            cs_dict = cast(dict[str, Any], config_source)
+            raw_overrides: object = cs_dict.get("tag_overrides", {})
+            if not isinstance(raw_overrides, dict):
                 continue
-            for configured_tag, overrides in tag_overrides.items():
+            tag_overrides_dict = cast(dict[str, Any], raw_overrides)
+            for configured_tag, overrides in tag_overrides_dict.items():
                 if str(configured_tag).strip().lstrip("-").casefold() != tag or not isinstance(overrides, dict):
                     continue
-                if key in overrides and overrides[key] is not None:
-                    return overrides[key]
+                overrides_dict = cast(dict[str, Any], overrides)
+                if key in overrides_dict and overrides_dict[key] is not None:
+                    return overrides_dict[key]
 
         return None
 
@@ -530,7 +535,7 @@ class DescriptionBuilder:
         pattern = re.compile(self._block_regex(headers), re.IGNORECASE)
         keep = 0 if replacing else 1
         matches = list(pattern.finditer(text))
-        pieces = []
+        pieces: list[str] = []
         cursor = 0
         for match in matches[keep:]:
             pieces.append(text[cursor : match.start()])
@@ -723,7 +728,7 @@ class DescriptionBuilder:
         raw_tracks = mediainfo.get("media", {}).get("track", [])
         if not isinstance(raw_tracks, list):
             return ""
-        tracks = [track for track in raw_tracks if isinstance(track, dict)]
+        tracks: list[dict[str, Any]] = [cast(dict[str, Any], track) for track in cast(list[object], raw_tracks) if isinstance(track, dict)]
 
         def value(track: dict[str, Any], key: str) -> str:
             field = track.get(key, "")
@@ -736,8 +741,8 @@ class DescriptionBuilder:
                 return ""
             hours, milliseconds = divmod(milliseconds, 3_600_000)
             minutes, milliseconds = divmod(milliseconds, 60_000)
-            seconds, milliseconds = divmod(milliseconds, 1000)
-            return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+            secs, milliseconds = divmod(milliseconds, 1000)
+            return f"{hours:02}:{minutes:02}:{secs:02}.{milliseconds:03}"
 
         def format_size(bytes_value: str) -> str:
             try:
@@ -777,7 +782,7 @@ class DescriptionBuilder:
             return ""
 
         filename = Path(value(general, "CompleteName") or video_file).stem
-        output = [
+        output: list[str] = [
             filename,
             "",
             "---GENERAL----",
@@ -996,6 +1001,38 @@ class DescriptionBuilder:
         desc_parts.append("[/center]\n")
         return "".join(desc_parts)
 
+    def _build_xxx_desc_section(self, meta: Meta, max_tags: int = 30) -> str:
+        """Studio, date, performers, tags, runtime and synopsis of an XXX release."""
+        if meta.category != "XXX":
+            return ""
+        labels = get_labels(XXX_LABELS, self.language)
+        release = meta.xxx_match if isinstance(meta.xxx_match, dict) else {}
+        rows: list[tuple[str, str]] = []
+        if meta.publisher:
+            rows.append((labels["studio"], _safe_game_field(meta.publisher)))
+        network = _safe_game_field(release.get("network"))
+        if network and network.casefold() != str(meta.publisher or "").casefold():
+            rows.append((labels["network"], network))
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(meta.release_date or "")):
+            rows.append((labels["release_date"], meta.release_date))
+        if meta.cast:
+            rows.append((labels["performers"], ", ".join(_safe_game_field(name) for name in meta.cast)))
+        tags = [_safe_game_field(tag) for tag in meta.keywords or [] if _safe_game_field(tag)]
+        if tags:
+            rows.append((labels["tags"], ", ".join(tags[:max_tags])))
+        # A runtime describes one video; packs have none.
+        if meta.video_duration and len(meta.filelist or []) <= 1:
+            rows.append((labels["duration"], f"{int(meta.video_duration)} {labels['minutes']}"))
+        overview = _clean_description_text(re.sub(r"<[^>]+>", "", str(meta.overview or ""))).strip()
+        if not rows and not overview:
+            return ""
+        parts: list[str] = []
+        if rows:
+            parts.append("\n".join(f"[b]{label}:[/b] {value}" for label, value in rows))
+        if overview:
+            parts.append(f"[b]{labels['synopsis']}[/b]\n{overview.replace('[', '(').replace(']', ')')}")
+        return "[center]" + "\n\n".join(parts) + "[/center]"
+
     def _build_book_desc_section(self, meta: Meta, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
         if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
@@ -1030,7 +1067,7 @@ class DescriptionBuilder:
         str_year = labels["year"]
 
         if overview:
-            overview = _book_overview_to_bbcode(overview)
+            overview = book_overview_to_bbcode(overview)
 
         audible_url = ""
         if asin:
@@ -1114,12 +1151,12 @@ class DescriptionBuilder:
                 final_book_parts.append(f"{header}{str_overview}{header_end}\n{overview}")
 
             return "\n\n".join(part for part in final_book_parts if part.strip())
-        book_parts = []
+        book_parts: list[str] = []
         prefix = f"{bullet} " if bullet else ""
         for label, val in fields:
             book_parts.append(f"{prefix}[b]{label}:[/b] {val}")
 
-        final_book_parts = []
+        final_book_parts: list[str] = []
         if underline:
             header = "[b][u]"
             header_end = "[/u][/b]\n"
@@ -1340,7 +1377,7 @@ class DescriptionBuilder:
                 game_parts.append("\n".join(table_lines))
             else:
                 # Simple BBCode format without table
-                simple_lines = []
+                simple_lines: list[str] = []
                 if clean_min:
                     simple_lines.append(f"[b]{col_min_header}[/b] {clean_min}")
                 if clean_rec:
@@ -1357,7 +1394,7 @@ class DescriptionBuilder:
                 return support_labels.get(cleaned_support.casefold(), cleaned_support)
 
             if table:
-                table_rows = []
+                table_rows: list[str] = []
                 table_rows.append(f"[tr][td][b]{str_language}[/b][/td][td][b]{str_support}[/b][/td][/tr]")
 
                 for lang, support in sorted(languages.items()):
@@ -1371,7 +1408,7 @@ class DescriptionBuilder:
                 game_parts.append(spoiler_str)
             else:
                 # Simple BBCode format without table
-                simple_lang_lines = []
+                simple_lang_lines: list[str] = []
                 for lang, support in sorted(languages.items()):
                     support_str = ", ".join(localized_support(value) for value in support)
                     simple_lang_lines.append(f"[b]{lang}[/b]: {support_str}")
@@ -1391,17 +1428,18 @@ class DescriptionBuilder:
                 return None
             return number if number > 0 else None
 
-        ordered = []
+        ordered: list[tuple[int, int | None, str, int, str, Any]] = []
         for index, track in enumerate(tracks):
             if not isinstance(track, dict):
                 continue
-            relative_path = str(track.get("relative_path") or "")
-            title = str(track.get("title") or "").strip() or Path(relative_path.replace("\\", "/")).stem
+            track_dict = cast(dict[str, Any], track)
+            relative_path = str(track_dict.get("relative_path") or "")
+            title = str(track_dict.get("title") or "").strip() or Path(relative_path.replace("\\", "/")).stem
             if not title:
                 continue
-            disc = positive_number(track.get("disc_number")) or 1
-            number = positive_number(track.get("track_number"))
-            ordered.append((disc, number, relative_path.casefold(), index, title, track.get("duration")))
+            disc = positive_number(track_dict.get("disc_number")) or 1
+            number = positive_number(track_dict.get("track_number"))
+            ordered.append((disc, number, relative_path.casefold(), index, title, track_dict.get("duration")))
 
         if not ordered:
             return ""
@@ -1442,12 +1480,13 @@ class DescriptionBuilder:
     def _build_music_rip_logs(release: dict[str, Any], labels: dict[str, Any]) -> str:
         """Render each CD rip log (EAC, XLD, ...) inside its own spoiler and code block."""
         auxiliary = release.get("auxiliary")
-        logs = auxiliary.get("logs") if isinstance(auxiliary, dict) else None
+        aux_dict = cast(dict[str, Any], auxiliary) if isinstance(auxiliary, dict) else None
+        logs: object = aux_dict.get("logs") if aux_dict is not None else None
         root_value = str(release.get("root") or "")
         if not isinstance(logs, list) or not root_value:
             return ""
         root = Path(root_value).resolve()
-        blocks = []
+        blocks: list[str] = []
         for relative in cast(list[Any], logs):
             log_path = (root / str(relative)).resolve()
             try:
@@ -1486,15 +1525,10 @@ class DescriptionBuilder:
             table = False
 
         release = meta.music_release
-        fields_data = release.get("fields", {})
-        tracks = release.get("tracks", [])
-        external_ids = release.get("external_ids", {})
-        if not isinstance(fields_data, dict):
-            fields_data = {}
-        if not isinstance(tracks, list):
-            tracks = []
-        if not isinstance(external_ids, dict):
-            external_ids = {}
+        fields_data: dict[str, Any] = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+        raw_tracks: object = release.get("tracks", [])
+        tracks: list[dict[str, Any]] = [cast(dict[str, Any], t) for t in cast(list[object], raw_tracks) if isinstance(t, dict)] if isinstance(raw_tracks, list) else []
+        external_ids: dict[str, Any] = release.get("external_ids", {}) if isinstance(release.get("external_ids"), dict) else {}
         if not fields_data and not tracks and not external_ids:
             return ""
 
@@ -1504,23 +1538,25 @@ class DescriptionBuilder:
 
         def value(name: str, fallback: Any = "") -> Any:
             """Return a populated normalized release field or its fallback."""
-            item = fields_data.get(name, {})
-            if isinstance(item, dict) and item.get("value") not in (None, "", [], {}):
-                return item["value"]
+            item: object = fields_data.get(name, {})
+            if isinstance(item, dict):
+                item_dict = cast(dict[str, Any], item)
+                val: object = item_dict.get("value")
+                if val not in (None, "", [], {}):
+                    return val
             return fallback
 
         def display(item: Any) -> str:
             """Format a release field for human-readable BBCode output."""
             if isinstance(item, list):
-                return ", ".join(str(part) for part in item if str(part).strip())
+                parts_list = cast(list[object], item)
+                return ", ".join(str(part) for part in parts_list if str(part).strip())
             return str(item).strip() if item not in (None, "") else ""
 
         def technical_values(name: str, formatter: Any = str) -> str:
             """Format unique valid technical values from the release tracks."""
             formatted_values: dict[Any, str] = {}
             for track in tracks:
-                if not isinstance(track, dict):
-                    continue
                 item = track.get(name)
                 if item in (None, ""):
                     continue
@@ -1537,8 +1573,6 @@ class DescriptionBuilder:
             """Return the release's average bitrate, weighted by track duration when every track has one."""
             samples: list[tuple[float, float]] = []
             for track in tracks:
-                if not isinstance(track, dict):
-                    continue
                 try:
                     bitrate = float(track.get("bitrate") or 0)
                 except TypeError, ValueError, OverflowError:
@@ -1558,7 +1592,7 @@ class DescriptionBuilder:
                 average = sum(bitrate for bitrate, _ in samples) / len(samples)
             return f"{round(average / 1000)} kbps"
 
-        text = {
+        text: dict[str, Any] = {
             "details": "Music Details" if not use_pt_br else "Detalhes da Música",
             "artist": "Artist" if not use_pt_br else "Artista",
             "album": "Album" if not use_pt_br else "Álbum",
@@ -1583,7 +1617,7 @@ class DescriptionBuilder:
             "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
         text.update(get_labels(MUSIC_LABELS, self.language))
-        external_id_labels = text["external_id_labels"]
+        external_id_labels = cast(dict[str, str], text["external_id_labels"])
 
         def musicbrainz_link(kind: str, identifier: Any) -> str:
             """Return a safe MusicBrainz BBCode link for a canonical UUID."""
@@ -1711,12 +1745,13 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,  # ci: ua_signature v4.9
+        ua_signature: bool = True,  # ci: ua_signature v5.0
         user_description: bool = True,
         music: bool = True,
+        xxx: bool = True,
         dynamic_hdr_plot: bool = True,
-        approved_image_hosts: list[str] | None = None,
-        signature: str = "",  # ci: ua_signature v4.9
+        approved_image_hosts: Sequence[str] | None = None,
+        signature: str = "",  # ci: ua_signature v5.0
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -1725,8 +1760,7 @@ class DescriptionBuilder:
 
         if image_list is None:
             image_list = []
-        if approved_image_hosts is None:
-            approved_image_hosts = []
+        approved_hosts = list(approved_image_hosts or [])
         # get_tracker_image_collection falls back to meta.image_list, so only a real override
         # replaces the base screenshots. It never disables per-file pack screenshots: those
         # upload through allowed_hosts, so a tracker's host policy is honoured either way.
@@ -1840,6 +1874,12 @@ class DescriptionBuilder:
             game_section = self._build_game_desc_section(meta)
             if game_section:
                 desc_parts.append(game_section)
+
+        # XXX details: studio, performers, tags, synopsis
+        if xxx and meta.category == "XXX":
+            xxx_section = self._build_xxx_desc_section(meta)
+            if xxx_section:
+                desc_parts.append(xxx_section)
 
         # Music details
         if music and meta.category == "MUSIC":
@@ -1962,7 +2002,7 @@ class DescriptionBuilder:
         audio_spectrogram_section = await self.get_audio_spectrogram_section(meta) if audio_spectrogram else ""
         dynamic_hdr_plot_section = await self.get_dynamic_hdr_plot_section(meta) if dynamic_hdr_plot else ""
 
-        discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_image_hosts, images, multi_screens) if screenshots else ""
+        discs_and_screenshots = await self._handle_discs_and_screenshots(meta, approved_hosts, images, multi_screens) if screenshots else ""
         if self._get_bool_config("hide_screenshot_header_if_only_section", True, meta):
             image_sections = [
                 (menu_section, await self.menu_screenshot_header(meta) if menu_section else ""),
@@ -2008,14 +2048,14 @@ class DescriptionBuilder:
                 await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
         # fmt: off
-        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.9
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v5.0
         # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:
         pack_images_file = Path(meta.base_dir) / "tmp" / meta.uuid / "pack_image_links.json"
         pack_images_data: dict[str, Any] = {}
         approved_hosts = set(approved_image_hosts or [])
-        if await self.common.path_exists(pack_images_file):
+        if await self.common.path_exists(str(pack_images_file)):
             try:
                 async with aiofiles.open(pack_images_file, encoding="utf-8") as f:
                     pack_images_data = json.loads(await f.read())
@@ -2627,10 +2667,10 @@ class DescriptionBuilder:
                     for img_index, image in enumerate(menu_images):
                         web_url = image.get("web_url")
                         raw_url = image.get("raw_url")
-                        img_url = image.get("img_url", raw_url)
+                        img_url = str(image.get("img_url") or raw_url)
                         if not web_url or not raw_url:
                             continue
-                        menu_parts.append(self.format_screenshot(web_url, raw_url, img_url, meta=meta))
+                        menu_parts.append(self.format_screenshot(str(web_url), str(raw_url), img_url, meta=meta))
                         self._append_screenshot_row_separator(menu_parts, img_index, screens_per_row)
                     menu_parts.append("[/center]\n\n")
                     menu_image_section = "".join(menu_parts)
@@ -2649,6 +2689,9 @@ class DescriptionBuilder:
 
         if get_tracker_framework(self.tracker) == "NEXUSPHP":
             return f"[img]{raw_url}[/img]"
+        if get_tracker_framework(self.tracker) == "LUMINANCE":
+            # Contact sheets must show as direct images, not as links to a gallery page.
+            return f"[img]{raw_url}[/img]\n"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
         if self.tracker == "TORRENTLEECH":
@@ -2667,10 +2710,9 @@ class DescriptionBuilder:
         bbcode = BBCODE()
         from src.trackersetup import get_tracker_framework
 
+        comparisons: list[str] = []
         if get_tracker_framework(tracker) == "UNIT3D":
             # Protect comparison payloads from all formatting, including newline cleanup.
-            comparisons: list[str] = []
-
             def preserve_comparison(match: re.Match[str]) -> str:
                 comparisons.append(match.group(0))
                 return f"\x00COMPARISON{len(comparisons) - 1}\x00"
@@ -2812,7 +2854,7 @@ class DescriptionBuilder:
             description = bbcode.convert_hex_colors_to_named(description)
 
             # Apply custom image line breaks for HDSPACE: if "imgbox" is not in the web_url, place only one image per line.
-            def hds_image_formatter(match) -> str:
+            def hds_image_formatter(match: re.Match[str]) -> str:
                 web_url = match.group(1)
                 raw_url = match.group(2)
                 if "imgbox" not in web_url:

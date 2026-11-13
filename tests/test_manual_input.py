@@ -1,6 +1,5 @@
 # ruff: noqa: S101
 import asyncio
-import json
 import re
 import threading
 from pathlib import Path
@@ -9,7 +8,7 @@ from typing import Any
 import pytest
 
 from src import manual_input, webui_events
-from src.manual_input import Choice, Question, ask, confirm_override, load_saved_answers, parse_answer
+from src.manual_input import Choice, Question, ask, confirm_override, parse_answer
 from src.manual_questions import QUESTION_KEYS, game_platform, game_subcategory, parse_answer_arg
 from src.meta import Meta
 
@@ -209,28 +208,6 @@ def test_concurrent_questions_are_asked_one_at_a_time(tmp_path: Path, monkeypatc
 
     asyncio.run(run())
     assert overlap is False
-
-
-def test_saved_answers_are_reloaded_from_meta_json(tmp_path: Path) -> None:
-    meta_dir = tmp_path / "tmp" / "fictional-release"
-    meta_dir.mkdir(parents=True)
-    (meta_dir / "meta.json").write_text(json.dumps({"manual_answers": {"xxx.tags": ["saved"], "game.platform": "PC"}}), encoding="utf-8")
-    meta = _meta(tmp_path, manual_answers={"game.platform": "PS4"})
-
-    asyncio.run(load_saved_answers(meta))
-
-    assert meta.manual_answers == {"game.platform": "PS4", "xxx.tags": ["saved"]}
-
-
-def test_unreadable_meta_json_is_ignored(tmp_path: Path) -> None:
-    meta_dir = tmp_path / "tmp" / "fictional-release"
-    meta_dir.mkdir(parents=True)
-    (meta_dir / "meta.json").write_text("{not json", encoding="utf-8")
-    meta = _meta(tmp_path)
-
-    asyncio.run(load_saved_answers(meta))
-
-    assert meta.manual_answers == {}
 
 
 @pytest.mark.parametrize(

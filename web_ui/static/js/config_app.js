@@ -303,6 +303,7 @@ const WorkspaceSwitcher = ({ activeWorkspace, isDarkMode, stretch }) => {
     { id: "upload", label: "Upload", href: `${APP_BASE}/` },
     { id: "config", label: "Configuration", href: `${APP_BASE}/config` },
     { id: "stats", label: "Stats", href: `${APP_BASE}/stats` },
+    { id: "history", label: "History", href: `${APP_BASE}/history` },
   ];
 
   return (
@@ -420,6 +421,13 @@ function ConfigApplicationRail({
           <RailStatsIcon />
           <span>Stats</span>
         </a>
+        <a
+          href={`${APP_BASE}/history`}
+          className="ua-app-rail-button rounded-lg"
+        >
+          <RailAssetIcon name="history" />
+          <span>History</span>
+        </a>
       </nav>
 
       <div className="min-h-4 flex-1"></div>
@@ -514,6 +522,7 @@ const DEFAULT_WORKFLOW_GROUPS = [
       "ARR INTEGRATION",
       "METADATA CACHING",
       "MUSIC METADATA",
+      "XXX METADATA",
     ],
   },
   {
@@ -658,6 +667,8 @@ const METADATA_CACHE_SERVICE_LABELS = {
   myanonamouse: "MyAnonamouse",
   musicbrainz: "MusicBrainz",
   discogs: "Discogs",
+  tpdb: "ThePornDB",
+  blvckout: "BLVCKOUT",
 };
 
 const METADATA_CACHE_SERVICE_GROUPS = [
@@ -671,6 +682,7 @@ const METADATA_CACHE_SERVICE_GROUPS = [
     services: ["google_books", "openlibrary", "myanonamouse"],
   },
   { label: "Music", services: ["musicbrainz", "discogs"] },
+  { label: "Adult", services: ["tpdb", "blvckout"] },
 ];
 
 const CONFIG_HEADING_LABELS = {
@@ -683,6 +695,7 @@ const CONFIG_HEADING_LABELS = {
   "CLIENT SELECTION": "Client Selection",
   "METADATA CACHING": "Metadata Caching",
   "MUSIC METADATA": "Music Metadata",
+  "XXX METADATA": "XXX Metadata",
   "TRACKER SEARCH AND IMPORT": "Tracker Search and Import",
   "PROWLARR CREDENTIAL FALLBACK": "Prowlarr Credential Fallback",
   "IMAGE HOSTING": "Image Hosting",
@@ -960,6 +973,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   imgbb_api: "ImgBB API Key",
   lensdump_api: "LensDump API Key",
   lostimg_api: "LostImg API Key",
+  luminapix_api: "LuminaPix API Key",
   midnightscene_api_key: "MidnightScene API Key",
   onlyimage_api: "OnlyImage API Key",
   passtheima_ge_api: "PassTheImage API Key",
@@ -970,6 +984,10 @@ const DISPLAY_LABEL_OVERRIDES = {
   utppm_api: "UTPPM API Key",
   zipline_api_key: "Zipline API Key",
   ggn_api_key: "GazelleGames API Key",
+  tpdb_api_key: "ThePornDB API Key",
+  blvckout_api_key: "BLVCKOUT API Key",
+  xxx_metadata_lookup: "Look Up XXX Metadata",
+  xxx_generate_names: "Name Non-Scene XXX Releases",
   audible_domain: "Audible Marketplace Domain",
   ffmpeg_path: "FFmpeg",
   ffprobe_path: "FFprobe",
@@ -1109,6 +1127,7 @@ const formatConfigFieldLabel = (key, pathParts = []) => {
       linked_folder: "Linked Folders",
       local_path: "Local Paths",
       remote_path: "Remote Paths",
+      match_existing_content: "Match Existing Content",
       watch_folder: "Watch Folder",
     };
     if (torrentClientFieldLabels[key]) return torrentClientFieldLabels[key];
@@ -1183,6 +1202,17 @@ const INLINE_FIELD_HELP = {
     linkLabel: "Open Google Cloud",
     linkOnNewLine: true,
   },
+  tpdb_api_key: {
+    description:
+      "Create a ThePornDB API token for XXX scene and movie metadata: title, studio, performers, tags, synopsis, cover and banner.",
+    href: "https://theporndb.net/register",
+    linkLabel: "Sign up at ThePornDB",
+    linkOnNewLine: true,
+  },
+  blvckout_api_key: {
+    description:
+      "A BLVCKOUT API key with read permission, for XXX movie metadata.",
+  },
   twitch_client_id: {
     description:
       "Create a Twitch application to obtain credentials for IGDB metadata.",
@@ -1224,6 +1254,7 @@ const imageHostApiKeys = {
   imgbb: ["imgbb_api"],
   lensdump: ["lensdump_api"],
   lostimg: ["lostimg_api"],
+  luminapix: ["luminapix_api"],
   ptscreens: ["ptscreens_api"],
   onlyimage: ["onlyimage_api"],
   dalexni: ["dalexni_api"],
@@ -1255,6 +1286,7 @@ const IMAGE_HOST_LABELS = {
   imgbox: "Imgbox",
   lensdump: "LensDump",
   lostimg: "LostImg",
+  luminapix: "LuminaPix",
   midnightscene: "MidnightScene",
   onlyimage: "OnlyImage",
   passtheimage: "PassTheImage",
@@ -1340,6 +1372,7 @@ const trackerNameMap = {
   FLOOD: "Flood",
   FUNFILE: "FunFile",
   GREATPOSTERWALL: "Great Poster Wall",
+  HAPPYFAPPY: "HappyFappy",
   HAWKEUNO: "hawke-uno",
   HDBITS: "HDBits",
   HDSPACE: "HD-Space",
@@ -1350,6 +1383,7 @@ const trackerNameMap = {
   ITATORRENTS: "ItaTorrents",
   IPTORRENTS: "IPTorrents",
   LASTDIGITALUNDERGROUND: "LastDigitalUnderground",
+  KUFIRC: "Kufirc",
   LAJIDUI: "lajidui",
   LEMONHD: "LemonHD",
   LATTEAM: "Lat-Team",
@@ -1387,6 +1421,7 @@ const trackerNameMap = {
   SAMARITANO: "Samaritano",
   SEEDPOOL: "seedpool",
   SHAREISLAND: "ShareIsland",
+  SIMURG: "Simurg",
   SKIPTHECOMMERCIALS: "SkipTheCommercials",
   SPEEDAPP: "SpeedApp",
   SWARMAZON: "Swarmazon",
@@ -2506,6 +2541,9 @@ function ConfigLeafEditor({
   const helpBelongsToTorrentClientCrossSeedNote =
     pathParts.includes("TORRENT_CLIENTS") &&
     ["qbit_cross_tag", "qbit_cross_cat", "content_layout"].includes(item.key);
+  const helpBelongsToTorrentClientExistingContentNote =
+    pathParts.includes("TORRENT_CLIENTS") &&
+    item.key === "match_existing_content";
   const hideRedundantImageHostHelp =
     pathParts[0] === "DEFAULT" &&
     (REDUNDANT_IMAGE_HOST_API_HELP_KEYS.has(item.key) ||
@@ -2518,6 +2556,7 @@ function ConfigLeafEditor({
     !helpBelongsToTorrentStorageNote &&
     !helpBelongsToTorrentClientOrganizationNote &&
     !helpBelongsToTorrentClientCrossSeedNote &&
+    !helpBelongsToTorrentClientExistingContentNote &&
     !hideRedundantImageHostHelp &&
     !isSuperSeedTrackerField
       ? getConfigHelpText(item, pathParts)
@@ -2569,6 +2608,11 @@ function ConfigLeafEditor({
   };
   const isContentLayoutField = (key, pathParts) => {
     return key === "content_layout" && pathParts.includes("TORRENT_CLIENTS");
+  };
+  const isMatchExistingContentField = (key, pathParts) => {
+    return (
+      key === "match_existing_content" && pathParts.includes("TORRENT_CLIENTS")
+    );
   };
   const torrentClientListFields = new Set([
     "linked_folder",
@@ -2849,7 +2893,10 @@ function ConfigLeafEditor({
     );
   }
 
-  if (typeof item.value === "boolean") {
+  if (
+    typeof item.value === "boolean" &&
+    !isMatchExistingContentField(item.key, pathParts)
+  ) {
     const originalValue = Boolean(item.value);
 
     return (
@@ -3251,6 +3298,63 @@ function ConfigLeafEditor({
     );
   }
 
+  if (isMatchExistingContentField(item.key, pathParts)) {
+    const matchExistingContentOptions = [
+      { value: "", label: "Off (Use Path Mapping)" },
+      { value: "prefer", label: "Prefer Existing Copy" },
+      { value: "require", label: "Require Existing Copy" },
+    ];
+    // Mirror the runtime parser: case and spacing are ignored, True means "prefer" and False is off.
+    const loweredExistingContentValue = selectedValue.trim().toLowerCase();
+    const normalizedExistingContentValue =
+      loweredExistingContentValue === "true"
+        ? "prefer"
+        : loweredExistingContentValue === "false"
+          ? ""
+          : loweredExistingContentValue;
+    const existingContentValue = matchExistingContentOptions.some(
+      (option) => option.value === normalizedExistingContentValue,
+    )
+      ? normalizedExistingContentValue
+      : selectedValue;
+    if (
+      !matchExistingContentOptions.some(
+        (option) => option.value === existingContentValue,
+      )
+    ) {
+      matchExistingContentOptions.unshift({
+        value: existingContentValue,
+        label: `${existingContentValue} (Unsupported)`,
+      });
+    }
+
+    const originalValue =
+      item.value === null || item.value === undefined ? "" : String(item.value);
+
+    return (
+      <div className="space-y-2">
+        <label htmlFor={fieldId} className={labelClass}>
+          {displayLabel}
+        </label>
+        <SelectDropdown
+          id={fieldId}
+          value={existingContentValue}
+          onChange={(newValue) => {
+            setSelectedValue(newValue);
+            onValueChange(path, newValue, {
+              originalValue,
+              isSensitive: false,
+              isRedacted: false,
+              readOnly: false,
+            });
+          }}
+          options={matchExistingContentOptions}
+          isDarkMode={isDarkMode}
+        />
+      </div>
+    );
+  }
+
   if (isLinkingField(item.key, pathParts)) {
     const linkingOptions = [
       { value: "", label: "None (Original Path)" },
@@ -3445,18 +3549,57 @@ function ConfigLeafEditor({
       normalizeClients(item.value),
     );
     const [isOpen, setIsOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState(null);
     const dropdownRef = useRef(null);
+    const triggerRef = useRef(null);
+    const menuRef = useRef(null);
     const dropdownId = `${fieldId}--options`;
 
     useEffect(() => {
       setSelected(normalizeClients(item.value));
     }, [item.value]);
 
+    // The menu is portaled with fixed positioning so section/accordion
+    // containers with overflow-hidden cannot clip it.
+    React.useLayoutEffect(() => {
+      if (!isOpen) {
+        setMenuPosition(null);
+        return undefined;
+      }
+      const positionMenu = () => {
+        if (!triggerRef.current) return;
+        const bounds = triggerRef.current.getBoundingClientRect();
+        const viewportHeight = document.documentElement.clientHeight;
+        const spaceBelow = viewportHeight - bounds.bottom - 8;
+        const spaceAbove = bounds.top - 8;
+        const above = spaceBelow < Math.min(240, spaceAbove);
+        setMenuPosition({
+          left: bounds.left,
+          width: bounds.width,
+          maxHeight: Math.min(
+            240,
+            Math.max(0, above ? spaceAbove : spaceBelow),
+          ),
+          ...(above
+            ? { bottom: viewportHeight - bounds.top + 4 }
+            : { top: bounds.bottom + 4 }),
+        });
+      };
+      positionMenu();
+      window.addEventListener("resize", positionMenu);
+      document.addEventListener("scroll", positionMenu, true);
+      return () => {
+        window.removeEventListener("resize", positionMenu);
+        document.removeEventListener("scroll", positionMenu, true);
+      };
+    }, [isOpen, selected.length]);
+
     useEffect(() => {
       const handleClickOutside = (event) => {
         if (
           dropdownRef.current &&
-          !dropdownRef.current.contains(event.target)
+          !dropdownRef.current.contains(event.target) &&
+          !(menuRef.current && menuRef.current.contains(event.target))
         ) {
           setIsOpen(false);
         }
@@ -3508,6 +3651,7 @@ function ConfigLeafEditor({
         </div>
         <div className={`relative ${isOpen ? "z-30" : ""}`} ref={dropdownRef}>
           <div
+            ref={triggerRef}
             role="combobox"
             tabIndex={0}
             aria-controls={dropdownId}
@@ -3555,40 +3699,47 @@ function ConfigLeafEditor({
               className={`ua-config-accordion-chevron h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : "rotate-0"}`}
             />
           </div>
-          {isOpen && (
-            <div
-              id={dropdownId}
-              role="listbox"
-              aria-multiselectable="true"
-              className="ua-config-multiselect-menu absolute z-40 mt-1 max-h-60 w-full overflow-auto rounded-lg border shadow-lg"
-            >
-              {torrentClients.length === 0 ? (
-                <div className="ua-config-service-description px-3 py-2 text-sm">
-                  No torrent clients configured
-                </div>
-              ) : (
-                torrentClients.map((client) => (
-                  <div
-                    key={client}
-                    role="option"
-                    aria-selected={selected.includes(client)}
-                    data-selected={selected.includes(client) ? "true" : "false"}
-                    className="ua-config-multiselect-option cursor-pointer px-3 py-2"
-                  >
-                    <label className="flex w-full cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(client)}
-                        onChange={() => toggleClient(client)}
-                        className="ua-theme-checkbox h-4 w-4"
-                      />
-                      {client}
-                    </label>
+          {isOpen &&
+            menuPosition &&
+            ReactDOM.createPortal(
+              <div
+                ref={menuRef}
+                id={dropdownId}
+                role="listbox"
+                aria-multiselectable="true"
+                style={menuPosition}
+                className="ua-config-multiselect-menu fixed z-50 overflow-auto rounded-lg border shadow-lg"
+              >
+                {torrentClients.length === 0 ? (
+                  <div className="ua-config-service-description px-3 py-2 text-sm">
+                    No torrent clients configured
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ) : (
+                  torrentClients.map((client) => (
+                    <div
+                      key={client}
+                      role="option"
+                      aria-selected={selected.includes(client)}
+                      data-selected={
+                        selected.includes(client) ? "true" : "false"
+                      }
+                      className="ua-config-multiselect-option cursor-pointer px-3 py-2"
+                    >
+                      <label className="flex w-full cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(client)}
+                          onChange={() => toggleClient(client)}
+                          className="ua-theme-checkbox h-4 w-4"
+                        />
+                        {client}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>,
+              triggerRef.current?.closest(".ua-config-page") || document.body,
+            )}
         </div>
       </div>
     );
@@ -5107,6 +5258,11 @@ function TorrentClientSettings({
         : ["linking"],
     },
     {
+      id: "existing-content",
+      title: "Existing Content",
+      keys: ["match_existing_content"],
+    },
+    {
       id: "watch",
       title: "Watch Folder",
       keys: ["watch_folder"],
@@ -5225,6 +5381,16 @@ function TorrentClientSettings({
                   different layout.
                 </p>
               </div>
+            )}
+            {group.id === "existing-content" && (
+              <p className="ua-config-service-description mt-3 text-xs leading-relaxed">
+                <span className="font-semibold">Match Existing Content:</span>{" "}
+                For a client that seeds its own copy of your files, such as a
+                seedbox. Before adding, UA looks in this client for a complete
+                torrent with the same files and seeds from its folder, without
+                path mapping or linking. Prefer falls back to the path mapping
+                when no copy is found; Require skips this client instead.
+              </p>
             )}
             {group.id === "linking" && (
               <div className="ua-config-service-description mt-3 space-y-1 text-xs leading-relaxed">

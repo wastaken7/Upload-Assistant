@@ -3,7 +3,7 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -22,6 +22,14 @@ from src.stats import record_event_async
 from src.trackers.common import Common
 
 Config = dict[str, Any]
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
 
 
 class PTerClub:
@@ -314,7 +322,7 @@ class PTerClub:
         else:
             logger.info(f"{self.tracker}: [yellow]Pterimg Cookies not found. Creating new session.")
 
-        data = {"login-subject": self.username, "password": self.password, "keep-login": 1}
+        data: dict[str, str | int] = {"login-subject": self.username, "password": self.password, "keep-login": 1}
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
             response = await client.get("https://s3.pterclub.com")
             data["auth_token"] = self._extract_auth_token(response.text, r'auth_token.*?"(\w+)"')
@@ -437,15 +445,15 @@ class PTerClub:
 
     def get_small_description(self, meta: Meta) -> str:
         """Build PTer's optional Chinese subtitle without emitting empty PTGen labels."""
-        ptgen = meta.ptgen if isinstance(meta.ptgen, dict) else {}
-        trans_title_value = ptgen.get("trans_title", [])
-        trans_titles = [str(title).strip() for title in trans_title_value if str(title).strip()] if isinstance(trans_title_value, list) else []
+        ptgen = meta.ptgen if _is_str_dict(meta.ptgen) else {}
+        trans_title_value = ptgen.get("trans_title")
+        trans_titles = [str(title).strip() for title in trans_title_value if str(title).strip()] if _is_obj_list(trans_title_value) else []
         if not trans_titles:
             return str(meta.title)
 
         small_descr = " / ".join(trans_titles)
-        genres_value = ptgen.get("genre", [])
-        genres = [str(genre).strip() for genre in genres_value if str(genre).strip()] if isinstance(genres_value, list) else []
+        genres_value = ptgen.get("genre")
+        genres = [str(genre).strip() for genre in genres_value if str(genre).strip()] if _is_obj_list(genres_value) else []
         if genres:
             small_descr += f" | 类别:{genres[0]}"
         return small_descr

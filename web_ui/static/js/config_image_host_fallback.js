@@ -7,6 +7,7 @@
     "imgbox",
     "lensdump",
     "lostimg",
+    "luminapix",
     "midnightscene",
     "onlyimage",
     "passtheimage",

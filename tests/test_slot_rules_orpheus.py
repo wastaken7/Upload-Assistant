@@ -164,6 +164,7 @@ def test_unknown_releases():
     assert verdict(torrent(media="WEB", edition=unknown), torrent(media="WEB", edition=unknown)) is BLOCK
     # Release information doesn't let a less preferred encode replace an Unknown Release.
     assert verdict(torrent(fmt="MP3", encoding="V2 (VBR)"), torrent(fmt="MP3", encoding="V0 (VBR)", edition=unknown)) is BLOCK
+
     def web_24(rate: int | None, edition: MusicEdition = EDITION) -> MusicTorrent:
         return torrent(media="WEB", encoding="24bit Lossless", sample_rate=rate, edition=edition)
 

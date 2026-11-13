@@ -267,6 +267,35 @@ def test_btn_rejects_bencoded_error_instead_of_seeding_it() -> None:
         tracker()._registered_torrent(b"d5:error14:login requirede")
 
 
+def _btn_torrent(announce: str, with_list: bool = False) -> bytes:
+    from torf import Torrent
+
+    torrent = Torrent(trackers=[announce], private=True, source="BTN")
+    torrent.metainfo["info"].update({"name": "Fictional.Show.S01E01.1080p.WEB-DL-NOGRP.mkv", "length": 3, "piece length": 16384, "pieces": b"\0" * 20})
+    if not with_list:
+        torrent.metainfo.pop("announce-list", None)
+    else:
+        torrent.metainfo["announce-list"] = [[announce]]
+    return torrent.dump(validate=False)
+
+
+def test_btn_registered_torrent_keeps_tracker_announce_without_config() -> None:
+    content = _btn_torrent("http://landof.tv/abc/announce")
+    assert tracker()._registered_torrent(content) == content
+
+
+@pytest.mark.parametrize("with_list", [False, True])
+def test_btn_registered_torrent_uses_configured_announce_and_keeps_hash(with_list: bool) -> None:
+    from torf import Torrent
+
+    content = _btn_torrent("http://landof.tv/abc/announce", with_list)
+    rewritten = tracker()._registered_torrent(content, "https://landof.tv/abc/announce")
+    original, result = Torrent.read_stream(content), Torrent.read_stream(rewritten)
+    assert result.infohash == original.infohash
+    assert result.metainfo["announce"] == "https://landof.tv/abc/announce"
+    assert result.metainfo.get("announce-list", [["https://landof.tv/abc/announce"]]) == [["https://landof.tv/abc/announce"]]
+
+
 def test_btn_get_name_uses_disambiguation_from_btn_series_name(monkeypatch) -> None:
     btn = tracker()
 
@@ -420,6 +449,37 @@ def test_btn_verify_autofill_uses_season_year_over_series_year() -> None:
     series_year_data = {"artist": "Paper Street Works (US)", "title": "S03E01", "year": "2005"}
     errors = btn._verify_autofill(series_year_data, meta, "Paper Street Works (US)", "Episode")
     assert errors == ["year '2005' != expected '2006'"]  # noqa: S101
+
+
+def test_btn_verify_autofill_uses_episode_air_date_without_season_data() -> None:
+    btn = tracker()
+    meta = Meta(season_int=4, episode_int=3, year=2004, tmdb_episode_data={"air_date": "2026-02-10"})
+
+    data = {"artist": "Paper Street Works", "title": "S04E03", "year": "2026"}
+    assert btn._verify_autofill(data, meta, "Paper Street Works", "Episode") == []  # noqa: S101
+
+
+def test_btn_verify_autofill_ignores_air_date_of_another_episode() -> None:
+    btn = tracker()
+    # TMDb data still describes the episode requested before TVDb renumbered it
+    meta = Meta(
+        season_int=4,
+        episode_int=3,
+        year=2004,
+        tmdb_episode_data={"air_date": "2010-02-10", "season_number": 1, "episode_number": 40},
+    )
+
+    data = {"artist": "Paper Street Works", "title": "S04E03", "year": "2026"}
+    assert btn._verify_autofill(data, meta, "Paper Street Works", "Episode") == []  # noqa: S101
+
+
+def test_btn_verify_autofill_skips_series_year_for_later_seasons() -> None:
+    btn = tracker()
+    # Nothing season-specific is known, so the 2004 premiere year must not be enforced for S04
+    meta = Meta(season_int=4, episode_int=3, year=2004)
+
+    data = {"artist": "Paper Street Works", "title": "S04E03", "year": "2026"}
+    assert btn._verify_autofill(data, meta, "Paper Street Works", "Episode") == []  # noqa: S101
 
 
 def test_btn_uploaded_torrent_id_does_not_return_older_group_torrent_during_retries(monkeypatch) -> None:

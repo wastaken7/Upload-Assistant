@@ -223,6 +223,21 @@ async def test_book_confirmation_shows_service_or_optional_hint(monkeypatch: pyt
     assert expected in service_line
 
 
+@pytest.mark.asyncio
+async def test_confirmation_treats_xxx_overview_and_source_as_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    """XXX synopses come from ThePornDB or --overview, and XXX files rarely name a source."""
+    messages: list[str] = []
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(Meta(category="XXX", unattended=True)) is True
+
+    for label, hint in (("Overview", "--overview or --tpdb"), ("Source", "--source")):
+        line = next(line for line in messages[0].splitlines() if f"[bold cyan]{label}[/bold cyan]" in line)
+        assert "⚠️ Missing" not in line
+        assert "Not set" in line
+        assert hint in line
+
+
 @pytest.mark.parametrize(
     ("category", "hints"),
     [
@@ -253,7 +268,7 @@ async def test_book_confirmation_shows_service_or_optional_hint(monkeypatch: pyt
         ),
         ("TV", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
         ("MOVIE", {"Title": "--tmdb", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
-        ("XXX", {"Title": "release filename", "Resolution": "--resolution", "Source": "--source", "Type": "--type"}),
+        ("XXX", {"Title": "release filename", "Resolution": "--resolution", "Type": "--type"}),
     ],
 )
 @pytest.mark.asyncio

@@ -14,8 +14,8 @@ from src.screenshot_manifest import capture_pages
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
 from src.screenshot_review import add_screenshot, list_screenshots, replace_screenshot
-from src.temp_paths import screenshots_dir
 from src.takescreens import _render_document_page, find_ebook_info_page, generate_ebook_screenshots, select_ebook_pages
+from src.temp_paths import screenshots_dir
 
 
 def _make_pdf(path: Path, pages: list[str]) -> None:

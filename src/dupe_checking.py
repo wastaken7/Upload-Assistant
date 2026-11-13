@@ -2,12 +2,20 @@
 import re
 from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict, TypeIs, cast
 
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.UNIT3D.hawkeuno import HawkeUno
+
+
+def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
+
+
+def _is_obj_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
 
 
 class DupeEntry(TypedDict, total=False):
@@ -16,6 +24,8 @@ class DupeEntry(TypedDict, total=False):
     files: list[str]
     file_count: int
     trumpable: bool
+    # Set by filter_dupes: marked trumpable on the site and in the upload's resolution.
+    trump_target: bool
     link: str | None
     download: str | None
     flags: list[str]
@@ -67,7 +77,6 @@ class DupeChecker:
             else:
                 logger.debug(dupes)
 
-        meta.trumpable_id = None
         meta.season_pack_exists = False
         meta.season_pack_id = None
         meta.season_pack_link = None
@@ -115,11 +124,12 @@ class DupeChecker:
 
                 # Case 3: Dict with files and file_count
                 if "files" in d:
-                    if isinstance(d["files"], list):
-                        entry_files = d["files"]
+                    d_files = d["files"]
+                    if _is_obj_list(d_files):
+                        entry_files = d_files
                         entry["files"] = [str(file) for file in entry_files]
-                    elif isinstance(d["files"], str) and d["files"]:
-                        entry["files"] = [d["files"]]
+                    elif isinstance(d_files, str) and d_files:
+                        entry["files"] = [d_files]
                     entry["file_count"] = len(entry["files"])
                 if "file_count" in d:
                     try:
@@ -204,8 +214,8 @@ class DupeChecker:
         is_usenet = bool(getattr(tracker_cls, "is_usenet", False))
         tracker_config = self.config.get("TRACKERS", {}).get(tracker_name.upper(), {})
         supports_exact_match_only = hasattr(tracker_cls, "exact_match_only")
-        has_configured_exact_match_only = isinstance(tracker_config, dict) and "exact_match_only" in tracker_config
-        configured_exact_match_only = tracker_config.get("exact_match_only") if has_configured_exact_match_only else None
+        has_configured_exact_match_only = _is_str_dict(tracker_config) and "exact_match_only" in tracker_config
+        configured_exact_match_only = tracker_config.get("exact_match_only") if _is_str_dict(tracker_config) and "exact_match_only" in tracker_config else None
         if has_configured_exact_match_only and not supports_exact_match_only:
             logger.warning(
                 f"{tracker_name}: 'exact_match_only' is not supported by this tracker and will be ignored.",
@@ -463,7 +473,7 @@ class DupeChecker:
                 # Get main title candidates
                 def get_main_title_candidates(cleaned_t: str) -> list[str]:
                     parts = re.split(r"[:]|\s+-\s+|\s+by\s+", cleaned_t)
-                    candidates = []
+                    candidates: list[str] = []
                     for p in parts:
                         p_clean = re.sub(r"[^a-z0-9\s]", "", p)
                         p_clean = re.sub(r"\s+", " ", p_clean).strip()
@@ -554,10 +564,11 @@ class DupeChecker:
                 logger.debug(f"[cyan]Book duplicate matched: {each}")
                 return False
 
-            # AITHER-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
-            if tracker_name in ["AITHER", "LST"] and entry.get("trumpable", False) and res_id and target_resolution == res_id:
-                meta.trumpable_id = entry.get("id")
-                remember_match("trumpable_id")
+            # No internal check: if the site marks it trumpable, it is trumpable.
+            # Only trackers that accept trump reports offer it (src.trump_reports).
+            # It does not remember the match: the matched download link is for cross-seeding.
+            if entry.get("trumpable", False) and res_id and target_resolution == res_id:
+                entry["trump_target"] = True
 
             if not meta.is_disc:
                 for file in filenames:
@@ -724,8 +735,9 @@ class DupeChecker:
                 season_episode_match, is_season = await DupeChecker.is_season_episode_match(normalized, target_season, target_episode)
                 logger.debug(f"[debug] Season/Episode match result: {season_episode_match}")
                 logger.debug(f"[debug] is_season: {is_season}")
-                # AITHER episode trumping logic
-                if is_season and tracker_name in ["AITHER", "LST"]:
+                # Season pack upload: episodes of the same season are trump targets.
+                # season_episode_match is False only for episodes here (an existing season pack matches).
+                if is_tv_pack and is_season and not season_episode_match and tracker_name in ["AITHER", "LST"]:
                     # Null-safe normalization for comparisons
                     target_source_lower = (target_source or "").lower()
                     type_id_lower = (type_id or "").lower()
@@ -742,9 +754,9 @@ class DupeChecker:
                             is_internal = False
                             if entry.get("internal", 0) == 1:
                                 trackers_section: dict[str, Any] = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-                                aither_settings: dict[str, Any] = trackers_section.get("AITHER", {})
-                                if aither_settings.get("internal") is True:
-                                    internal_groups = aither_settings.get("internal_groups", [])
+                                tracker_settings: dict[str, Any] = trackers_section.get(tracker_name, {})
+                                if tracker_settings.get("internal") is True:
+                                    internal_groups = tracker_settings.get("internal_groups", [])
                                     if isinstance(internal_groups, list):
                                         tag_without_prefix = tag[1:] if tag else ""
                                         if tag_without_prefix in internal_groups and tag_without_prefix.lower() in normalized:
@@ -886,13 +898,13 @@ class DupeChecker:
         local_size = parse_size_to_bytes(meta.source_size)
         if local_size is None and not meta.is_disc and meta.mediainfo:
             tracks = meta.mediainfo.get("media", {}).get("track", [])
-            if tracks and isinstance(tracks, list) and len(tracks) > 0:
+            if tracks and _is_obj_list(tracks) and len(tracks) > 0 and _is_str_dict(tracks[0]):
                 local_size = parse_size_to_bytes(tracks[0].get("FileSize"))
 
         # 3. Candidate files and file count
         candidate_files: list[str] = []
         raw_files = candidate.get("files", [])
-        if isinstance(raw_files, list):
+        if _is_obj_list(raw_files):
             candidate_files = [Path(str(f)).name.lower() for f in raw_files if f]
         elif isinstance(raw_files, str) and raw_files:
             candidate_files = [Path(f.strip()).name.lower() for f in raw_files.split(",") if f.strip()]

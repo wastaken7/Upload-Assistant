@@ -2,14 +2,11 @@
 """Shared machinery for tracker slot rules."""
 
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date
 from typing import Any, ClassVar, Protocol
 
 from src.slot_rules.models import SlotDecision, Verdict
+from src.slot_rules.pages import RULES_PAGES, TRANSCRIBED
 from src.slot_rules.profile import DISC, DV, HDR10, HDR10P, HLG, PQ10, WEBDL, WEBRIP, ReleaseProfile
-
-# Rules transcribed from the tracker pages on this date.
-RULES_DATE_2026_10_15 = date(2026, 10, 15)
 
 type SlotKey = tuple[object, ...]
 # Returns a verdict and reason when the upload competes with an occupant of its slot.
@@ -100,7 +97,6 @@ class SlotRules:
     """Base class: subclasses set the class attributes and implement ``decide``."""
 
     TRACKER: ClassVar[str] = ""
-    RULES_DATE: ClassVar[date] = RULES_DATE_2026_10_15
 
     def __init__(self, meta: Any = None) -> None:
         # Upload metadata, for rules that use tracker data stored during the search.
@@ -115,16 +111,20 @@ class SlotRules:
         *,
         slot: str = "",
         why: str = "",
+        trump: bool = False,
     ) -> SlotDecision:
+        page = RULES_PAGES.get(self.TRACKER)
         return SlotDecision(
             verdict=verdict,
             reason=reason,
             tracker=self.TRACKER,
-            rules_date=self.RULES_DATE,
+            rules_date=page.updated if page else TRANSCRIBED,
             slot=slot,
             why=why,
             conflicts=[dict(conflict.entry) for conflict in conflicts],
             notes=list(notes),
+            rules_url=page.url if page else "",
+            trump=trump,
         )
 
     def evaluate(self, upload: ReleaseProfile, existing: Sequence[ReleaseProfile]) -> SlotDecision | None:
@@ -219,6 +219,10 @@ class SlotRules:
         if blocking:
             why = next((reason for _, reason in blocking if reason), "")
             return self.decision(Verdict.BLOCK, "Another release already fills this slot.", [profile for profile, _ in blocking], notes, slot=label, why=why)
+        # Replacing the competing releases must still leave room beside the ones that coexist.
+        coexisting = [profile for profile in occupants if coexists and coexists(upload, profile)]
+        if len(coexisting) >= capacity:
+            return self.decision(Verdict.BLOCK, f"All {capacity} places in this slot are already taken.", coexisting, notes, slot=label)
         reviewing = [(profile, reason) for profile, verdict, reason in results if verdict is Verdict.REVIEW]
         if reviewing:
             return self.decision(
@@ -237,6 +241,7 @@ class SlotRules:
             notes,
             slot=label,
             why=reasons,
+            trump=True,
         )
 
     @staticmethod

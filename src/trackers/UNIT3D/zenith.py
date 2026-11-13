@@ -4,6 +4,7 @@ from typing import Any, cast
 
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D, ParamsList
@@ -172,7 +173,7 @@ class Zenith(UNIT3D):
                 logger.info(f"{self.tracker}: [bold red]Author '{meta.author}' is banned on {self.tracker}. Skipping upload...[/bold red]")
                 return False
 
-        return await self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await self.common.check_adult_media_allowed(meta, self.tracker)
 
     async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
         urls = await super().get_search_urls(meta, request_params)
@@ -388,6 +389,13 @@ class Zenith(UNIT3D):
         name = " ".join(part for part in title_parts if part)
         name = " ".join(name.split())
         return f"{name}{str(meta.tag or '').strip()}"
+
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        builder = DescriptionBuilder(self.tracker, self.config)
+        # Zenith staff asked for no per-episode/per-disc screenshots in packs.
+        # Keep the override local so other trackers retain the user's setting.
+        builder.tracker_config = {**builder.tracker_config, "multiScreens": 0}
+        return {"description": await builder.general_description_generator(meta, mediainfo=False, nfo=False)}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {

@@ -88,7 +88,11 @@ def test_personal_release_flag_updates_the_current_item_and_resets_for_the_next(
 
     started, updated, other = _events(capsys.readouterr().out)
     assert {key: value for key, value in updated.items() if key != "ts"} == {
-        "kind": "item", "index": 1, "total": 2, "name": "Personal.mkv", "personal_release": True,
+        "kind": "item",
+        "index": 1,
+        "total": 2,
+        "name": "Personal.mkv",
+        "personal_release": True,
     }
     assert "personal_release" not in started
     assert "personal_release" not in other
@@ -107,6 +111,22 @@ async def test_unattended_confirmation_publishes_the_resolved_personal_release_f
     updates = [event for event in _events(capsys.readouterr().out) if event["kind"] == "item" and "personal_release" in event]
     assert len(updates) == 1
     assert updates[0]["personal_release"] is personal_release
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("category", "flagged"), [("MOVIE", True), ("XXX", False)])
+async def test_xxx_confirmation_does_not_ask_for_overview_or_source(gui_env, capsys, category, flagged) -> None:
+    """XXX synopses come from ThePornDB or --overview and XXX files rarely name a source."""
+    from src.meta import Meta
+    from src.uphelper import UploadHelper
+
+    webui_events.begin_item("/media/Example.mp4", 1, 1)
+    meta = Meta(category=category, unattended=True, resolution="1080p", type="WEBDL", overview="", source="")
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(meta) is True
+
+    texts = [str(entry.get("text")) for event in _events(capsys.readouterr().out) for entry in event.get("notices", []) or [] if isinstance(entry, dict)]
+    assert any(text.startswith("Overview is missing") for text in texts) is flagged
+    assert any(text.startswith("Source is missing") for text in texts) is flagged
 
 
 def test_oversized_events_are_not_written(gui_env, capsys, monkeypatch) -> None:
@@ -395,6 +415,7 @@ def test_slot_events_carry_the_terminal_details(gui_env, capsys) -> None:
         conflicts=[{"name": "Fictional.Movie.2020-OTHERGRP", "link": "https://tracker.invalid/t/1", "size": "4 GiB"}],
         notes=["Check the audio tracks."],
         rules_date=date(2020, 1, 1),
+        rules_url="https://tracker.invalid/rules",
         source_size=4 * 1024**3,
     )
 
@@ -404,6 +425,7 @@ def test_slot_events_carry_the_terminal_details(gui_env, capsys) -> None:
     assert event["why"] == "One release per group and resolution."
     assert event["notes"] == ["Check the audio tracks."]
     assert event["rules"].startswith("Rules as of 2020-01-01 (")
+    assert event["rules_url"] == "https://tracker.invalid/rules"
     (conflict,) = event["conflicts"]
     assert conflict["diff_pct"] == 0
     # Same size as the upload: the terminal's red end of the scale.
@@ -614,4 +636,3 @@ async def test_bdinfo_comparison_emits_tracker_notices_for_gui_dupe_prompt(gui_e
         ("FAKE", "Audio track count differs on Fictional.Film.2020"),
         ("FAKE", "Playlist length matches: 01:45:00"),
     ]
-

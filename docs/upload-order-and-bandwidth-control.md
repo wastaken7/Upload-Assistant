@@ -123,3 +123,19 @@ ua "/path/to/content" -tk BLUTOPIA,CURUPIRA -u -uo concurrent -qbcon -qbcrl 500 
 ```
 
 CLI values apply to the current upload. `--upload-order` and positive threshold/time values override their configured defaults; the two bandwidth-control flags enable their respective settings for that run.
+
+## Scheduled uploads
+
+Two options delay the upload until the release is fully prepared (MediaInfo, screenshots, descriptions, torrent and duplicate checks):
+
+- `--upload-at TIME` waits until a local time. `HH:MM` means the next occurrence of that time; `"YYYY-MM-DD HH:MM"` sets a date and must be in the future. Invalid or past values stop the run before anything is prepared.
+- `--upload-interval DURATION` (or `DEFAULT.upload_interval`) keeps a minimum time between uploads in one run. It is measured from the end of the last upload that succeeded, so releases that are skipped do not wait, and the next release is prepared while the interval runs.
+
+```bash
+# Start uploading the queue at 02:00 and then upload at most one release every 30 minutes.
+ua --queue nightly "/path/to/folder" --upload-at 02:00 --upload-interval 30m
+```
+
+After either wait, every torrent tracker repeats its duplicate search before it uploads. Only releases that were not in the first search count; slot rules and the normal duplicate filters then decide, and the tracker is skipped automatically when a new duplicate blocks the upload. Usenet indexers are not checked again.
+
+The scheduled wait happens before the qBittorrent bandwidth slot is taken, so other runs that use bandwidth control are not blocked. With `--debug`, the wait is only reported.

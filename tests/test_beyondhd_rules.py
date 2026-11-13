@@ -13,7 +13,7 @@ def _check(video_encode: str, uhd: str = "") -> tuple[bool, list[str]]:
     tracker = BEYONDHD({"DEFAULT": {}, "TRACKERS": {"BEYONDHD": {}}})
     prompts: list[str] = []
 
-    async def confirm(_meta: Meta, message: str) -> bool:
+    def warn(message: str) -> bool:
         prompts.append(message)
         return False
 
@@ -28,8 +28,8 @@ def _check(video_encode: str, uhd: str = "") -> tuple[bool, list[str]]:
     )
     with (
         patch.object(tracker, "get_name", AsyncMock(return_value="Fictional Movie 2001 1080p BluRay Opus 2.0 x264-Example")),
-        patch.object(tracker, "_confirm_or_skip", side_effect=confirm),
-        patch("src.trackers.beyondhd.Common.check_and_confirm_adult_media_upload", AsyncMock(return_value=True)),
+        patch.object(tracker, "_rule_warning", side_effect=warn),
+        patch("src.trackers.beyondhd.Common.check_adult_media_allowed", AsyncMock(return_value=True)),
     ):
         result = asyncio.run(tracker.get_additional_checks(meta))
     return result, prompts
@@ -44,7 +44,7 @@ def test_beyondhd_rejects_non_x26x_encode():
     assert _check(" H.264") == (False, [])
 
 
-def test_beyondhd_prompts_for_non_uhd_x265_encode():
+def test_beyondhd_fails_non_uhd_x265_encode():
     result, prompts = _check(" x265")
     assert result is False
     assert any("x265 encodes" in prompt for prompt in prompts)

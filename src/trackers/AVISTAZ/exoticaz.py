@@ -5,7 +5,7 @@ import re
 import uuid
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeIs
 from urllib.parse import urljoin
 
 import aiofiles
@@ -16,11 +16,21 @@ from src import payload_preview
 from src.app_paths import CODE_DIR
 from src.cogs.redaction import Redaction
 from src.console import logger
-from src.manual_input import Question, ask, choices_from, confirm_override, has_answer
+from src.manual_input import Question, ask, choices_from, has_answer
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
+from src.takescreens import is_xxx_contact_sheet
 from src.trackers.AVISTAZ import AZTrackerBase
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, object]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
 
 # https://exoticaz.to/rules/upload-rules
 CATEGORY_IDS = {
@@ -171,12 +181,15 @@ class ExoticaZ(AZTrackerBase):
         if meta.video_width and meta.video_height:
             return int(meta.video_width), int(meta.video_height)
         # XXX preparation does not always fill the dimensions, so read the first video track.
-        for track in (meta.mediainfo or {}).get("media", {}).get("track", []):
-            if isinstance(track, dict) and track.get("@type") == "Video":
-                try:
-                    return int(float(track.get("Width", 0))), int(float(track.get("Height", 0)))
-                except TypeError, ValueError:
-                    return 0, 0
+        media_dict: object = (meta.mediainfo or {}).get("media") if _is_str_dict(meta.mediainfo) else None
+        tracks: object = media_dict.get("track") if _is_str_dict(media_dict) else None
+        if _is_obj_list(tracks):
+            for track in tracks:
+                if _is_str_dict(track) and track.get("@type") == "Video":
+                    try:
+                        return int(float(str(track.get("Width", 0)))), int(float(str(track.get("Height", 0))))
+                    except TypeError, ValueError:
+                        return 0, 0
         return 0, 0
 
     def get_resolution_ids(self, meta: Meta) -> list[str]:
@@ -246,8 +259,9 @@ class ExoticaZ(AZTrackerBase):
         try:
             response = await self.session.get(f"{self.base_url}/api/v1/{endpoint}", params={"term": term}, headers=headers)
             response.raise_for_status()
-            data = response.json().get("data", [])
-            return data if isinstance(data, list) else []
+            payload: object = response.json()
+            data_obj: object = payload.get("data") if _is_str_dict(payload) else None
+            return [item for item in data_obj if _is_str_dict(item)] if _is_obj_list(data_obj) else []
         except Exception as e:
             logger.info(f"{self.tracker}: Unable to search {endpoint} for '{term}': {e}", extra={"markup": False})
             return []
@@ -327,7 +341,13 @@ class ExoticaZ(AZTrackerBase):
         return []
 
     def is_full_size_screenshot(self, meta: Meta, path: Path) -> bool:
-        """Tell single frames from video sheets, whose grid changes the aspect ratio."""
+        """Tell single frames from video sheets.
+
+        Sheets are marked in the screenshot manifest; unmarked images fall back
+        to the aspect ratio, which a sheet's grid changes.
+        """
+        if is_xxx_contact_sheet(meta.base_dir, meta.uuid, path):
+            return False
         video_width, video_height = self.video_dimensions(meta)
         if not video_width or not video_height:
             return False
@@ -386,12 +406,12 @@ class ExoticaZ(AZTrackerBase):
         return "\n\n".join(warnings)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         if self.config["TRACKERS"][self.tracker].get("check_for_rules", True):
             warnings = self.rules(meta)
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
-                if not await confirm_override(meta, "Do you want to continue anyway?"):
-                    return False
+                passed = False
 
         media_info = await self.get_file_info(meta)
         if len(media_info.encode("utf-8")) > MAXIMUM_MEDIAINFO_SIZE:
@@ -403,7 +423,7 @@ class ExoticaZ(AZTrackerBase):
             logger.info(f"{self.tracker}: [yellow]Unattended mode: no site tags were found for this release. Skipping {self.tracker} upload.[/yellow]")
             return False
 
-        return True
+        return passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         duplicates: list[dict[str, str]] = []
@@ -537,7 +557,7 @@ class ExoticaZ(AZTrackerBase):
         async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
 
-        step1_data = {"_token": token, "file_name": data["file_name"], "category_id": data["category_id"], "media_info": data["media_info"]}
+        step1_data: dict[str, Any] = {"_token": token, "file_name": data["file_name"], "category_id": data["category_id"], "media_info": data["media_info"]}
         files = {"torrent_file": (torrent_path.name, torrent_bytes, "application/x-bittorrent")}
         response = await self.session.post(f"{self.base_url}/upload", data=step1_data, files=files, headers={"Referer": f"{self.base_url}/upload"})
         location = response.headers.get("Location", "")
@@ -570,7 +590,7 @@ class ExoticaZ(AZTrackerBase):
                 response = await self.session.post(
                     f"{self.base_url}/add/image/torrent/{torrent_id}", data=form, files={"qqfile": (path.name, image_bytes, content_type)}, headers=headers
                 )
-                result = response.json() if response.is_success else {}
+                result: dict[str, Any] = response.json() if response.is_success else {}
                 if result.get("success") and result.get("fileId"):
                     file_ids.append(str(result["fileId"]))
                 else:
@@ -634,7 +654,7 @@ class ExoticaZ(AZTrackerBase):
             return False
 
         edit_url = f"{self.base_url}/edit/torrent/{torrent_id}"
-        form = {"_token": token, **data}
+        form: dict[str, Any] = {"_token": token, **data}
         file_ids = await self.upload_screenshots(torrent_id, token, image_paths)
         if not file_ids:
             await self.save_draft(torrent_id, form)

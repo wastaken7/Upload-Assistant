@@ -42,7 +42,7 @@ async def _without_release_group(value: str, meta: Meta) -> str:
 
 
 async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta, folder_id: str, base_dir: str) -> tuple[str, str]:
-    source = "BluRay"
+    raw_source: object = "BluRay"
     system = ""
     mi: dict[str, Any] = {}
     if meta.is_disc != "BDMV":
@@ -53,19 +53,23 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             logger.debug("No mediainfo.json")
     try:
         if meta.manual_source:
-            source = meta.manual_source
+            raw_source = meta.manual_source
         else:
             try:
                 source_input = await _without_release_group(video, meta)
-                source = guessit_fn(source_input).get("source", source)
+                raw_source = guessit_fn(source_input).get("source", raw_source)
             except Exception:
                 try:
                     source_input = await _without_release_group(path, meta)
-                    source = guessit_fn(source_input).get("source", source)
+                    raw_source = guessit_fn(source_input).get("source", raw_source)
                 except Exception:
-                    source = "BluRay"
-        if isinstance(source, list):
-            source = source[-1] if source else "BluRay"
+                    raw_source = "BluRay"
+        source = "BluRay"
+        if isinstance(raw_source, list):
+            raw_list: list[object] = list(raw_source)
+            source = str(raw_list[-1]) if raw_list else "BluRay"
+        elif isinstance(raw_source, str):
+            source = raw_source
         if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
             if type == "DISC":
                 source = "Blu-ray"

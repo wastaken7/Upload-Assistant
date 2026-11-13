@@ -5,9 +5,10 @@ import ntpath
 import os
 import re
 import sys
+from collections.abc import Iterable
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -15,7 +16,7 @@ import cli_ui
 import guessit
 from torf import Torrent
 
-from src import webui_events
+from src import upload_history, webui_events
 from src.bluray_com import find_bluray_url, get_bluray_releases, use_bluray_url
 from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS, BOOK_SERVICES
 from src.cleanup import cleanup_manager
@@ -36,7 +37,21 @@ from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
 from src.video import video_manager
 from src.xxx_keywords import extract_xxx_keywords
+from src.xxx_lookup import lookup_xxx_metadata
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_obj_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_obj_iterable(val: object) -> TypeIs[Iterable[object]]:
+    return isinstance(val, (list, tuple, set))
+
 
 guessit_module: Any = cast(Any, guessit)
 
@@ -112,10 +127,10 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-def _normalize_search_year(value: Any) -> str | None:
+def _normalize_search_year(value: object) -> str | None:
     if value is None or value == "":
         return None
-    if isinstance(value, (list, tuple, set)):
+    if _is_obj_iterable(value):
         for candidate in value:
             normalized = _normalize_search_year(candidate)
             if normalized is not None:
@@ -131,6 +146,124 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(value)
     except TypeError, ValueError:
         return default
+
+
+# CLI arguments that describe a release of only one category, as {category: {meta field: flag}}.
+# Passing any of them names the category, as ``--category`` would.  Arguments shared
+# between categories (--publisher, --cast, --imdb, --tvdb, --mal) and switches that
+# only change behaviour (--multi, --music-check-log, --no-music-discogs,
+# --music-enrich) are left out on purpose.  ``--tmdb movie/`` and ``--tmdb tv/``
+# already set the category while the arguments are parsed.
+CATEGORY_ONLY_ARGS: dict[str, dict[str, str]] = {
+    "GAME": {
+        "igdb_manual": "--igdb",
+        "steam_manual": "--steam",
+        "manual_platform": "--platform",
+        "game_title": "--game-title",
+        "game_developer": "--developer",
+        "game_version": "--game-version",
+        "game_subcategory": "--game-subcategory",
+    },
+    "BOOK": {
+        "book_author": "--author",
+        "book_title": "--book-title",
+        "book_narrator": "--book-narrator",
+        "book_translator": "--book-translator",
+        "book_language": "--book-language",
+        "book_isbn": "--isbn",
+        "book_asin": "--asin",
+        "audible_url": "--audible-url",
+        "openlibrary": "--openlibrary",
+        "comic": "--comic",
+        "manga": "--manga",
+        "magazine": "--magazine",
+        "newspaper": "--newspaper",
+    },
+    "MUSIC": {
+        "music_artist": "--music-artist",
+        "music_album": "--music-album",
+        "music_media": "--music-media",
+        "music_release_type": "--music-release-type",
+        "music_release_year": "--music-release-year",
+        "music_edition_year": "--music-edition-year",
+        "music_unknown_release": "--music-unknown-release",
+        "music_artist_roles": "--music-artist-role",
+        "music_request_id": "--music-request-id",
+        "music_group_id": "--music-group-id",
+        "music_watermark": "--music-watermark",
+        "music_lineage": "--music-lineage",
+        "music_showcase": "--music-showcase",
+        "music_label": "--music-label",
+        "music_catalogue_number": "--music-catalogue-number",
+        "music_genres": "--music-genre",
+        "music_discogs_id": "--music-discogs-id",
+        "music_discogs_release_id": "--music-discogs-release-id",
+        "music_discogs_master_id": "--music-discogs-master-id",
+    },
+    "XXX": {
+        "tpdb_manual": "--tpdb",
+        "blvckout_manual": "--blvckout",
+    },
+    "TV": {
+        "manual_season": "--season",
+        "manual_episode": "--episode",
+        "manual_episode_title": "--manual-episode-title",
+        "manual_date": "--daily",
+        "tvmaze_manual": "--tvmaze",
+    },
+}
+
+
+def category_args_given(meta: Meta) -> dict[str, list[str]]:
+    """Return ``{category: [flags]}`` for the category-only CLI arguments set on ``meta``."""
+    given: dict[str, list[str]] = {}
+    for category, fields in CATEGORY_ONLY_ARGS.items():
+        flags = [flag for field, flag in fields.items() if getattr(meta, field, None)]
+        if flags:
+            given[category] = flags
+    return given
+
+
+def _category_from_args(meta: Meta, *, warn: bool) -> tuple[str, list[str]] | None:
+    """Return the one category the CLI arguments point to, with the flags that point to it."""
+    given = category_args_given(meta)
+    if not given:
+        return None
+    # ``--tmdb movie/`` or ``--tmdb tv/`` names a category too.
+    tmdb_category = str(meta.tmdb_manual_category or "").upper()
+    implied: set[str] = set(given)
+    if tmdb_category:
+        implied.add(tmdb_category)
+    if len(implied) > 1:
+        if warn:
+            described = "; ".join(f"{category}: {', '.join(flags)}" for category, flags in given.items())
+            outcome = f"keeping {tmdb_category} from --tmdb" if tmdb_category else "leaving the category to automatic detection"
+            logger.info(f"[yellow]Arguments for different categories were given ({described}); {outcome}. Use --category to choose one.[/yellow]")
+        return None
+    return next(iter(given.items()))
+
+
+def apply_category_from_args(meta: Meta) -> None:
+    """Let GAME, BOOK and MUSIC arguments name the category before file-type detection.
+
+    TV arguments wait for :func:`apply_tv_category_from_args`, so a book, game or
+    music release passed with ``--season`` keeps the category of its files.
+    """
+    result = _category_from_args(meta, warn=True)
+    if result and result[0] != "TV":
+        category, flags = result
+        meta.category = category
+        logger.debug(f"[cyan]Category set to {category} by {', '.join(flags)}[/cyan]")
+
+
+def apply_tv_category_from_args(meta: Meta) -> None:
+    """After file-type detection, let TV arguments replace an unset or automatic MOVIE category."""
+    if meta.manual_category or str(meta.category or "").upper() not in ("", "MOVIE"):
+        return
+    result = _category_from_args(meta, warn=False)
+    if result and result[0] == "TV":
+        meta.category = "TV"
+        logger.debug(f"[cyan]Category set to TV by {', '.join(result[1])}[/cyan]")
 
 
 def check_pre_release(meta: Meta) -> bool:
@@ -248,6 +381,8 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         # Sports is a tracker classification; metadata still needs TV/MOVIE.
         if manual_category != "SPORTS":
             meta.category = manual_category
+    else:
+        apply_category_from_args(meta)
 
     # If category is manually set to BOOK, ensure meta.audiobook is set if audio files are present
     if meta.category == "BOOK" and not meta.audiobook:
@@ -371,6 +506,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
             ".nca",
             ".nds",
             ".nsp",
+            ".nup",
             ".nsz",
             ".pbp",
             ".pkg",
@@ -442,6 +578,9 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and await asyncio.to_thread(is_xxx_video_release, meta.path):
         meta.category = "XXX"
         logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
+
+    # TV arguments only decide between TV and MOVIE, once the files ruled out the other categories.
+    apply_tv_category_from_args(meta)
 
     if meta.category == "XXX":
         for field_name, value in extract_xxx_metadata(meta.basename_no_ext).items():
@@ -582,7 +721,8 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             videopath, filelist, search_term, search_file_folder = prep_instance._resolve_game_filelist(meta, videoloc)
             video = videopath
         else:
-            videopath, meta.filelist = await video_manager.get_video(videoloc, meta.sorted_filelist)
+            # XXX site-rip packs often nest their videos in per-part or per-year folders.
+            videopath, meta.filelist = await video_manager.get_video(videoloc, meta.sorted_filelist, recursive=meta.category == "XXX")
             if not videopath or not meta.filelist:
                 raise ValueError(f"No video files found in {videoloc}")
             filelist = meta.filelist
@@ -789,8 +929,14 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
             if not meta.unattended:
                 await asyncio.sleep(2)
 
-    mediainfo_tracks = meta.mediainfo.get("media", {}).get("track") or []
-    meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track["@type"] == "Text" and track["Default"] == "Yes"]) > 1
+    media: dict[str, Any] = {}
+    if _is_str_dict(meta.mediainfo):
+        candidate_media = meta.mediainfo.get("media")
+        if _is_str_dict(candidate_media):
+            media = candidate_media
+    tracks_raw = media.get("track") if _is_str_dict(media) else None
+    mediainfo_tracks: list[dict[str, Any]] = [t for t in tracks_raw if _is_str_dict(t)] if _is_obj_list(tracks_raw) else []
+    meta.has_multiple_default_subtitle_tracks = len([track for track in mediainfo_tracks if track.get("@type") == "Text" and track.get("Default") == "Yes"]) > 1
 
     # Check if there's a language restriction
     if meta.has_languages:
@@ -952,6 +1098,14 @@ async def search_metadata(
     _bdinfo: dict[str, Any],
     mi: dict[str, Any] | None,
 ) -> None:
+    """Resolve the release's external IDs and metadata from arguments, saved IDs, Sonarr/Radarr and providers."""
+    if meta.saved_ids:
+        # IDs remembered from an earlier run need the category they were confirmed with;
+        # detect it now (it only depends on the path) instead of after the ID handling below.
+        if not meta.category:
+            meta.category = (await prep_instance.get_cat(videopath, meta) or "").upper()
+        upload_history.apply_saved_ids(meta)
+
     # Ensure all manual IDs have proper default values
     meta.tmdb_manual = meta.tmdb_manual or 0
     meta.imdb_manual = meta.imdb_manual or 0
@@ -1022,6 +1176,8 @@ async def search_metadata(
         meta.category = meta.category.upper()
 
     ids = None
+    # A confirmation edit prepares the same meta again; drop the previous pass's Arr year.
+    meta.arr_year = 0
     if not meta.skip_trackers:
         if meta.category == "TV" and use_sonarr and meta.tvdb_id == 0:
             ids = await prep_instance.sonarr_manager.get_sonarr_data(filename=meta.path, title=meta.filename)
@@ -1043,8 +1199,8 @@ async def search_metadata(
                     meta.tvmaze_id = ids["tvmaze_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1060,8 +1216,8 @@ async def search_metadata(
                     meta.imdb_id = ids["imdb_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1099,8 +1255,8 @@ async def search_metadata(
                     meta.tvmaze_id = ids["tvmaze_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1116,8 +1272,8 @@ async def search_metadata(
                     meta.imdb_id = ids["imdb_id"]
                 if meta.tmdb_id == 0 and ids["tmdb_id"] is not None:
                     meta.tmdb_id = ids["tmdb_id"]
-                if meta.manual_year == 0 and ids["year"] is not None:
-                    meta.manual_year = ids["year"]
+                if ids["year"] is not None:
+                    meta.arr_year = ids["year"]
             else:
                 ids = None
 
@@ -1186,7 +1342,8 @@ async def search_metadata(
 
     # run a search to find tmdb and imdb ids if we don't have them
     if int(meta.tmdb_id or 0) == 0 and int(meta.imdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
-        year = meta.manual_year or meta.search_year or meta.year if meta.category == "TV" else meta.manual_year or meta.year or meta.search_year
+        detected_year = meta.search_year or meta.year if meta.category == "TV" else meta.year or meta.search_year
+        year = meta.manual_year or meta.arr_year or detected_year
         year_value = _normalize_search_year(year)
         category_pref = meta.category or ""
         tmdb_task: asyncio.Task[tuple[int, str]] = asyncio.create_task(
@@ -1340,7 +1497,11 @@ async def search_metadata(
 
     _reject_invalid_automatic_imdb(meta, filename)
 
-    meta.populate_cast()
+    if meta.category == "XXX":
+        await lookup_xxx_metadata(meta, prep_instance.config)
+
+    # XXX trackers take every performer of a scene; other categories list the main cast.
+    meta.populate_cast(limit=100 if meta.category == "XXX" else 5)
 
 
 async def finalize_metadata(
@@ -1779,7 +1940,7 @@ async def finalize_metadata(
     if meta.category == "XXX" and not meta.audio:
         meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
     if meta.category == "XXX" and not meta.video_codec:
-        meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = await video_manager.get_video_encode(mi_data, meta.type, bdinfo)
+        meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = await video_manager.get_video_encode(mi_data, meta.type or "", bdinfo)
 
     if meta.category in ("TV", "MOVIE", "XXX"):
         meta.adult_media = prep_instance.check_adult_media(meta)
@@ -1813,9 +1974,8 @@ async def finalize_metadata(
 
     meta = await tag_override(meta)
 
-    # Automatically set personalrelease to True if detected release group matches any of the personal_release_groups tags
     personal_groups = prep_instance.config["DEFAULT"].get("personal_release_groups", [])
-    if isinstance(personal_groups, list) and meta.tag:
+    if _is_obj_list(personal_groups) and meta.tag:
         detected_group = meta.tag.lstrip("-").lower()
         personal_groups_clean = [str(g).lstrip("-").lower() for g in personal_groups if g]
         if detected_group in personal_groups_clean:
@@ -1933,10 +2093,10 @@ async def finalize_metadata(
                             continue
 
                         existing = requirements.setdefault(lang, {}).setdefault(data_type, "")
-                        merged_tags = set(filter(None, [t.strip() for t in existing.split(",") + append_to_response.split(",")]))
+                        merged_tags: set[str] = {t.strip() for t in existing.split(",") + append_to_response.split(",") if t.strip()}
                         requirements[lang][data_type] = ",".join(sorted(merged_tags))
 
-            tasks = []
+            tasks: list[tuple[str, str, Any]] = []
             for lang, types in requirements.items():
                 for data_type, append_to_response in types.items():
                     tasks.append(
@@ -1944,9 +2104,9 @@ async def finalize_metadata(
                     )
             if tasks:
                 logger.debug(f"[cyan]Pre-fetching TMDB localized data for languages: {list(requirements.keys())}[/cyan]")
-                langs_and_types = [(item[0], item[1]) for item in tasks]
+                langs_and_types: list[tuple[str, str]] = [(item[0], item[1]) for item in tasks]
                 coroutines = [item[2] for item in tasks]
-                results = await asyncio.gather(*coroutines)
+                results: list[Any] = list(await asyncio.gather(*coroutines))
 
                 meta.tmdb_localized_data = {}
                 for (lang, data_type), result in zip(langs_and_types, results, strict=True):

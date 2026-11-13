@@ -17,11 +17,24 @@ import math
 import os
 import string
 from pathlib import Path
+from typing import Any, TypeIs
 
 from argon2 import PasswordHasher
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 log = logging.getLogger(__name__)
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
+
+
+def _is_object_list(val: object) -> TypeIs[list[object]]:
+    return isinstance(val, list)
+
+
+def _is_str_list(val: object) -> TypeIs[list[str]]:
+    return _is_object_list(val) and all(isinstance(item, str) for item in val)
 
 
 class EncryptionError(Exception):
@@ -280,7 +293,7 @@ def _generate_field_key() -> bytes:
     return token_bytes(32)
 
 
-def _pack_field(extras: dict, field: str, plaintext: str | None) -> None:
+def _pack_field(extras: dict[str, Any] | None, field: str, plaintext: str | None) -> None:
     """Store a field under `extras['fields'][field]` with its own random key.
 
     Structure:
@@ -291,7 +304,8 @@ def _pack_field(extras: dict, field: str, plaintext: str | None) -> None:
     """
     if extras is None:
         return
-    fields = extras.get("fields") or {}
+    raw_fields = extras.get("fields")
+    fields: dict[str, Any] = raw_fields if _is_str_dict(raw_fields) else {}
     if plaintext is None:
         fields.pop(field, None)
         extras["fields"] = fields
@@ -334,12 +348,13 @@ def _pack_field(extras: dict, field: str, plaintext: str | None) -> None:
     extras["fields"] = fields
 
 
-def _unpack_field(extras: dict, field: str) -> str | None:
+def _unpack_field(extras: dict[str, Any] | None, field: str) -> str | None:
     if not extras:
         return None
-    fields = extras.get("fields") or {}
+    raw_fields = extras.get("fields")
+    fields: dict[str, Any] = raw_fields if _is_str_dict(raw_fields) else {}
     info = fields.get(field)
-    if not info:
+    if not _is_str_dict(info):
         return None
     enc = info.get("enc")
     key_enc = info.get("key_enc")
@@ -349,12 +364,12 @@ def _unpack_field(extras: dict, field: str) -> str | None:
     except Exception:
         master = None
 
-    if key_enc and master:
+    if isinstance(key_enc, str) and key_enc and master:
         with contextlib.suppress(Exception):
             fk_hex = decrypt_text(master, key_enc)
             if fk_hex:
                 fk = bytes.fromhex(fk_hex)
-                return decrypt_text(fk, enc) if enc else None
+                return decrypt_text(fk, enc) if isinstance(enc, str) and enc else None
 
     return None
 
@@ -363,14 +378,15 @@ def create_user(username: str, password: str) -> None:
     path = _get_user_file()
     # Prevent creating a new user if one already exists. Persisted user is authoritative.
     # The file can already hold IP controls or failed sign-in records; keep those.
-    existing: dict = {}
+    existing: dict[str, Any] = {}
     if path.exists():
         try:
-            existing = json.loads(path.read_text(encoding="utf-8"))
+            loaded_existing: object = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             raise OSError("failed to read existing user file; aborting to avoid overwriting it") from None
-        if not isinstance(existing, dict) or existing.get("password_hash"):
+        if not _is_str_dict(loaded_existing) or loaded_existing.get("password_hash"):
             raise ValueError("a user account already exists")
+        existing = loaded_existing
 
     # Enforce minimum password entropy to ensure user-chosen secrets are strong.
     # Estimate entropy by character-class pool size heuristic: lowercase, uppercase,
@@ -393,7 +409,7 @@ def create_user(username: str, password: str) -> None:
     if _password_entropy(password) < 48:
         raise ValueError("password must have at least 48 bits of entropy")
 
-    extras = {}
+    extras: dict[str, Any] = {}
     # Pack username into per-field encrypted storage. Fail loudly on error.
     _pack_field(extras, "username", username)
 
@@ -401,33 +417,37 @@ def create_user(username: str, password: str) -> None:
     extras_enc = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     username_enc = encrypt_text(key, username)
 
-    data = {**existing, "username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
+    data: dict[str, Any] = {**existing, "username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
     write_private_text(path, json.dumps(data))
 
 
-def load_user() -> dict | None:
+def load_user() -> dict[str, Any] | None:
     path = _get_user_file()
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        loaded: object = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+    if not _is_str_dict(loaded):
+        return None
+    data: dict[str, Any] = loaded
 
     # Attempt to decrypt extras blob (contains per-field encrypted values)
     with contextlib.suppress(Exception):
         key = _get_master_key()
-        extras = {}
+        extras: dict[str, Any] = {}
         extras_enc = data.get("extras_enc")
-        if extras_enc:
+        if isinstance(extras_enc, str) and extras_enc:
             dec = decrypt_text(key, extras_enc)
             if dec:
-                extras = json.loads(dec)
-                if isinstance(extras, dict):
+                parsed_extras: object = json.loads(dec)
+                if _is_str_dict(parsed_extras):
+                    extras = parsed_extras
                     data["extras"] = extras
         # Decrypt username
         username_enc = data.get("username_enc")
-        if username_enc:
+        if isinstance(username_enc, str) and username_enc:
             username = decrypt_text(key, username_enc)
             if username:
                 data["username"] = username
@@ -451,34 +471,39 @@ def get_totp_secret() -> str | None:
     u = load_user()
     if not u:
         return None
-    extras = u.get("extras") or {}
+    raw_extras = u.get("extras")
+    extras: dict[str, Any] = raw_extras if _is_str_dict(raw_extras) else {}
     # Use per-field unpack
     val = _unpack_field(extras, "totp_secret")
     if val is not None:
         return val
     # Backwards compat: older code may have totp_secret in extras dict directly
-    return extras.get("totp_secret")
+    legacy_val = extras.get("totp_secret")
+    return legacy_val if isinstance(legacy_val, str) else None
 
 
 def set_totp_secret(secret: str | None) -> None:
     # Read raw file, update extras, re-encrypt
     path = _get_user_file()
+    raw: dict[str, Any] = {}
     if path.exists():
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            loaded_raw: object = json.loads(path.read_text(encoding="utf-8"))
+            if _is_str_dict(loaded_raw):
+                raw = loaded_raw
         except Exception:
             raise OSError("failed to read existing user file; aborting to avoid overwriting encrypted data") from None
-    else:
-        raw = {}
-    extras = {}
+    extras: dict[str, Any] = {}
     extras_enc = raw.get("extras_enc")
-    if extras_enc:
+    if isinstance(extras_enc, str) and extras_enc:
         # If an encrypted extras blob exists, require successful decryption
         key = _get_master_key()
         dec = decrypt_text(key, extras_enc)
         if not dec:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
-        extras = json.loads(dec)
+        parsed_extras: object = json.loads(dec)
+        if _is_str_dict(parsed_extras):
+            extras = parsed_extras
 
     # Pack/unpack with per-field keys
     # Pack/unpack with per-field keys; let encryption errors propagate
@@ -493,35 +518,40 @@ def get_recovery_hashes() -> list[str]:
     u = load_user()
     if not u:
         return []
-    extras = u.get("extras") or {}
+    raw_extras = u.get("extras")
+    extras: dict[str, Any] = raw_extras if _is_str_dict(raw_extras) else {}
     val = _unpack_field(extras, "recovery_hashes")
     if val is not None:
         with contextlib.suppress(Exception):
-            parsed = json.loads(val)
-            if isinstance(parsed, list):
+            parsed: object = json.loads(val)
+            if _is_str_list(parsed):
                 return parsed
     # Backwards compat
-    return extras.get("recovery_hashes") or []
+    legacy_hashes = extras.get("recovery_hashes")
+    return legacy_hashes if _is_str_list(legacy_hashes) else []
 
 
 def set_recovery_hashes(hashes: list[str]) -> None:
     path = _get_user_file()
+    raw: dict[str, Any] = {}
     if path.exists():
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            loaded_raw: object = json.loads(path.read_text(encoding="utf-8"))
+            if _is_str_dict(loaded_raw):
+                raw = loaded_raw
         except Exception:
             raise OSError("failed to read existing user file; aborting to avoid overwriting encrypted data") from None
-    else:
-        raw = {}
-    extras = {}
+    extras: dict[str, Any] = {}
     extras_enc = raw.get("extras_enc")
-    if extras_enc:
+    if isinstance(extras_enc, str) and extras_enc:
         # If an encrypted extras blob exists, require successful decryption
         key = derive_aes_key(load_session_secret())
         dec = decrypt_text(key, extras_enc)
         if not dec:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
-        extras = json.loads(dec)
+        parsed_extras: object = json.loads(dec)
+        if _is_str_dict(parsed_extras):
+            extras = parsed_extras
 
     _pack_field(extras, "recovery_hashes", json.dumps(hashes, separators=(",", ":"), ensure_ascii=False))
 
@@ -532,22 +562,25 @@ def set_recovery_hashes(hashes: list[str]) -> None:
 
 def set_twofa_state(secret: str | None, recovery_hashes: list[str]) -> None:
     path = _get_user_file()
+    raw: dict[str, Any] = {}
     if path.exists():
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            loaded_raw: object = json.loads(path.read_text(encoding="utf-8"))
+            if _is_str_dict(loaded_raw):
+                raw = loaded_raw
         except Exception:
             raise OSError("failed to read existing user file; aborting to avoid overwriting encrypted data") from None
-    else:
-        raw = {}
 
-    extras = {}
+    extras: dict[str, Any] = {}
     extras_enc = raw.get("extras_enc")
-    if extras_enc:
+    if isinstance(extras_enc, str) and extras_enc:
         key = _get_master_key()
         dec = decrypt_text(key, extras_enc)
         if not dec:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
-        extras = json.loads(dec)
+        parsed_extras: object = json.loads(dec)
+        if _is_str_dict(parsed_extras):
+            extras = parsed_extras
 
     _pack_field(extras, "totp_secret", secret)
     _pack_field(extras, "recovery_hashes", json.dumps(recovery_hashes, separators=(",", ":"), ensure_ascii=False))
@@ -557,38 +590,43 @@ def set_twofa_state(secret: str | None, recovery_hashes: list[str]) -> None:
     write_private_text(path, json.dumps(raw))
 
 
-def get_api_tokens() -> dict:
+def get_api_tokens() -> dict[str, Any]:
     u = load_user()
     if not u:
         return {}
-    extras = u.get("extras") or {}
+    raw_extras = u.get("extras")
+    extras: dict[str, Any] = raw_extras if _is_str_dict(raw_extras) else {}
     val = _unpack_field(extras, "api_tokens")
     if val is not None:
         with contextlib.suppress(Exception):
-            parsed = json.loads(val)
-            if isinstance(parsed, dict):
+            parsed: object = json.loads(val)
+            if _is_str_dict(parsed):
                 return parsed
-    return extras.get("api_tokens") or {}
+    legacy_tokens = extras.get("api_tokens")
+    return legacy_tokens if _is_str_dict(legacy_tokens) else {}
 
 
-def set_api_tokens(store: dict) -> None:
+def set_api_tokens(store: dict[str, Any]) -> None:
     path = _get_user_file()
+    raw: dict[str, Any] = {}
     if path.exists():
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            loaded_raw: object = json.loads(path.read_text(encoding="utf-8"))
+            if _is_str_dict(loaded_raw):
+                raw = loaded_raw
         except Exception:
             raise OSError("failed to read existing user file; aborting to avoid overwriting encrypted data") from None
-    else:
-        raw = {}
-    extras = {}
+    extras: dict[str, Any] = {}
     extras_enc = raw.get("extras_enc")
-    if extras_enc:
+    if isinstance(extras_enc, str) and extras_enc:
         # If an encrypted extras blob exists, require successful decryption
         key = derive_aes_key(load_session_secret())
         dec = decrypt_text(key, extras_enc)
         if not dec:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
-        extras = json.loads(dec)
+        parsed_extras: object = json.loads(dec)
+        if _is_str_dict(parsed_extras):
+            extras = parsed_extras
 
     _pack_field(extras, "api_tokens", json.dumps(store, separators=(",", ":"), ensure_ascii=False))
 
@@ -605,7 +643,8 @@ def verify_user(username: str, password: str) -> bool:
     stored_username = u.get("username")
     if stored_username is None or stored_username != username:
         return False
-    return verify_password(u.get("password_hash", ""), password)
+    password_hash = u.get("password_hash")
+    return verify_password(password_hash if isinstance(password_hash, str) else "", password)
 
 
 def encrypt_bytes(aes_key: bytes, plaintext: bytes) -> str:

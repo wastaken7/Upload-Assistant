@@ -2,7 +2,7 @@
 import platform
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeIs, cast
 
 import aiofiles
 import httpx
@@ -12,11 +12,14 @@ from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.description_review import get_base_description
-from src.manual_input import confirm_override
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
+
+
+def _is_str_dict(val: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(val, dict)
 
 
 class BEYONDHD:
@@ -186,7 +189,7 @@ class BEYONDHD:
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
 
-        files = {
+        files: dict[str, Any] = {
             "mediainfo": mi_dump,
             "file": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
         }
@@ -315,7 +318,7 @@ class BEYONDHD:
             if not isinstance(original_images, list) or not isinstance(rehosted_images, list):
                 continue
             for original, rehosted in zip(original_images, rehosted_images, strict=False):
-                if not isinstance(original, dict) or not isinstance(rehosted, dict):
+                if not _is_str_dict(original) or not _is_str_dict(rehosted):
                     continue
                 original_url = original.get("raw_url")
                 rehosted_url = rehosted.get("raw_url")
@@ -395,6 +398,7 @@ class BEYONDHD:
             return
 
     async def get_additional_checks(self, meta: Meta) -> bool:
+        passed = True
         bhd_name = await self.get_name(meta)
         if any(
             phrase in bhd_name.lower()
@@ -417,8 +421,8 @@ class BEYONDHD:
                 "-irobot",
                 "-beyondhd",
             )
-        ) and not await self._confirm_or_skip(meta, f"This is an internal {self.tracker} release"):
-            return False
+        ):
+            passed = self._rule_warning(f"This is an internal {self.tracker} release")
 
         if not meta.valid_mi_settings:
             logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
@@ -453,8 +457,8 @@ class BEYONDHD:
             ("lfi", meta.type == "WEBDL", "LFi WEB-DLs are banned"),
         )
         for group, applies, reason in conditional_bans:
-            if tag == group and applies and not await self._confirm_or_skip(meta, f"{reason} at {self.tracker}"):
-                return False
+            if tag == group and applies:
+                passed = self._rule_warning(f"{reason} at {self.tracker}")
 
         lossless_main_audio = any(codec in str(meta.audio) for codec in ("TrueHD", "DTS-HD MA"))
         rule_prompts = (
@@ -473,11 +477,11 @@ class BEYONDHD:
             (meta.sd == 1, "SD is only allowed if there is no retail HD/UHD source available"),
         )
         for violated, message in rule_prompts:
-            if violated and not await self._confirm_or_skip(meta, message):
-                return False
+            if violated:
+                passed = self._rule_warning(message)
 
         common = Common(config=self.config)
-        return await common.check_and_confirm_adult_media_upload(meta, self.tracker)
+        return await common.check_adult_media_allowed(meta, self.tracker) and passed
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -520,7 +524,7 @@ class BEYONDHD:
                 if each.get("hdr10") == 1 or each.get("hdr10+") == 1:
                     flags.append("HDR")
 
-                result = {
+                result: dict[str, Any] = {
                     "name": each["name"],
                     "link": each["url"],
                     "size": each["size"],
@@ -532,9 +536,10 @@ class BEYONDHD:
 
         return dupes
 
-    async def _confirm_or_skip(self, meta: Meta, message: str) -> bool:
+    def _rule_warning(self, message: str) -> bool:
+        """Report a rule the release breaks; the tracker checks ask whether to upload anyway."""
         logger.info(f"{self.tracker}: [bold red]{escape(message)}[/bold red]")
-        return await confirm_override(meta)
+        return False
 
     def _is_true(self, value: Any) -> bool:
         """

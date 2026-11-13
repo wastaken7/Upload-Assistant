@@ -1,6 +1,6 @@
 [project]
 name = "upload-assistant"
-version = "4.9"
+version = "5.0"
 requires-python = ">=3.14"
 description = "A simple tool to take the work out of uploading."
 readme = "README.md"
@@ -72,7 +72,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/wastaken7/Upload-Assistant"
-Documentation = "https://github.com/wastaken7/Upload-Assistant/tree/master/docs"
+Documentation = "https://github.com/wastaken7/Upload-Assistant/tree/development/docs"
 Issues = "https://github.com/wastaken7/Upload-Assistant/issues"
 Source = "https://github.com/wastaken7/Upload-Assistant"
 
@@ -152,6 +152,8 @@ known-first-party = ["data", "src", "web_ui"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingImports = true

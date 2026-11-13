@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, TypeIs
 
 import aiofiles
 import bencodepy
@@ -16,6 +16,10 @@ from src.torrent_manifest import TorrentManifest
 from src.trackers.naming import add_incomplete_pack_marker
 
 Config = dict[str, Any]
+
+
+def _is_obj_dict(val: object) -> TypeIs[dict[object, object]]:
+    return isinstance(val, dict)
 
 
 class IPTorrents:
@@ -337,7 +341,7 @@ class IPTorrents:
 
         if category == "GAME":
             platform = str(meta.platform).upper()
-            if platform in {"NDS", "3DS", "SWITCH"}:
+            if platform in {"NDS", "3DS", "SWITCH", "SWITCH2"}:
                 return game_nin
             if platform in {"WII", "WIIU"}:
                 return game_wii
@@ -419,14 +423,23 @@ class IPTorrents:
         try:
             async with aiofiles.open(torrent_path, "rb") as f:
                 torrent_data = await f.read()
-            metainfo = bencodepy.decode(torrent_data)
-            info = metainfo.get(b"info", {})
-            total_size = 0
-            if b"files" in info:
-                for file_info in info[b"files"]:
-                    total_size += file_info.get(b"length", 0)
+            raw_meta: object = bencodepy.decode(torrent_data)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            if not _is_obj_dict(raw_meta):
+                return False
+            info = raw_meta.get(b"info")
+            if not _is_obj_dict(info):
+                return False
+            total_size: int = 0
+            files = info.get(b"files")
+            if isinstance(files, (list, tuple)):
+                files_list: list[object] = list(files)
+                for file_info in files_list:
+                    if _is_obj_dict(file_info):
+                        length = file_info.get(b"length", 0)
+                        total_size += int(length) if isinstance(length, (int, float)) else 0
             else:
-                total_size = info.get(b"length", 0)
+                length = info.get(b"length", 0)
+                total_size = int(length) if isinstance(length, (int, float)) else 0
             size_gb = total_size / (1024**3)
             return size_gb >= 8
         except Exception as e:

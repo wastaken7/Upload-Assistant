@@ -10,7 +10,7 @@ SOURCE_SVG = BASE_DIR / "docs" / "assets" / "logo.svg"
 APP_ICON_BACKGROUND = (16, 14, 13, 255)
 
 
-def draw_logo(size=512, svg_path=SOURCE_SVG):
+def draw_logo(size: int = 512, svg_path: Path = SOURCE_SVG) -> Image.Image:
     """Render the repository logo SVG as a Pillow image.
 
     Keeping this helper preserves the API used by generate_social_preview.py,
@@ -23,13 +23,13 @@ def draw_logo(size=512, svg_path=SOURCE_SVG):
     return Image.open(BytesIO(rendered_svg)).convert("RGBA")
 
 
-def draw_app_icon(logo):
+def draw_app_icon(logo: Image.Image) -> Image.Image:
     """Make an opaque app icon so transparent padding cannot render white."""
     background = Image.new("RGBA", logo.size, APP_ICON_BACKGROUND)
     return Image.alpha_composite(background, logo)
 
 
-def main():
+def main() -> None:
     print("Generating assets for Upload-Assistant...")
 
     # Base directory paths
