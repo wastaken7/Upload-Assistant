@@ -1359,7 +1359,7 @@ wheels = [
 
 [[package]]
 name = "upload-assistant"
-version = "4.9"
+version = "5.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
