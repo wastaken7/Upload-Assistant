@@ -151,6 +151,8 @@ const SHOW_SUBTITLE_TRACKS_KEY = "ua_webui_show_subtitle_tracks";
 const OUTPUT_MODE_KEY = "ua_webui_output_mode";
 const RUN_GUI_RESULTS_COLLAPSED_KEY = "ua_webui_run_gui_results_collapsed";
 const RUN_GUI_COLLAPSED_ITEMS_KEY = "ua_webui_run_gui_collapsed_items";
+const RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY =
+  "ua_webui_run_gui_collapsed_option_groups";
 const REVIEW_PANELS_IN_MODAL_KEY = "ua_webui_review_panels_in_modal";
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 256;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 320;
@@ -479,9 +481,9 @@ const getStoredCollapsedSections = () => {
   }
 };
 
-const getStoredCollapsedRunGuiItems = () => {
+const getStoredCollapsedRunGuiItems = (key = RUN_GUI_COLLAPSED_ITEMS_KEY) => {
   try {
-    const stored = JSON.parse(storage.get(RUN_GUI_COLLAPSED_ITEMS_KEY) || "[]");
+    const stored = JSON.parse(storage.get(key) || "[]");
     return Array.isArray(stored)
       ? stored.filter((key) => typeof key === "string")
       : [];
@@ -2965,6 +2967,14 @@ function AudionutsUAGUI() {
   const [collapsedRunGuiItems, setCollapsedRunGuiItems] = useState(
     () => new Set(getStoredCollapsedRunGuiItems()),
   );
+  // Option groups on the confirm screen ("media", "upload") the user folded.
+  const [collapsedRunGuiOptionGroups, setCollapsedRunGuiOptionGroups] =
+    useState(
+      () =>
+        new Set(
+          getStoredCollapsedRunGuiItems(RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY),
+        ),
+    );
   // Mirrors the active tab's runtime.gui; background tabs update only their runtime.
   const [runGui, setRunGui] = useState(initialRunGuiState);
   const [executionScreenshots, setExecutionScreenshots] = useState(
@@ -3144,6 +3154,13 @@ function AudionutsUAGUI() {
       JSON.stringify(Array.from(collapsedRunGuiItems)),
     );
   }, [collapsedRunGuiItems]);
+
+  useEffect(() => {
+    storage.set(
+      RUN_GUI_COLLAPSED_OPTION_GROUPS_KEY,
+      JSON.stringify(Array.from(collapsedRunGuiOptionGroups)),
+    );
+  }, [collapsedRunGuiOptionGroups]);
 
   // A new question opens at the top of the GUI panel, so its Yes/No buttons
   // are always in the same place even if the panel was scrolled down.
@@ -10285,57 +10302,86 @@ function AudionutsUAGUI() {
     ].map(([group, label]) => {
       const items = options.filter((option) => option.group === group);
       if (!items.length) return null;
+      const collapsed = collapsedRunGuiOptionGroups.has(group);
+      const changedCount = items.filter(
+        (option) => option.key in changed,
+      ).length;
+      const toggle = () =>
+        setCollapsedRunGuiOptionGroups((prev) => {
+          const next = new Set(prev);
+          if (!next.delete(group)) next.add(group);
+          return next;
+        });
       return (
         <div key={group}>
-          {renderRunGuiSectionLabel(label)}
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {items.map((option) => {
-              const value =
-                option.key in changed ? changed[option.key] : option.value;
-              if (option.type === "choice") {
-                const choices = Array.isArray(option.choices)
-                  ? option.choices
-                  : [];
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand" : "Collapse"}
+            className="flex items-center gap-1"
+          >
+            {renderRunGuiSectionLabel(label)}
+            {collapsed && changedCount > 0 && (
+              <span className="ua-run-gui-count rounded-full px-1.5 text-[0.68rem] font-semibold">
+                {changedCount} changed
+              </span>
+            )}
+            <LucideIcon
+              name={collapsed ? "chevron-down" : "chevron-up"}
+              className="ua-run-gui-muted h-3.5 w-3.5"
+            />
+          </button>
+          {!collapsed && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {items.map((option) => {
+                const value =
+                  option.key in changed ? changed[option.key] : option.value;
+                if (option.type === "choice") {
+                  const choices = Array.isArray(option.choices)
+                    ? option.choices
+                    : [];
+                  return (
+                    <label
+                      key={option.key}
+                      className="ua-run-gui-choice flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm"
+                    >
+                      {option.label}
+                      <select
+                        value={value}
+                        onChange={(event) => update(option, event.target.value)}
+                        disabled={disabled}
+                        className="ua-run-gui-input rounded border px-1.5 py-0.5 text-sm disabled:opacity-50"
+                      >
+                        {choices.map((choice) => (
+                          <option key={choice} value={choice}>
+                            {choice}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
                 return (
                   <label
                     key={option.key}
-                    className="ua-run-gui-choice flex items-center gap-2 rounded-lg border px-2.5 py-1 text-sm"
+                    title={option.locked || option.hint || undefined}
+                    data-selected={value === true}
+                    className="ua-run-gui-choice flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60"
                   >
+                    <input
+                      type="checkbox"
+                      checked={value === true}
+                      onChange={() => update(option, value !== true)}
+                      disabled={disabled || Boolean(option.locked)}
+                      className="h-4 w-4 shrink-0"
+                    />
                     {option.label}
-                    <select
-                      value={value}
-                      onChange={(event) => update(option, event.target.value)}
-                      disabled={disabled}
-                      className="ua-run-gui-input rounded border px-1.5 py-0.5 text-sm disabled:opacity-50"
-                    >
-                      {choices.map((choice) => (
-                        <option key={choice} value={choice}>
-                          {choice}
-                        </option>
-                      ))}
-                    </select>
                   </label>
                 );
-              }
-              return (
-                <label
-                  key={option.key}
-                  title={option.locked || option.hint || undefined}
-                  data-selected={value === true}
-                  className="ua-run-gui-choice flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60"
-                >
-                  <input
-                    type="checkbox"
-                    checked={value === true}
-                    onChange={() => update(option, value !== true)}
-                    disabled={disabled || Boolean(option.locked)}
-                    className="h-4 w-4 shrink-0"
-                  />
-                  {option.label}
-                </label>
-              );
-            })}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       );
     });
