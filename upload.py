@@ -1990,6 +1990,15 @@ async def _process_meta_screens(
     return True
 
 
+def _randomized_torrents_possible(meta: Meta, base_torrent: Path | None) -> bool:
+    """Randomized torrents are copies of the base torrent.
+
+    A --nohash run cannot create a missing base, so there is nothing to copy.
+    A hashing run without a base is a real error and must still surface.
+    """
+    return base_torrent is not None or not meta.nohash
+
+
 async def process_meta(meta: Meta, base_dir: str) -> bool:
     """Process the metadata for each queued path."""
     if not meta.imghost:
@@ -2371,7 +2380,10 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 base_piece_mb = None
 
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
-        TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
+        if _randomized_torrents_possible(meta, torrent_path):
+            TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
+        else:
+            logger.warning("[yellow]Skipping randomized torrents: no base torrent is available and --nohash is set.")
     webui_events.stage("torrent", "done")
 
     await write_meta_file(meta)

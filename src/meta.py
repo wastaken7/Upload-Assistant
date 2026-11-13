@@ -335,7 +335,7 @@ class Meta:
     manual: bool = False
     matched_episode_ids: int | None = None
     matched_tracker: str = ""
-    max_piece_size: int = 0
+    max_piece_size: int | None = None
     mediainfo: dict[str, Any] = field(default_factory=dict[str, Any])
     menu_images: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     mismatched_imdb_id: int = 0
