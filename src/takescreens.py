@@ -25,7 +25,7 @@ from typing import Any, cast
 import ffmpeg
 from PIL import Image
 
-from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
+from src.artwork import COVER_FRAME_ANSWER, is_public_http_url, is_valid_cover_image, is_valid_image_bytes, save_cover_frame, saved_cover_frame
 from src.binaries import configured_binary
 from src.cleanup import cleanup_manager
 from src.console import logger
@@ -530,7 +530,14 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
         # Avoid the opening frame, which is frequently black or only a logo.
         lower = min(max(duration * 0.10, 1.0), max(duration - 0.1, 0.0))
         upper = max(lower, min(duration * 0.85, max(duration - 0.1, 0.0)))
-        timestamp = secrets.SystemRandom().uniform(lower, upper) if random_frame and upper > lower else lower
+        saved = None if random_frame else saved_cover_frame(meta)
+        if random_frame and upper > lower:
+            timestamp = secrets.SystemRandom().uniform(lower, upper)
+        elif saved is not None and saved < duration:
+            # The frame a person picked for this release in an earlier run.
+            timestamp = saved
+        else:
+            timestamp = lower
         stream = _ffmpeg.input(str(video_path), ss=str(timestamp))
         command = _ffmpeg.output(
             stream,
@@ -548,13 +555,15 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
 
     meta.artwork_path = str(output_path)
     meta.artwork_url = ""
-    logger.warning(
-        "[yellow]No XXX cover was found after checking, in order: explicit --poster, "
-        "a local artwork sidecar, and provider artwork. For the local search, place a valid "
-        "GIF/JPG/JPEG/PNG/WEBP image beside the media (or inside the release folder) with a "
-        "filename containing one of: poster, cover, front, folder, artwork. "
-        f"Generated a fallback cover from a video frame: {output_path.name}.[/yellow]"
-    )
+    if random_frame:
+        # Picked by a person in the Web UI: rebuild this frame in later runs.
+        meta.manual_answers[COVER_FRAME_ANSWER] = round(timestamp, 3)
+        try:
+            save_cover_frame(base_dir, folder_id, timestamp)
+        except OSError as error:
+            logger.warning(f"[yellow]The new XXX cover will not be remembered for later runs: {error}[/yellow]")
+    # Debug only: a frame cover is the normal outcome for releases without artwork.
+    logger.debug(f"No XXX cover from --poster, a local artwork sidecar or the provider; generated {output_path.name} from a video frame.")
     return str(output_path)
 
 
@@ -1000,6 +1009,7 @@ async def disc_screenshots(
                     "zipline",
                     "midnightscene",
                     "bioma",
+                    "luminapix",
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
@@ -1048,6 +1058,7 @@ async def disc_screenshots(
                                 "zipline",
                                 "midnightscene",
                                 "bioma",
+                                "luminapix",
                                 "passtheimage",
                                 "seedpool_cdn",
                                 "sharex",
@@ -2578,6 +2589,7 @@ async def screenshots(
                     "zipline",
                     "midnightscene",
                     "bioma",
+                    "luminapix",
                     "passtheimage",
                     "seedpool_cdn",
                     "sharex",
@@ -2648,6 +2660,7 @@ async def screenshots(
                                     "zipline",
                                     "midnightscene",
                                     "bioma",
+                                    "luminapix",
                                     "passtheimage",
                                     "seedpool_cdn",
                                     "sharex",
@@ -2702,7 +2715,21 @@ async def screenshots(
                     elif (
                         img_host
                         and img_host
-                        in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "thrimg", "utppm"]
+                        in [
+                            "lensdump",
+                            "ptscreens",
+                            "onlyimage",
+                            "dalexni",
+                            "zipline",
+                            "midnightscene",
+                            "bioma",
+                            "luminapix",
+                            "passtheimage",
+                            "seedpool_cdn",
+                            "sharex",
+                            "thrimg",
+                            "utppm",
+                        ]
                         and new_size > 75000
                     ):
                         valid_image = True

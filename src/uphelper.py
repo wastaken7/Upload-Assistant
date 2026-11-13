@@ -938,7 +938,14 @@ class UploadHelper:
                 "BOOK": "Use --overview.",
                 "GAME": "Use --overview.",
             }.get(meta.category, "Add text with --description or --descfile.")
-            lines.append(("Overview", f"{meta.overview[:60]}...." if meta.overview else _missing_with_hint(missing_warning, overview_hint)))
+            if meta.overview:
+                overview_line = f"{meta.overview[:60]}...."
+            elif meta.category == "XXX":
+                # The synopsis comes from ThePornDB or --overview; trackers that need text check it themselves.
+                overview_line = _optional_hint("Use --overview or --tpdb.")
+            else:
+                overview_line = _missing_with_hint(missing_warning, overview_hint)
+            lines.append(("Overview", overview_line))
             if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
                 lines.append(("Episode Title", (meta.auto_episode_title)))
             if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
@@ -976,7 +983,9 @@ class UploadHelper:
             lines.append(("Edition", edition or _optional_hint("Use --edition if applicable.")))
             is_video = meta.category in ("TV", "MOVIE", "XXX")
             lines.append(("Resolution", resolution or (_missing_with_hint(missing_warning, "Use --resolution.") if is_video else "")))
-            lines.append(("Source", str(source) if source else (_missing_with_hint(missing_warning, "Use --source.") if is_video else "")))
+            # XXX files rarely name a source and nothing built for XXX uses it.
+            source_hint = _optional_hint("Use --source if applicable.") if meta.category == "XXX" else _missing_with_hint(missing_warning, "Use --source.")
+            lines.append(("Source", str(source) if source else (source_hint if is_video else "")))
             lines.append(("Type", type_ or (_missing_with_hint(missing_warning, "Use --type.") if is_video else "")))
             lines.append(("Group Tag", tag or ("" if meta.no_tag else _optional_hint("Use --tag if applicable."))))
 

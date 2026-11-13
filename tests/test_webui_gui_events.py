@@ -113,6 +113,22 @@ async def test_unattended_confirmation_publishes_the_resolved_personal_release_f
     assert updates[0]["personal_release"] is personal_release
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("category", "flagged"), [("MOVIE", True), ("XXX", False)])
+async def test_xxx_confirmation_does_not_ask_for_overview_or_source(gui_env, capsys, category, flagged) -> None:
+    """XXX synopses come from ThePornDB or --overview and XXX files rarely name a source."""
+    from src.meta import Meta
+    from src.uphelper import UploadHelper
+
+    webui_events.begin_item("/media/Example.mp4", 1, 1)
+    meta = Meta(category=category, unattended=True, resolution="1080p", type="WEBDL", overview="", source="")
+    assert await UploadHelper({"DEFAULT": {}}).get_confirmation(meta) is True
+
+    texts = [str(entry.get("text")) for event in _events(capsys.readouterr().out) for entry in event.get("notices", []) or [] if isinstance(entry, dict)]
+    assert any(text.startswith("Overview is missing") for text in texts) is flagged
+    assert any(text.startswith("Source is missing") for text in texts) is flagged
+
+
 def test_oversized_events_are_not_written(gui_env, capsys, monkeypatch) -> None:
     monkeypatch.setattr(webui_events, "MAX_EVENT_BYTES", 200)
 

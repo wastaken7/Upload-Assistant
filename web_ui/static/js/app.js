@@ -9420,10 +9420,10 @@ function AudionutsUAGUI() {
                           ? "Generating a new XXX cover"
                           : "Generate a new XXX cover"
                       }
-                      className="ua-processing-cover-action ua-accent-action absolute right-3 top-3 inline-flex flex-shrink-0 items-center gap-1.5 rounded-full p-2.5 text-xs font-semibold disabled:cursor-wait disabled:opacity-60"
+                      className="ua-processing-cover-action ua-accent-action absolute right-3 top-3 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full p-0 disabled:cursor-wait disabled:opacity-60"
                       title="Generate another cover from a different video frame"
                     >
-                      <span aria-hidden="true">
+                      <span aria-hidden="true" className="flex">
                         {coverAction === "regenerate" ? (
                           <SpinnerIcon />
                         ) : (

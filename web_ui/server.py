@@ -5634,7 +5634,7 @@ def _tracker_codebase(tracker_name: str) -> str | None:
     from src.trackersetup import get_tracker_framework
 
     framework = get_tracker_framework(tracker_name) or ""
-    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ"}.get(framework)
+    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ", "LUMINANCE": "Luminance"}.get(framework)
 
 
 def _tracker_destination_type(tracker_class: Any) -> str:
