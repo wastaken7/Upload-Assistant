@@ -195,6 +195,40 @@ def _image_host_totals(return_dict: dict[str, Any]) -> dict[str, tuple[int, int,
     return {str(host): (int(values[0]), int(values[1]), int(values[2])) for host, values in totals.items() if _is_any_list(values) and len(values) == 3}
 
 
+async def upload_luminapix(image: str, config: dict[str, Any], request_timeout: float) -> dict[str, Any]:
+    """Upload one image to LuminaPix, the Chevereto 4 host Kufirc requires (https://luminapix.eu/api-v1)."""
+    api_key = str(config.get("DEFAULT", {}).get("luminapix_api") or "").strip()
+    if not api_key:
+        logger.info("[red]LuminaPix API key not found in config.")
+        return {"status": "failed", "reason": "Missing LuminaPix API key"}
+    try:
+        async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+            files = {"source": (Path(image).name, await img_file.read())}
+            response = await client.post("https://luminapix.eu/api/1/upload", headers={"X-API-Key": api_key}, data={"format": "json"}, files=files, timeout=request_timeout)
+    except httpx.TimeoutException:
+        logger.info("[red]Request to LuminaPix timed out")
+        return {"status": "failed", "reason": "Request timed out"}
+    except httpx.RequestError as e:
+        logger.info(f"[red]Request to LuminaPix failed with error: {e}")
+        return {"status": "failed", "reason": str(e)}
+    try:
+        data: object = response.json()
+    except ValueError:
+        return {"status": "failed", "reason": f"Invalid JSON response from LuminaPix (HTTP {response.status_code})"}
+
+    image_data: object = data.get("image") if _is_str_dict(data) else None
+    if response.status_code != 200 or not _is_str_dict(image_data):
+        error: object = data.get("error") if _is_str_dict(data) else None
+        message = error.get("message") if _is_str_dict(error) else ""
+        return {"status": "failed", "reason": f"LuminaPix upload failed: HTTP {response.status_code} {message or response.text[:200]}"}
+    url = image_data.get("url")
+    viewer = image_data.get("url_viewer")
+    if not isinstance(url, str) or not url:
+        return {"status": "failed", "reason": "LuminaPix response was missing the image URL"}
+    web_url = viewer if isinstance(viewer, str) and viewer else url
+    return {"status": "success", "img_url": url, "raw_url": url, "web_url": web_url, "local_file_path": image}
+
+
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
     """Upload one image to the selected host and return its generated URLs."""
     image, img_host, config, _meta = args
@@ -581,6 +615,9 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 if response is not None:
                     logger.info(response.text)
                 return {"status": "failed", "reason": f"Failed to parse THR img response for {Path(image).name}"}
+
+        elif img_host == "luminapix":
+            return await upload_luminapix(image, config, timeout)
 
         elif img_host == "passtheimage":
             url = "https://passtheima.ge/api/1/upload"

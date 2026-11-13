@@ -2689,6 +2689,9 @@ class DescriptionBuilder:
 
         if get_tracker_framework(self.tracker) == "NEXUSPHP":
             return f"[img]{raw_url}[/img]"
+        if get_tracker_framework(self.tracker) == "LUMINANCE":
+            # Contact sheets must show as direct images, not as links to a gallery page.
+            return f"[img]{raw_url}[/img]\n"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
         if self.tracker == "TORRENTLEECH":

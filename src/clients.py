@@ -111,10 +111,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 hdb_id = _query_id(parsed.query, "id")
                 if hdb_id:
                     tracker_ids[tracker_key] = hdb_id
-            elif matched_tracker == "BROADCASTHENET":
-                btn_id = _query_id(parsed.query, "id")
-                if btn_id:
-                    tracker_ids[tracker_key] = btn_id
+            elif matched_tracker in {"BROADCASTHENET", "HAPPYFAPPY", "KUFIRC"}:
+                query_id = _query_id(parsed.query, "id")
+                if query_id:
+                    tracker_ids[tracker_key] = query_id
             elif matched_tracker in {"BeyondHD", "BEYONDHD"}:
                 match = re.search(r"/details/(\d+)", path)
                 if match:

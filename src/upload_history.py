@@ -769,6 +769,10 @@ async def record_item_async(meta: Any, tracker_class_map: Mapping[str, Any], *, 
     """
     global _item
     try:
+        from src.artwork import remember_cover_frame
+
+        # A cover frame picked in the Web UI was saved by the server process, not on this meta.
+        remember_cover_frame(meta)
         await asyncio.to_thread(remember_release, meta)
     except Exception as exc:
         logger.debug(f"Release IDs and answers were not saved: {exc}")

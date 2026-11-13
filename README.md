@@ -339,6 +339,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                     | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                   | FunFile                | FUNFILE                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/greatposterwall.png" alt="" width="16" height="16" />    | Great Poster Wall      | GREATPOSTERWALL        | MOVIE                        |
+| <img src="web_ui/static/img/trackers/happyfappy.png" width="16" height="16" />                | HappyFappy             | HAPPYFAPPY             | XXX                          |
 | <img src="web_ui/static/img/trackers/hawkeuno.png" width="16" height="16" />                  | hawke-uno              | HAWKEUNO               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdbits.png" width="16" height="16" />                    | HDBits                 | HDBITS                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/hdspace.png" width="16" height="16" />                   | HD-Space               | HDSPACE                | MOVIE, TV                    |
@@ -348,6 +349,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />                | InfinityHD             | INFINITYHD             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/iptorrents.png" width="16" height="16" />                | IPTorrents             | IPTORRENTS             | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/itatorrents.png" width="16" height="16" />               | ItaTorrents            | ITATORRENTS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/kufirc.png" width="16" height="16" />                    | Kufirc                 | KUFIRC                 | XXX                          |
 | <img src="web_ui/static/img/trackers/lajidui.png" width="16" height="16" />                   | lajidui                | LAJIDUI                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lemonhd.png" width="16" height="16" />                   | LemonHD                | LEMONHD                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lastdigitalunderground.png" width="16" height="16" />    | LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
