@@ -134,8 +134,40 @@ def test_missing_tracker_creation_and_falsy_values_save_together(batch_config):
     assert post_updates(updates)[1] == 200
     assert server._load_config_from_file(config_path) == {
         "DEFAULT": {"screens": 0},
-        "TRACKERS": {"AITHER": {"add_logo": False, "custom_header": None}},
+        "TRACKERS": {"AITHER": {"api_key": "", "add_logo": False, "custom_header": None}},
     }
+
+
+def test_new_tracker_persists_displayed_template_values(batch_config):
+    config_path, example_path, keys, _ = batch_config
+    example = server._load_config_from_file(example_path)
+    example["TRACKERS"]["AITHER"] = {
+        "api_key": "",
+        "anon": True,
+        "modq": False,
+        "tag_overrides": {"EXAMPLEGRP": {"anon": False}},
+        **dict.fromkeys(keys, True),
+    }
+    example_path.write_text(f"config = {example!r}\n", encoding="utf-8")
+    config_path.write_text("config = {'TRACKERS': {'BLU': {'api_key': 'x'}}}\n", encoding="utf-8")
+    updates = [
+        {"path": ["TRACKERS", "AITHER"], "value": "{}"},
+        {"path": ["TRACKERS", "AITHER", "api_key"], "value": "new-key"},
+    ]
+    assert post_updates(updates)[1] == 200
+    # Unedited values shown by the WebUI are saved; DEFAULT overrides stay inherited.
+    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == {
+        "api_key": "new-key",
+        "anon": True,
+        "modq": False,
+    }
+
+
+def test_existing_tracker_is_not_refilled_from_template(batch_config):
+    config_path, _, _, _ = batch_config
+    config_path.write_text("config = {'TRACKERS': {'aither': {'api_key': 'x'}}}\n", encoding="utf-8")
+    assert post_updates([{"path": ["TRACKERS", "AITHER"], "value": "{}"}])[1] == 200
+    assert "api_key" not in server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
 
 
 def test_write_failure_does_not_report_success_and_can_be_retried(batch_config, monkeypatch):
