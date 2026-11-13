@@ -9,6 +9,7 @@ from typing import ClassVar
 
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.LUMINANCE import GAME_EXTENSIONS, Luminance
 from src.xxx_lookup import is_scene_style_name
 
@@ -165,11 +166,16 @@ class Kufirc(Luminance):
         default_config = self.config.get("DEFAULT", {})
         return bool(self.configured_image_hosts()) and bool(str(default_config.get("luminapix_api", "")).strip())
 
+    def images_already_hosted(self, meta: Meta) -> bool:
+        """Whether the cover and every screenshot are already on luminapix.eu, so nothing needs uploading."""
+        images = [image for image in get_tracker_image_collection(meta, self.tracker, "screenshots") if isinstance(image, dict)]
+        return bool(self.get_cover(meta)) and bool(images) and all(self._is_approved_url(str(image.get("raw_url") or "")) for image in images)
+
     def rule_warnings(self, meta: Meta) -> list[str]:
         warnings = super().rule_warnings(meta)
         if len(self._files(meta)) > MAX_FILES:
             warnings.append(f"Torrents with more than {MAX_FILES:,} files are not allowed.")
-        if not self.luminapix_ready():
+        if not self.luminapix_ready() and not self.images_already_hosted(meta):
             warnings.append(
                 "Kufirc only accepts images hosted on luminapix.eu. Add 'luminapix' to an img_host_N setting and set 'luminapix_api' (Settings > API on luminapix.eu)."
             )

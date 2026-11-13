@@ -10,8 +10,10 @@ and a few extra fields, which the subclasses declare.
 
 from __future__ import annotations
 
+import http.cookiejar
 import platform
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
@@ -48,8 +50,10 @@ _FANSITE_NAMES = re.compile(r"\b(?:onlyfans|fansly|fanvue|manyvids|fancentro|loy
 
 
 def normalize_tag(value: Any) -> str:
-    """Turn a name into a Luminance tag: lower case, words joined by dots."""
-    text = re.sub("['" + chr(0x2019) + "]", "", str(value or "").casefold().replace("&", " and "))
+    """Turn a name into a Luminance tag: lower case, words joined by dots, accents dropped ("Éva" -> "eva")."""
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
+    # Apostrophes join a word rather than split it ("Rock'n" -> "rockn"); the ASCII step already dropped typographic ones.
+    text = text.casefold().replace("&", " and ").replace("'", "")
     return re.sub(r"[^a-z0-9]+", ".", text).strip(".")
 
 
@@ -88,6 +92,7 @@ class Luminance:
         self.rehost_images_manager = RehostImagesManager(config)
         self.upload_url = f"{self.base_url}/upload.php"
         self.torrent_url = f"{self.base_url}/torrents.php?id="
+        self.cookie_jar: http.cookiejar.CookieJar | None = None
         self.session = httpx.AsyncClient(
             headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"},
             timeout=60.0,
@@ -100,8 +105,11 @@ class Luminance:
 
     async def _load_cookies(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        if not cookie_jar:
+        # None means the file could not be loaded; an empty jar is falsy but valid.
+        if cookie_jar is None:
             return False
+        # httpx wraps this jar and writes cookies the site sets into it, so saving the jar keeps them.
+        self.cookie_jar = cookie_jar
         self.session.cookies = cast(Any, cookie_jar)
         return True
 
@@ -136,7 +144,7 @@ class Luminance:
             logger.info(f"{self.tracker}: could not open the upload page: {error!r}")
             return False
         if token:
-            await self.cookie_validator.save_session_cookies(self.tracker, cast(Any, self.session.cookies))
+            await self.cookie_validator.save_session_cookies(self.tracker, self.cookie_jar)
         return bool(token)
 
     # ------------------------------------------------------------------
@@ -384,11 +392,11 @@ class Luminance:
     def description_text(self, meta: Meta) -> str:
         """The written part of the description: the synopsis or the user's own text.
 
-        The user's text includes a description saved in the WebUI editor, which
-        is only copied into ``meta`` when it is read through ``get_base_description``.
+        Only text the upload renders counts: the synopsis (``meta.overview``, which
+        the provider's description fills) and the user's description, including one
+        saved in the WebUI editor, which ``get_base_description`` copies into ``meta``.
         """
-        release = self._release(meta)
-        parts = [str(meta.overview or ""), str(release.description if release else ""), get_base_description(meta)]
+        parts = [str(meta.overview or ""), get_base_description(meta)]
         return " ".join(re.sub(r"\[[^\]]*\]|<[^>]+>|https?://\S+", " ", part) for part in parts).strip()
 
     # ------------------------------------------------------------------
@@ -564,7 +572,9 @@ class Luminance:
         )
         torrent_id = str(tracker_status.get("torrent_id") or "")
         if uploaded and not meta.debug and torrent_id.isdigit() and not await self.download_site_torrent(meta, torrent_id):
-            # The site may have changed the info hash, so the local copy might not seed.
+            # The site may have changed the info hash, so the local copy might not seed:
+            # keep it out of the torrent client and ask for the site's copy instead.
+            tracker_status["skip_client_injection"] = True
             tracker_status["status_message"] = (
                 f"Uploaded, but the .torrent could not be downloaded from the site. Download it from {self.torrent_url}{torrent_id} and seed that copy."
             )

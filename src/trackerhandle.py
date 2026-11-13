@@ -301,7 +301,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -343,7 +344,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:

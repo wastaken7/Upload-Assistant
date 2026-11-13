@@ -114,6 +114,32 @@ def test_tags_are_dotted_and_space_separated() -> None:
     tags = HappyFappy(config()).get_tags(scene_meta()).split()
     assert tags == ["jane.example", "mock.performer", "fakestudio", "blowjob", "big.tits", "cowgirl", "1080p", "mp4", "2026"]
     assert normalize_tag("Rock & Roll's Best") == "rock.and.rolls.best"
+    # Accented names keep their letters.
+    assert normalize_tag("Éva Júlia") == "eva.julia"
+    assert normalize_tag("Zoë Rock" + chr(0x2019) + "n") == "zoe.rockn"
+
+
+def test_validation_saves_the_loaded_cookie_jar(tmp_path: Path) -> None:
+    """The site can rotate its session cookie; the jar it was written into must be saved."""
+    import http.cookiejar
+
+    async def run() -> tuple[Any, Any]:
+        site = Kufirc(config())
+        jar = http.cookiejar.MozillaCookieJar(str(tmp_path / "KUFIRC.txt"))
+        site.cookie_validator.load_session_cookies = AsyncMock(return_value=jar)
+        save = AsyncMock()
+        site.cookie_validator.save_session_cookies = save
+        site.session = httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, text='<form id="upload_table"><input name="auth" value="tok"></form>', request=request))
+        )
+        try:
+            assert await site.validate_credentials(scene_meta())
+        finally:
+            await site.session.aclose()
+        return save.await_args.args[1], jar
+
+    saved, jar = asyncio.run(run())
+    assert saved is jar
 
 
 @pytest.mark.parametrize(
@@ -296,8 +322,11 @@ def test_upload_corrected_by_the_site_counts_and_seeds_the_site_copy(monkeypatch
     assert download.await_args.args[1] == "4242"
     if downloaded:
         assert status["status_message"] == "Torrent uploaded successfully."
+        assert "skip_client_injection" not in status
     else:
         assert "https://www.happyfappy.net/torrents.php?id=4242" in status["status_message"]
+        # The local copy may not match the site's, so it must not reach the torrent client.
+        assert status["skip_client_injection"] is True
 
 
 def test_kufirc_puts_mediainfo_in_the_description_and_converts_alignment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -327,9 +356,27 @@ def test_rule_checks() -> None:
     assert any("luminapix.eu" in warning for warning in kufirc.rule_warnings(scene_meta()))
     assert Kufirc(config(img_host_1="luminapix", luminapix_api="key")).rule_warnings(scene_meta()) == []
 
+    # Images already on luminapix.eu need no upload key.
+    hosted = scene_meta(
+        rehosted_artwork_url="https://luminapix.eu/images/2026/01/01/cover.png",
+        image_list=[dict.fromkeys(("img_url", "raw_url", "web_url"), "https://luminapix.eu/images/2026/01/01/sheet.png")],
+    )
+    assert not any("luminapix.eu" in warning for warning in kufirc.rule_warnings(hosted))
+    half_hosted = scene_meta(
+        rehosted_artwork_url="https://luminapix.eu/images/2026/01/01/cover.png",
+        image_list=[dict.fromkeys(("img_url", "raw_url", "web_url"), "https://img.example/sheet.png")],
+    )
+    assert any("luminapix.eu" in warning for warning in kufirc.rule_warnings(half_hosted))
+
     # Failures are only reported; the tracker status check asks whether to upload anyway.
     assert asyncio.run(kufirc.get_additional_checks(scene_meta())) is False
     assert asyncio.run(hf.get_additional_checks(scene_meta())) is True
+
+
+def test_only_rendered_text_counts_as_a_description() -> None:
+    """A provider description that is not in the upload (no synopsis) does not satisfy HappyFappy."""
+    meta = scene_meta(overview="", xxx_match={**SCENE, "description": "Only on the provider."})
+    assert any("English text description" in note for note in HappyFappy(config()).rule_notes(meta))
 
 
 def test_description_saved_in_the_webui_editor_counts_as_text(tmp_path: Path) -> None:
