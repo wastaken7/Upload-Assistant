@@ -424,3 +424,40 @@ async def test_provision_blocks_a_tracker_when_only_an_oversized_variant_exists_
 
     assert blocked == {"TEST"}
     assert manifest.selected_path("TEST") is None
+
+
+def _persist_selection(manifest: TorrentManifest, tracker: str, entry: TorrentEntry) -> None:
+    data = json.loads(manifest.path.read_text(encoding="utf-8"))
+    data["selections"][tracker] = entry.id
+    manifest.path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_selection_from_an_earlier_run_is_cleared_when_no_variant_is_acceptable(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    entry = manifest.register(oversized, "base", "client:first")
+    _persist_selection(manifest, "TEST", entry)
+    assert manifest.selected_path("TEST") == manifest.entry_path(entry)
+
+    assert manifest.select("TEST", "base") is None
+    assert manifest.selected_path("TEST") is None
+
+
+@pytest.mark.asyncio
+async def test_provision_drops_an_earlier_oversized_selection_when_hashing_is_off(tmp_path):
+    from src.meta import Meta
+
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    entry = manifest.register(oversized, "base", "client:first")
+    _persist_selection(manifest, "TEST", entry)
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"], nohash=True)
+
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": _TrackerWithoutPolicy})
+
+    assert blocked == {"TEST"}
+    assert manifest.selected_path("TEST") is None

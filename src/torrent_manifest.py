@@ -215,6 +215,12 @@ class TorrentManifest:
         """
         candidates = [entry for entry in self.entries(layout) if (policy.accepts(entry.stats) if policy is not None else entry.piece_size <= PIECE_SIZE_MAX)]
         if not candidates:
+            # Drop a selection recorded by an earlier run, so a variant that is
+            # no longer acceptable cannot be picked up through selected_path().
+            with self._lock:
+                manifest = self._load()
+                if cast(dict[str, Any], manifest["selections"]).pop(tracker.upper(), None) is not None:
+                    self._save(manifest)
             return None
         candidates.sort(key=lambda entry: (entry.piece_size, entry.metainfo_size, entry.id))
         by_path = {self.entry_path(entry).resolve(): entry for entry in candidates}
