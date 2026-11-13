@@ -35,6 +35,12 @@ def _preferred_variants(meta: Meta, manifest: TorrentManifest, layout: TorrentLa
     return [layout_choice, meta.reuse_torrent_path, manifest.default_path(layout)]
 
 
+def _default_is_oversized(manifest: TorrentManifest, layout: TorrentLayout) -> bool:
+    default = manifest.default_path(layout)
+    entry = manifest.entry_for_path(default) if default is not None else None
+    return entry is not None and entry.piece_size > PIECE_SIZE_MAX
+
+
 def _content_size(path: str | os.PathLike[str]) -> int:
     source = Path(path)
     if source.is_file():
@@ -101,7 +107,11 @@ async def provision_tracker_torrents(
                     cooldown = 0
                 if cooldown > 0:
                     await asyncio.sleep(cooldown)
-                await TorrentCreator.create_torrent(hash_meta, Path(meta.path), output, piece_size=max(1, chosen // MIB))
+                # A default no client can load must not stay the base that other
+                # steps copy, such as randomized torrents, so the replacement takes
+                # its place. A usable default is left alone.
+                replace_default = _default_is_oversized(manifest, layout)
+                await TorrentCreator.create_torrent(hash_meta, Path(meta.path), output, piece_size=max(1, chosen // MIB), make_default=replace_default)
                 if manifest.select(tracker, layout, policy, preferred=_preferred_variants(meta, manifest, layout)) is None:
                     blocked[tracker] = "Skipped: generated torrent does not satisfy the tracker policy"
         except asyncio.CancelledError:

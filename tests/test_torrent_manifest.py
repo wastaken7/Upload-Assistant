@@ -461,3 +461,46 @@ async def test_provision_drops_an_earlier_oversized_selection_when_hashing_is_of
 
     assert blocked == {"TEST"}
     assert manifest.selected_path("TEST") is None
+
+
+async def _provision_with_fake_hashing(tmp_path, monkeypatch, stored_piece_size, tracker_class, new_piece_size):
+    from src.meta import Meta
+
+    stored = tmp_path / "stored.torrent"
+    write_torrent(stored, stored_piece_size, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    stored_entry = manifest.register(stored, "base", "client:first")
+    media = tmp_path / "release.mkv"
+    media.touch()
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], trackers=["TEST"])
+
+    async def create_torrent(_hash_meta, _path, _output, **kwargs):
+        generated = tmp_path / "generated.torrent"
+        write_torrent(generated, new_piece_size, 512 * MIB)
+        manifest.register(generated, "base", "generated", make_default=kwargs.get("make_default", False))
+
+    monkeypatch.setattr(TorrentCreator, "create_torrent", create_torrent)
+    blocked = await provision_tracker_torrents(meta, {"TRACKERS": {"TEST": {}}}, ["TEST"], {"TEST": tracker_class})
+    assert blocked == set()
+    return manifest, stored_entry
+
+
+@pytest.mark.asyncio
+async def test_replacement_for_an_oversized_default_becomes_the_default(tmp_path, monkeypatch):
+    manifest, oversized_entry = await _provision_with_fake_hashing(tmp_path, monkeypatch, 256 * MIB, _TrackerWithoutPolicy, 64 * MIB)
+
+    default = manifest.default_path("base")
+    assert default is not None
+    assert default != manifest.entry_path(oversized_entry)
+    assert Torrent.read(default).piece_size == 64 * MIB
+    assert default == manifest.selected_path("TEST")
+
+
+@pytest.mark.asyncio
+async def test_tracker_specific_replacement_leaves_a_usable_default_alone(tmp_path, monkeypatch):
+    manifest, usable_entry = await _provision_with_fake_hashing(tmp_path, monkeypatch, 32 * MIB, PassThePopcorn, 16 * MIB)
+
+    assert manifest.default_path("base") == manifest.entry_path(usable_entry)
+    selected = manifest.selected_path("TEST")
+    assert selected is not None
+    assert Torrent.read(selected).piece_size == 16 * MIB
