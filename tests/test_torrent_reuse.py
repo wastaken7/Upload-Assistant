@@ -981,3 +981,76 @@ def test_mkbrr_exact_exclude_string(tmp_path):
     assert TorrentCreator.mkbrr_exact_exclude_string(str(release), filelist) is None  # noqa: S101 - "*.srt" drops the selected subtitle
     (release / "bonus" / "E01.mkv").write_bytes(b"test data")
     assert TorrentCreator.mkbrr_exact_exclude_string(str(release), filelist, allow_subs=True) is None  # noqa: S101
+
+
+def _reuse_candidates(tmp_path, monkeypatch, piece_sizes, content_size):
+    media = tmp_path / "release.mkv"
+    media.touch()
+    candidates = []
+    for piece_size in piece_sizes:
+        torrent = Torrent()
+        torrent.metainfo["info"] = {
+            "name": media.name,
+            "length": content_size,
+            "piece length": piece_size,
+            "pieces": b"x" * (20 * -(-content_size // piece_size)),
+        }
+        candidate = tmp_path / f"{piece_size}.torrent"
+        torrent.write(candidate)
+        candidates.append(str(candidate))
+
+    async def fake_search(_self, _meta, _client_name, _prefer_small, _piece_limit, _best_match, collect_all=False):
+        return candidates
+
+    monkeypatch.setattr(Clients, "_search_single_client_for_torrent", fake_search)
+    return media
+
+
+def _reuse_config(prefer_max_16):
+    return {
+        "DEFAULT": {"default_torrent_client": "qbit", "searching_client_list": ["qbit"], "prefer_max_16_torrent": prefer_max_16},
+        "TORRENT_CLIENTS": {"qbit": {"torrent_client": "qbit"}},
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("piece_sizes", "expected"),
+    [
+        ((4 * MIB, 8 * MIB, 16 * MIB), 8 * MIB),  # an exact match for the recommended size
+        ((2 * MIB, 4 * MIB, 32 * MIB), 4 * MIB),  # one step away beats two
+        ((16 * MIB, 4 * MIB), 16 * MIB),  # equally close: the first one found is kept
+    ],
+)
+async def test_reuse_prefers_the_variant_closest_to_the_recommended_piece_size(tmp_path, monkeypatch, piece_sizes, expected):
+    # 9 GiB of content is hashed with 8 MiB pieces when a torrent is created.
+    media = _reuse_candidates(tmp_path, monkeypatch, piece_sizes, 9 * 1024 * MIB)
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], client="none")
+
+    chosen = await Clients(_reuse_config(prefer_max_16=False)).find_existing_torrent(meta)
+
+    assert chosen is not None  # noqa: S101
+    assert Torrent.read(chosen).piece_size == expected  # noqa: S101
+    assert meta.reuse_torrent_client == "qbit"  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_reuse_respects_a_requested_max_piece_size_when_ranking_variants(tmp_path, monkeypatch):
+    media = _reuse_candidates(tmp_path, monkeypatch, (8 * MIB, 4 * MIB, 2 * MIB), 9 * 1024 * MIB)
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], client="none", max_piece_size=4)
+
+    chosen = await Clients(_reuse_config(prefer_max_16=False)).find_existing_torrent(meta)
+
+    assert chosen is not None  # noqa: S101
+    assert Torrent.read(chosen).piece_size == 4 * MIB  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_reuse_still_takes_the_smallest_variant_when_small_pieces_are_preferred(tmp_path, monkeypatch):
+    media = _reuse_candidates(tmp_path, monkeypatch, (8 * MIB, 4 * MIB, 16 * MIB), 9 * 1024 * MIB)
+    meta = Meta(base_dir=str(tmp_path), uuid="release", path=str(media), filelist=[str(media)], client="none")
+
+    chosen = await Clients(_reuse_config(prefer_max_16=True)).find_existing_torrent(meta)
+
+    assert chosen is not None  # noqa: S101
+    assert Torrent.read(chosen).piece_size == 4 * MIB  # noqa: S101

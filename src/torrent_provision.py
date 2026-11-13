@@ -29,6 +29,12 @@ def _variant_lock(meta: Meta, layout: TorrentLayout, policy: TorrentPolicy) -> a
         return _locks.setdefault(key, asyncio.Lock())
 
 
+def _preferred_variants(meta: Meta, manifest: TorrentManifest, layout: TorrentLayout) -> list[str | Path | None]:
+    """Return the torrents already chosen for this run, most specific first."""
+    layout_choice = meta.subs_reuse_torrent_path if layout == "base_subs" else meta.base_reuse_torrent_path
+    return [layout_choice, meta.reuse_torrent_path, manifest.default_path(layout)]
+
+
 def _content_size(path: str | os.PathLike[str]) -> int:
     source = Path(path)
     if source.is_file():
@@ -58,7 +64,7 @@ async def provision_tracker_torrents(
             allow_subs = _is_str_mapping(tracker_settings) and bool(tracker_settings.get("allow_ext_subtitles", False))
             layout: TorrentLayout = "base_subs" if allow_subs and manifest.default_path("base_subs") is not None else "base"
             policy = cast(TorrentPolicy | None, getattr(factory, "torrent_policy", None))
-            if manifest.select(tracker, layout, policy) is not None:
+            if manifest.select(tracker, layout, policy, preferred=_preferred_variants(meta, manifest, layout)) is not None:
                 continue
             if meta.nohash:
                 blocked[tracker] = "Skipped: no policy-compliant torrent is available and hashing is disabled"
@@ -67,7 +73,7 @@ async def provision_tracker_torrents(
                 continue
 
             async with _variant_lock(meta, layout, policy):
-                if manifest.select(tracker, layout, policy) is not None:
+                if manifest.select(tracker, layout, policy, preferred=_preferred_variants(meta, manifest, layout)) is not None:
                     continue
                 if meta.path is None:
                     blocked[tracker] = "Skipped: source path is unavailable for torrent creation"
@@ -92,7 +98,7 @@ async def provision_tracker_torrents(
                 if cooldown > 0:
                     await asyncio.sleep(cooldown)
                 await TorrentCreator.create_torrent(hash_meta, Path(meta.path), output, piece_size=max(1, chosen // MIB))
-                if manifest.select(tracker, layout, policy) is None:
+                if manifest.select(tracker, layout, policy, preferred=_preferred_variants(meta, manifest, layout)) is None:
                     blocked[tracker] = "Skipped: generated torrent does not satisfy the tracker policy"
         except asyncio.CancelledError:
             raise

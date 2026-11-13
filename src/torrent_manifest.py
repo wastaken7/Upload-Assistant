@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, TypeIs, cast
@@ -194,12 +195,27 @@ class TorrentManifest:
         resolved = Path(path).resolve()
         return next((entry for entry in self.entries() if self.entry_path(entry).resolve() == resolved), None)
 
-    def select(self, tracker: str, layout: TorrentLayout, policy: TorrentPolicy | None = None) -> TorrentEntry | None:
+    def select(
+        self,
+        tracker: str,
+        layout: TorrentLayout,
+        policy: TorrentPolicy | None = None,
+        *,
+        preferred: Sequence[str | Path | None] = (),
+    ) -> TorrentEntry | None:
+        """Record and return the variant a tracker uploads.
+
+        The first ``preferred`` path that is an acceptable variant wins, so a
+        tracker keeps the torrent already chosen for the run. Only when none
+        qualifies, such as a tracker policy rejecting it, is the smallest
+        acceptable variant used.
+        """
         candidates = [entry for entry in self.entries(layout) if policy is None or policy.accepts(entry.stats)]
         if not candidates:
             return None
         candidates.sort(key=lambda entry: (entry.piece_size, entry.metainfo_size, entry.id))
-        entry = candidates[0]
+        by_path = {self.entry_path(entry).resolve(): entry for entry in candidates}
+        entry = next((by_path[path] for item in preferred if item and (path := Path(item).resolve()) in by_path), candidates[0])
         with self._lock:
             manifest = self._load()
             cast(dict[str, Any], manifest["selections"])[tracker.upper()] = entry.id
