@@ -15,6 +15,31 @@ guessit_module = import_module("guessit")
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 _TECHNICAL_HYPHEN_PREFIXES = {"blu", "dts", "web"}
 
+# Trailing bracket/parenthesis forms the generic group regex also accepts.
+_GROUP_SUFFIX = r"(?:\[.+\])?\)?(?:\s\[.+\])?$"
+
+# Release groups whose names the generic regex cannot read. Each pattern is
+# anchored to the end of the name and maps to the canonical group name, or to
+# None to keep the text captured by the pattern's first group.
+_NONSTANDARD_GROUPS: tuple[tuple[re.Pattern[str], str | None], ...] = (
+    # ZR- ends with a hyphen that is part of the group name.
+    (re.compile(r"-ZR-" + _GROUP_SUFFIX, re.IGNORECASE), "ZR-"),
+    # D-Z0N3 has a hyphen inside the name; some releases drop the "D-".
+    (re.compile(r"-(?:D-)?Z0N3" + _GROUP_SUFFIX), "D-Z0N3"),
+    # HONE names the encoder before the group in HUNO-style names: "(... - Encoder HONE)".
+    (re.compile(r"-\s*([A-Za-z0-9]+\s+HONE)" + _GROUP_SUFFIX), None),
+)
+_EPISODE_VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts", ".m2ts"}
+
+
+def match_nonstandard_group(name: str) -> str | None:
+    """Return the canonical group for a name (without extension) that ends with a non-standard group."""
+    for pattern, group in _NONSTANDARD_GROUPS:
+        match = pattern.search(name)
+        if match:
+            return group or match.group(1)
+    return None
+
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
@@ -76,8 +101,18 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         if ext.lower() in known_extensions:
             basename_stripped = name
 
-        non_anime_match = re.search(
-            r"(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$", basename_stripped
+        # Groups the generic regex cannot read are matched explicitly, so
+        # technical suffixes and arbitrary trailing punctuation never become groups.
+        release_group = match_nonstandard_group(basename_stripped)
+        if release_group:
+            logger.debug(f"Non-standard group match: {release_group}")
+
+        non_anime_match = (
+            None
+            if release_group
+            else re.search(
+                r"(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$", basename_stripped
+            )
         )
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()
@@ -112,9 +147,21 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
                             if merged and (merged in title_norm or merged in author_norm):
                                 release_group = None
 
-            if release_group and "Z0N3" in release_group:
-                release_group = release_group.replace("Z0N3", "D-Z0N3")
             logger.debug(f"Non-anime regex match: {release_group}")
+
+    # A generic season folder may omit the group present in every episode.
+    # Infer a non-standard group only when all supplied episode filenames agree
+    # on it; extras such as NCOP/NCED/menus (no SxxEyy in the name) are ignored.
+    # Per-file season pack checks must only see a file's own tag, so inference
+    # is skipped there.
+    if not release_group and meta.tv_pack and meta.filelist and not season_pack_check:
+        episode_groups = {
+            match_nonstandard_group(Path(p).stem)
+            for p in meta.filelist
+            if Path(p).suffix.lower() in _EPISODE_VIDEO_EXTENSIONS and re.search(r"S\d{1,2}E\d{1,4}", Path(p).stem, re.IGNORECASE)
+        }
+        if len(episode_groups) == 1:
+            release_group = episode_groups.pop()
 
     # If regex patterns didn't work, fall back to guessit
     if not release_group and meta.is_disc:
