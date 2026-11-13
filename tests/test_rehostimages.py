@@ -86,6 +86,46 @@ def test_rehosting_discovers_registered_screenshots_after_capture(tmp_path, is_d
         assert hosting.await_args.args[5][0] == str(screenshot)
 
 
+@pytest.mark.parametrize(("hosts", "expected_host"), [(["imgbb", "pixhost", "luminapix"], "luminapix"), (["imgbb", "pixhost"], None)])
+def test_skipping_unaccepted_image_hosts_is_not_reported_as_an_error(tmp_path, monkeypatch, hosts, expected_host):
+    """Falling back through the configured hosts is normal; only finding none accepted is an error."""
+    messages: list[str] = []
+    monkeypatch.setattr("src.rehostimages.logger.info", lambda message, *_args, **_kwargs: messages.append(str(message)))
+    directory = screenshots_dir(tmp_path, "release")
+    screenshot = directory / "original.png"
+    screenshot.write_bytes(b"png")
+    register(tmp_path, "release", [screenshot], "main")
+
+    async def host(*args, **_kwargs):
+        images = [{key: f"https://luminapix.eu/images/{Path(path).name}" for key in ("img_url", "raw_url", "web_url")} for path in args[5]]
+        return images, len(images)
+
+    hosting = AsyncMock(side_effect=host)
+    meta = Meta(base_dir=str(tmp_path), uuid="release", title="Example", screens=1, filelist=["source.mkv"], category="MOVIE")
+    asyncio.run(
+        _handle_image_upload(
+            meta,
+            "TEST",
+            {"luminapix.eu": "luminapix"},
+            ["luminapix"],
+            default_config={f"img_host_{index}": host for index, host in enumerate(hosts, start=1)},
+            takescreens_manager=SimpleNamespace(screenshots=AsyncMock()),
+            uploadscreens_manager=SimpleNamespace(upload_screens=hosting),
+        )
+    )
+
+    red = [message for message in messages if "[red]" in message]
+    if expected_host:
+        assert red == []
+        assert meta.imghost == expected_host
+        hosting.assert_awaited_once()
+        assert any("using image host 'luminapix'" in message for message in messages)
+    else:
+        assert len(red) == 1
+        assert "accepted: luminapix" in red[0]
+        hosting.assert_not_awaited()
+
+
 class _Alpha:
     image_host_policy = ImageHostPolicy({}, ("imgbox", "imgbb"))
 

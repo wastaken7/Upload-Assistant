@@ -2,6 +2,7 @@
 
 import asyncio
 import ipaddress
+import json
 import re
 import shutil
 import socket
@@ -24,6 +25,45 @@ MAX_ARTWORK_BYTES = 10 * 1024 * 1024
 MAX_ARTWORK_PIXELS = 40_000_000
 _POSTER_KEYWORDS = ("poster", "cover", "front", "folder", "artwork", "capa")
 _BANNER_KEYWORDS = ("banner", "backdrop", "landscape", "header")
+
+
+# The video frame a person picked for a generated XXX cover, kept with the
+# release's saved answers so later runs rebuild the same cover.
+COVER_FRAME_ANSWER = "xxx.cover_frame"
+_COVER_FRAME_FILE = "cover_frame.json"
+
+
+def saved_cover_frame(meta: Meta) -> float | None:
+    """The cover frame time (seconds) chosen in an earlier run, or None."""
+    value = meta.manual_answers.get(COVER_FRAME_ANSWER)
+    try:
+        seconds = float(value) if value is not None else None
+    except TypeError, ValueError:
+        return None
+    return seconds if seconds is not None and seconds >= 0 else None
+
+
+def save_cover_frame(base_dir: str, folder_id: str, seconds: float) -> None:
+    """Note a newly chosen cover frame beside the cover.
+
+    The Web UI picks frames in its own process; the upload reads this file
+    with :func:`remember_cover_frame` before it saves the release's answers.
+    """
+    path = artwork_dir(base_dir, folder_id) / _COVER_FRAME_FILE
+    path.write_text(json.dumps({"seconds": round(seconds, 3)}), encoding="utf-8")
+
+
+def remember_cover_frame(meta: Meta) -> None:
+    """Copy a cover frame picked in the Web UI into the answers saved for the release."""
+    if meta.category != "XXX" or not meta.uuid:
+        return
+    path = artwork_dir(meta.base_dir, meta.uuid) / _COVER_FRAME_FILE
+    try:
+        seconds = float(json.loads(path.read_text(encoding="utf-8"))["seconds"])
+    except OSError, ValueError, TypeError, KeyError:
+        return
+    if seconds >= 0:
+        meta.manual_answers[COVER_FRAME_ANSWER] = seconds
 
 
 def is_public_http_url(value: str | None) -> bool:

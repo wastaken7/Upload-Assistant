@@ -5634,7 +5634,7 @@ def _tracker_codebase(tracker_name: str) -> str | None:
     from src.trackersetup import get_tracker_framework
 
     framework = get_tracker_framework(tracker_name) or ""
-    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ"}.get(framework)
+    return {"UNIT3D": "UNIT3D", "GAZELLE": "Gazelle", "NEXUSPHP": "NexusPHP", "AVISTAZ": "AvistaZ", "LUMINANCE": "Luminance"}.get(framework)
 
 
 def _tracker_destination_type(tracker_class: Any) -> str:
@@ -6274,6 +6274,17 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
+    if len(path) == 2 and path[0] == "TRACKERS" and coerced_value == {} and isinstance(example_value, Mapping):
+        saved_trackers = _as_dict(prior_config.get("TRACKERS")) or {}
+        if path[1].casefold() not in {str(name).casefold() for name in saved_trackers}:
+            # Startup sync never fills tracker blocks, so persist the template
+            # values the WebUI displays. DEFAULT overrides remain inherited.
+            example_tracker: dict[str, Any] = _as_dict(example_value) or {}
+            coerced_value = {
+                name: value
+                for name, value in example_tracker.items()
+                if name not in _TRACKER_DEFAULT_OVERRIDE_KEYS and name != "tag_overrides" and not isinstance(value, Mapping)
+            }
     if is_webui_prompt_timeout and (not isinstance(coerced_value, (int, float)) or not math.isfinite(coerced_value) or coerced_value < 0):
         raise ValueError("Unattended prompt timeout must be a finite number of minutes greater than or equal to 0")
     overlay_choices = {"overlay_position": {"left", "right"}, "overlay_layout": {"stacked", "single_line"}}

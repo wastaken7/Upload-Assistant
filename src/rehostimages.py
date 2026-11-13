@@ -741,6 +741,8 @@ async def _handle_image_upload(
         current_position = next((i for i, index in enumerate(configured_indices) if index >= img_host_index), len(configured_indices))
         selected_host = False
         current_upload_index = img_host_index
+        # Hosts the tracker does not accept are skipped in order; that is the normal fallback, not an error.
+        skipped_hosts: list[str] = []
         while current_position < len(configured_indices):
             current_upload_index = configured_indices[current_position]
             current_img_host_key = f"img_host_{current_upload_index}"
@@ -751,7 +753,7 @@ async def _handle_image_upload(
                 continue
 
             if current_img_host not in approved_image_hosts:
-                logger.info(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
+                skipped_hosts.append(current_img_host)
                 retry_mode = True
                 images_reuploaded = True
                 current_position += 1
@@ -761,9 +763,14 @@ async def _handle_image_upload(
             logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
             break
 
+        if skipped_hosts:
+            logger.debug(f"{tracker}: skipped image hosts it does not accept: {', '.join(skipped_hosts)}")
         if not selected_host:
-            logger.info("[red]No approved image host was selected; skipping upload.")
+            accepted = ", ".join(approved_image_hosts) or "none"
+            logger.info(f"[red]{tracker}: none of the configured image hosts is accepted (accepted: {accepted}); skipping the image upload.[/red]")
             return [], True, images_reuploaded
+        if skipped_hosts:
+            logger.info(f"{tracker}: using image host '{meta.imghost}', the first configured host it accepts.")
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(meta, multi_screens, current_upload_index, 0, multi_screens, all_screenshots, {}, retry_mode)
         if policy_enabled:

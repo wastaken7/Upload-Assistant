@@ -190,9 +190,9 @@ async def process_trackers(
                 result_parts: list[str] = []
                 status_message = str(status.get("status_message", ""))
                 has_status_message = bool(status_message) and "data error" not in status_message
-                link_url = ""
+                link_url = str(status.get("torrent_link") or "")
 
-                if "torrent_id" in status:
+                if not link_url and "torrent_id" in status:
                     torrent_url = str(getattr(tracker_class, "torrent_url", ""))
                     link_url = f"{torrent_url}{status['torrent_id']}"
 
@@ -301,7 +301,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -343,7 +344,8 @@ async def process_trackers(
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
                     status["upload_success"] = True
-                    if not getattr(tracker_class, "is_usenet", False):
+                    # A tracker sets skip_client_injection when the local .torrent may not match the site's.
+                    if not getattr(tracker_class, "is_usenet", False) and not status.get("skip_client_injection"):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:

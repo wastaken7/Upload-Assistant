@@ -44,6 +44,7 @@ def test_tracker_codebase_uses_registered_frameworks_only() -> None:
         ("ORPHEUS", "Gazelle"),
         ("1PTBA", "NexusPHP"),
         ("AVISTAZ", "AvistaZ"),
+        ("KUFIRC", "Luminance"),
         ("NZBGEEK", None),
         ("BROADCASTHENET", None),
         ("UNKNOWN", None),

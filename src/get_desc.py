@@ -1745,13 +1745,13 @@ class DescriptionBuilder:
         screenshots: bool = True,
         tonemapped_header: bool = True,
         tv_info: bool = True,
-        ua_signature: bool = True,  # ci: ua_signature v4.9
+        ua_signature: bool = True,  # ci: ua_signature v5.0
         user_description: bool = True,
         music: bool = True,
         xxx: bool = True,
         dynamic_hdr_plot: bool = True,
         approved_image_hosts: Sequence[str] | None = None,
-        signature: str = "",  # ci: ua_signature v4.9
+        signature: str = "",  # ci: ua_signature v5.0
         desc_header: str = "",
     ) -> str:
         apply_saved_draft(meta)
@@ -2048,7 +2048,7 @@ class DescriptionBuilder:
                 await description_file.write(self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip())))  # fmt: off
 
         # fmt: off
-        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v4.9
+        return self.tracker_specific_formats(self.tracker, "\n".join(part for part in (description_str, ((signature or (f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]" if meta.ua_signature else "")) if ua_signature else "")) if part.strip()))  # ci: ua_signature v5.0
         # fmt: on
 
     async def _check_saved_pack_image_links(self, meta: Meta, approved_image_hosts: list[str]) -> dict[str, Any]:
@@ -2689,6 +2689,9 @@ class DescriptionBuilder:
 
         if get_tracker_framework(self.tracker) == "NEXUSPHP":
             return f"[img]{raw_url}[/img]"
+        if get_tracker_framework(self.tracker) == "LUMINANCE":
+            # Contact sheets must show as direct images, not as links to a gallery page.
+            return f"[img]{raw_url}[/img]\n"
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
         if self.tracker == "TORRENTLEECH":

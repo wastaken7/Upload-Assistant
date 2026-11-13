@@ -534,6 +534,48 @@ async def test_xxx_fallback_cover_uses_a_video_frame(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_regenerated_xxx_cover_frame_is_reused_in_later_runs(tmp_path, monkeypatch):
+    """A cover picked with the Web UI button is rebuilt from the same frame on the next run."""
+    from src.artwork import COVER_FRAME_ANSWER, remember_cover_frame
+
+    video = tmp_path / "Fictional.Scene.mp4"
+    video.write_bytes(b"video")
+    commands: list[str] = []
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(" ".join(command_args))
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (120, 80), "purple").save(output, format="PNG")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", lambda _path: {"format": {"duration": "60"}, "streams": [{"codec_type": "video"}]})
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(takescreens.secrets.SystemRandom, "uniform", lambda _self, _low, _high: 33.25)
+
+    # The Web UI server regenerates from its own copy of meta.
+    server_meta = Meta(base_dir=str(tmp_path), uuid="release", category="XXX")
+    assert await takescreens.xxx_fallback_cover([str(video)], server_meta.uuid, server_meta.base_dir, server_meta, random_frame=True)
+    assert "-ss 33.25" in commands[-1]
+
+    # The upload process picks the choice up before it saves the release's answers.
+    upload_meta = Meta(base_dir=str(tmp_path), uuid="release", category="XXX")
+    remember_cover_frame(upload_meta)
+    assert upload_meta.manual_answers[COVER_FRAME_ANSWER] == 33.25
+
+    # A later run, with the saved answers reloaded, uses that frame instead of the default one.
+    later_meta = Meta(base_dir=str(tmp_path / "later"), uuid="release", category="XXX", manual_answers={COVER_FRAME_ANSWER: 33.25})
+    assert await takescreens.xxx_fallback_cover([str(video)], later_meta.uuid, later_meta.base_dir, later_meta)
+    assert "-ss 33.25" in commands[-1]
+
+    # A saved frame past the end of the video is ignored.
+    short_meta = Meta(base_dir=str(tmp_path / "short"), uuid="release", category="XXX", manual_answers={COVER_FRAME_ANSWER: 90})
+    assert await takescreens.xxx_fallback_cover([str(video)], short_meta.uuid, short_meta.base_dir, short_meta)
+    assert "-ss 6.0" in commands[-1]
+
+
+@pytest.mark.asyncio
 async def test_xxx_fallback_cover_skips_unprobeable_candidates(tmp_path, monkeypatch):
     invalid = tmp_path / "release.mkv"
     video = tmp_path / "OnlyFans.Creator.mp4"
