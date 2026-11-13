@@ -567,3 +567,31 @@ def test_randomized_torrents_never_copy_an_oversized_default(tmp_path):
 
     randomized = next((tmp_path / "tmp" / "release").glob("[[]RAND-1[]]*.torrent"))
     assert Torrent.read(randomized).piece_size == 64 * MIB
+
+
+def test_nohash_run_without_a_usable_base_skips_randomized_torrents(tmp_path):
+    import upload
+    from src.meta import Meta
+
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+    base = manifest.default_path("base")
+
+    assert base is None
+    assert upload._randomized_torrents_possible(Meta(nohash=True), base) is False
+    # A hashing run with no base is a real error and must still reach it.
+    assert upload._randomized_torrents_possible(Meta(nohash=False), base) is True
+
+
+def test_nohash_run_with_a_usable_base_keeps_randomized_torrents(tmp_path):
+    import upload
+    from src.meta import Meta
+
+    usable = tmp_path / "usable.torrent"
+    write_torrent(usable, 64 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(usable, "base", "client:first")
+
+    assert upload._randomized_torrents_possible(Meta(nohash=True), manifest.default_path("base")) is True
