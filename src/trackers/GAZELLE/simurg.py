@@ -111,7 +111,7 @@ class Simurg:
     display_name = "Simurg"
     auth_type = "other_api"
     supported_categories = ("BOOK",)
-    source_flag = "Simurg"
+    source_flag = "SIM"
     base_url = "https://simurg.world"
     tracker_urls = ("tracker.simurg.world",)
     banned_groups = ()
