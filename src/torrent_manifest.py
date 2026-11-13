@@ -154,7 +154,8 @@ class TorrentManifest:
             )
             torrents[entry_id] = asdict(entry)
             defaults = cast(dict[str, Any], manifest["defaults"])
-            if make_default or layout not in defaults:
+            # A default that no client can load gives way to the first usable variant.
+            if make_default or layout not in defaults or (stats.piece_size <= PIECE_SIZE_MAX and self._is_oversized(torrents.get(defaults[layout]))):
                 defaults[layout] = entry_id
             self._save(manifest)
             return entry
@@ -254,8 +255,33 @@ class TorrentManifest:
         value: object = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
         if not _is_str_dict(value):
             return None
+        if self._is_oversized(value):
+            # Left by a run from before the piece-size bound: every step that
+            # copies the default, such as randomized torrents, must get a
+            # variant a client can load, or none at all.
+            replacement = self._promote_usable_default(layout)
+            if replacement is None:
+                return None
+            value = asdict(replacement)
         try:
             path = self.entry_path(TorrentEntry(**value))
         except TypeError, ValueError:
             return None
         return path if path.is_file() else None
+
+    @staticmethod
+    def _is_oversized(value: object) -> bool:
+        piece_size = value.get("piece_size") if _is_str_dict(value) else None
+        return isinstance(piece_size, int) and piece_size > PIECE_SIZE_MAX
+
+    def _promote_usable_default(self, layout: TorrentLayout) -> TorrentEntry | None:
+        """Make the largest variant within the piece-size bound the default."""
+        with self._lock:
+            usable = [entry for entry in self.entries(layout) if entry.piece_size <= PIECE_SIZE_MAX]
+            if not usable:
+                return None
+            chosen = max(usable, key=lambda entry: (entry.piece_size, -entry.metainfo_size, entry.id))
+            manifest = self._load()
+            cast(dict[str, Any], manifest["defaults"])[layout] = chosen.id
+            self._save(manifest)
+            return chosen

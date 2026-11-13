@@ -504,3 +504,66 @@ async def test_tracker_specific_replacement_leaves_a_usable_default_alone(tmp_pa
     selected = manifest.selected_path("TEST")
     assert selected is not None
     assert Torrent.read(selected).piece_size == 16 * MIB
+
+
+def test_default_moves_to_a_usable_variant_when_it_is_oversized(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    small = tmp_path / "small.torrent"
+    large = tmp_path / "large.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    write_torrent(small, 16 * MIB, 512 * MIB)
+    write_torrent(large, 64 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    oversized_entry = manifest.register(oversized, "base", "client:first")
+    manifest.register(small, "base", "client:second")
+    large_entry = manifest.register(large, "base", "client:third")
+    data = json.loads(manifest.path.read_text(encoding="utf-8"))
+    # A manifest written before the piece-size bound existed still points at the oversized variant.
+    data["defaults"]["base"] = oversized_entry.id
+    manifest.path.write_text(json.dumps(data), encoding="utf-8")
+
+    default = manifest.default_path("base")
+
+    assert default == manifest.entry_path(large_entry)
+    # The choice is stored, so later readers such as randomized torrents see the same base.
+    assert json.loads(manifest.path.read_text(encoding="utf-8"))["defaults"]["base"] == large_entry.id
+
+
+def test_oversized_default_without_a_usable_variant_counts_as_no_base(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+
+    assert manifest.default_path("base") is None
+
+
+def test_new_usable_variant_replaces_an_oversized_default(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    usable = tmp_path / "usable.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    write_torrent(usable, 64 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    manifest.register(oversized, "base", "client:first")
+
+    usable_entry = manifest.register(usable, "base", "generated")
+
+    assert manifest.default_path("base") == manifest.entry_path(usable_entry)
+
+
+def test_randomized_torrents_never_copy_an_oversized_default(tmp_path):
+    oversized = tmp_path / "oversized.torrent"
+    usable = tmp_path / "usable.torrent"
+    write_torrent(oversized, 256 * MIB, 512 * MIB)
+    write_torrent(usable, 64 * MIB, 512 * MIB)
+    manifest = TorrentManifest(tmp_path, "release")
+    oversized_entry = manifest.register(oversized, "base", "client:first")
+    manifest.register(usable, "base", "client:second")
+    data = json.loads(manifest.path.read_text(encoding="utf-8"))
+    data["defaults"]["base"] = oversized_entry.id
+    manifest.path.write_text(json.dumps(data), encoding="utf-8")
+
+    TorrentCreator.create_random_torrents(str(tmp_path), "release", 1, str(tmp_path / "release.mkv"))
+
+    randomized = next((tmp_path / "tmp" / "release").glob("[[]RAND-1[]]*.torrent"))
+    assert Torrent.read(randomized).piece_size == 64 * MIB
