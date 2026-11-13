@@ -42,6 +42,39 @@ async def test_zr_generic_season_folder_ignores_extras():
 
 
 @pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("Example Film 2010 1080p BluRay DD 5.1 x264-D-Z0N3.mkv", "-D-Z0N3"),
+        ("Example.Film.2010.1080p.BluRay.DD.5.1.x264-D-Z0N3.mkv", "-D-Z0N3"),
+        ("Example Film 2010 1080p BluRay DD 5.1 x264-Z0N3.mkv", "-D-Z0N3"),
+        ("Example Film 2010 1080p BluRay DD 5.1 x264-D-Z0N3 [extra].mkv", "-D-Z0N3"),
+        ("Example Film (2026) (1080p BluRay x265 SDR DDP 5.1 English - Encoder HONE).mkv", "-Encoder HONE"),
+        ("Example Film (2026) (2160p WEB-DL H265 DV HDR DDP Atmos 5.1 English - HONE).mkv", "-HONE"),
+        ("Example.Film.2026.1080p.WEB-DL.DDP5.1.H.264-HONE.mkv", "-HONE"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_nonstandard_release_groups(filename, expected):
+    assert await get_tag(filename, Meta(category="MOVIE", uuid=filename)) == expected
+
+
+@pytest.mark.asyncio
+async def test_hone_encoder_season_folder():
+    folder = "Example Show (2013) S01 (1080p BluRay x265 SDR OPUS 5.1 DUAL - Encoder HONE)"
+    meta = Meta(category="TV", tv_pack=True, uuid=folder)
+    assert await get_tag(folder, meta) == "-Encoder HONE"
+
+
+@pytest.mark.asyncio
+async def test_generic_season_folder_infers_nonstandard_group():
+    files = [f"Example Show (2013) S01E{n:02} (1080p BluRay x265 SDR OPUS 5.1 DUAL - Encoder HONE).mkv" for n in (1, 2)]
+    meta = Meta(category="TV", tv_pack=True, uuid="Example Show S01", filelist=files)
+    assert await get_tag(files[0], meta) == "-Encoder HONE"
+    meta.filelist = [files[0], "Example Show S01E02 1080p BluRay -ZR-.mkv"]
+    assert await get_tag(files[0], meta) == ""
+
+
+@pytest.mark.parametrize(
     "filename",
     [
         "Movie.2005.1080p.WEB-DL.mkv",
