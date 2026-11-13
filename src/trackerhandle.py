@@ -190,9 +190,9 @@ async def process_trackers(
                 result_parts: list[str] = []
                 status_message = str(status.get("status_message", ""))
                 has_status_message = bool(status_message) and "data error" not in status_message
-                link_url = ""
+                link_url = str(status.get("torrent_link") or "")
 
-                if "torrent_id" in status:
+                if not link_url and "torrent_id" in status:
                     torrent_url = str(getattr(tracker_class, "torrent_url", ""))
                     link_url = f"{torrent_url}{status['torrent_id']}"
 
