@@ -1,7 +1,8 @@
 import asyncio
 
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -67,17 +68,119 @@ async def populate_hdr_for_early_capture(meta: Meta, mi: dict[str, Any] | None, 
     meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
 
 
+def _selected_tracker_names(meta: Meta, config: dict[str, Any]) -> set[str]:
+    """Trackers chosen for this run, or the configured default trackers."""
+    selected = meta.trackers or config.get("TRACKERS", {}).get("default_trackers", "")
+    if isinstance(selected, str):
+        return {tracker.strip().upper() for tracker in selected.split(",") if tracker.strip()}
+    return {str(tracker).strip().upper() for tracker in selected if str(tracker).strip()}
+
+
 def _frame_overlay_requires_late_capture(meta: Meta, config: dict[str, Any]) -> bool:
     """Defer overlays until tracker upload eligibility is known."""
     if not meta.frame_overlay:
         return False
+    return bool(_selected_tracker_names(meta, config) & _FRAME_OVERLAY_FORBIDDEN_TRACKERS)
 
-    selected = meta.trackers or config.get("TRACKERS", {}).get("default_trackers", "")
-    if isinstance(selected, str):
-        tracker_names = {tracker.strip().upper() for tracker in selected.split(",") if tracker.strip()}
+
+def _pack_screens_count(meta: Meta, config: dict[str, Any]) -> int:
+    """Screenshots per additional disc or playlist, as the descriptions will request them.
+
+    Each tracker's description reads ``multiScreens`` with its own and tag overrides,
+    so capture the largest count any selected tracker needs.
+    """
+    from src.get_desc import DescriptionBuilder
+
+    counts: list[int] = []
+    trackers_config: object = config.get("TRACKERS")
+    if isinstance(trackers_config, dict):
+        configured = cast(dict[str, Any], trackers_config)
+        counts = [
+            DescriptionBuilder(tracker, config)._get_int_config("multiScreens", 2, meta)
+            for tracker in sorted(_selected_tracker_names(meta, config))
+            if isinstance(configured.get(tracker), dict)
+        ]
+    if not counts:
+        try:
+            counts.append(int(config.get("DEFAULT", {}).get("multiScreens", 2)))
+        except ValueError, TypeError:
+            counts.append(2)
+    return max(0, *counts)
+
+
+async def capture_extra_disc_screenshots(meta: Meta, config: dict[str, Any], takescreens_manager: Any) -> None:
+    """Capture what each additional disc or BDMV playlist still lacks before the review.
+
+    Safe to call again: groups that already hold enough screenshots are skipped,
+    so the upload stage can retry after an early capture was skipped or failed.
+    """
+    target = _pack_screens_count(meta, config)
+    discs = list(meta.discs or [])
+    if target <= 0 or not discs:
+        return
+    captures: list[tuple[str, Callable[[], Awaitable[Any]]]] = []
+    if meta.is_disc == "BDMV" and len(discs) == 1:
+        playlist_keys = [key for key in discs[0] if key.startswith("bdinfo")]
+        for index, key in enumerate(playlist_keys[1:], start=1):
+            playlist_bdinfo = discs[0].get(key)
+            if isinstance(playlist_bdinfo, dict):
+                group = f"PLAYLIST_{index}"
+                captures.append((group, partial(_capture_extra_bdmv_group, meta, takescreens_manager, group, cast(dict[str, Any], playlist_bdinfo), target)))
     else:
-        tracker_names = {str(tracker).strip().upper() for tracker in selected if str(tracker).strip()}
-    return bool(tracker_names & _FRAME_OVERLAY_FORBIDDEN_TRACKERS)
+        for index, disc in enumerate(discs[1:], start=1):
+            group = f"FILE_{index}"
+            if disc.get("type") == "BDMV" and isinstance(disc.get("bdinfo"), dict):
+                captures.append((group, partial(_capture_extra_bdmv_group, meta, takescreens_manager, group, disc["bdinfo"], target)))
+            elif disc.get("type") == "DVD":
+                # dvd_screenshots counts the group's registered screenshots itself.
+                captures.append((group, partial(takescreens_manager.dvd_screenshots, meta, index, _reviewed_group_target(meta, group, target), True, False)))
+    for group, capture in captures:
+        if _reviewed_group_target(meta, group, target) <= 0:
+            continue
+        # One unreadable disc must not stop the others or the upload; the
+        # description skips a group without screenshots and says so.
+        try:
+            await capture()
+        except Exception as error:
+            logger.warning(f"[yellow]Could not capture screenshots for {group}: {error}[/yellow]")
+
+
+def _reviewed_group_target(meta: Meta, group: str, target: int) -> int:
+    """The count the review left for a group; frames deleted there are not refilled."""
+    from src.screenshot_review import group_target_count
+    from src.temp_paths import release_temp_dir
+
+    return group_target_count(release_temp_dir(meta.base_dir, meta.uuid), group, target)
+
+
+async def _capture_extra_bdmv_group(meta: Meta, takescreens_manager: Any, group: str, bdinfo: dict[str, Any], target: int) -> None:
+    """Capture only the screenshots an additional BDMV disc or playlist still lacks.
+
+    A forced disc capture ignores what the group already holds, so capturing the
+    full count on every run added copies of the same frames.
+    """
+    existing = len(manifest_files(meta.base_dir, meta.uuid, group))
+    missing = _reviewed_group_target(meta, group, target) - existing
+    if missing <= 0:
+        logger.debug(f"[cyan]Reusing {existing} screenshots for {group}.[/cyan]")
+        return
+    # Every sampling grid starts at the same frame. Offsetting the retake counter
+    # by what the group holds moves the new grid off the frames already captured.
+    meta.retake_call_count = max(meta.retake_call_count or 0, existing)
+    await takescreens_manager.disc_screenshots(
+        meta,
+        group,
+        bdinfo,
+        meta.uuid,
+        meta.base_dir,
+        meta.vapoursynth,
+        [],
+        meta.ffdebug,
+        missing,
+        True,
+        False,
+        group,
+    )
 
 
 class Prep:
@@ -322,47 +425,7 @@ class Prep:
                 # Capture every additional playlist/disc before the WebUI
                 # review. Description generation must only render hosted
                 # images, never create new local media artifacts.
-                multi_screens = int(self.config.get("DEFAULT", {}).get("multiScreens", 2))
-                if multi_screens > 0:
-                    discs = list(meta.discs or [])
-                    if len(discs) == 1:
-                        disc = discs[0]
-                        playlist_keys = [key for key in disc if key.startswith("bdinfo")]
-                        for index, key in enumerate(playlist_keys[1:], start=1):
-                            playlist_bdinfo = disc.get(key)
-                            if isinstance(playlist_bdinfo, dict):
-                                await self.takescreens_manager.disc_screenshots(
-                                    meta,
-                                    f"PLAYLIST_{index}",
-                                    playlist_bdinfo,
-                                    meta.uuid,
-                                    meta.base_dir,
-                                    meta.vapoursynth,
-                                    [],
-                                    meta.ffdebug,
-                                    multi_screens,
-                                    True,
-                                    False,
-                                    f"PLAYLIST_{index}",
-                                )
-                    else:
-                        for index, disc in enumerate(discs[1:], start=1):
-                            disc_bdinfo = disc.get("bdinfo")
-                            if disc.get("type") == "BDMV" and isinstance(disc_bdinfo, dict):
-                                await self.takescreens_manager.disc_screenshots(
-                                    meta,
-                                    f"FILE_{index}",
-                                    disc_bdinfo,
-                                    meta.uuid,
-                                    meta.base_dir,
-                                    meta.vapoursynth,
-                                    [],
-                                    meta.ffdebug,
-                                    multi_screens,
-                                    True,
-                                    False,
-                                    f"FILE_{index}",
-                                )
+                await capture_extra_disc_screenshots(meta, self.config, self.takescreens_manager)
             elif meta.is_disc == "DVD":
                 await self.takescreens_manager.dvd_screenshots(
                     meta,
@@ -371,6 +434,7 @@ class Prep:
                     retry_cap=False,
                     cleanup_after_capture=False,
                 )
+                await capture_extra_disc_screenshots(meta, self.config, self.takescreens_manager)
             elif meta.category == "XXX":
                 await self.takescreens_manager.xxx_contact_sheets(meta.filelist or [], meta.uuid, meta.base_dir, meta)
             elif videopath:

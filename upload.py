@@ -295,7 +295,7 @@ _config_path = Path(_data_dir) / "config.py"
 from src.book_prep import sanitize_book_author, sanitize_book_language
 from src.meta import Meta
 from src.post_upload_hooks import run_post_upload_hooks
-from src.prep import Prep
+from src.prep import Prep, capture_extra_disc_screenshots
 
 # Enable ANSI colors on Windows
 _use_colors = True
@@ -1569,6 +1569,8 @@ async def _process_meta_screens(
                             0,
                             cleanup_after_capture=False,
                         )
+                        # Covers runs whose early capture was skipped or failed.
+                        await capture_extra_disc_screenshots(meta, config, takescreens_manager)
                     except asyncio.CancelledError as e:
                         await cleanup_screenshot_temp_files(meta)
                         await asyncio.sleep(0.1)
@@ -1593,6 +1595,7 @@ async def _process_meta_screens(
                             retry_cap=False,
                             cleanup_after_capture=False,
                         )
+                        await capture_extra_disc_screenshots(meta, config, takescreens_manager)
                     except asyncio.CancelledError as e:
                         await cleanup_screenshot_temp_files(meta)
                         await asyncio.sleep(0.1)

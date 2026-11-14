@@ -374,6 +374,115 @@ def test_early_bdmv_capture_includes_extra_discs() -> None:
     assert screenshot_spy.calls[1][0][-1] == "FILE_1"
 
 
+def test_extra_disc_capture_uses_tracker_multiscreens() -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["TRACKERS"] = {"default_trackers": "", "AAA": {"multiScreens": "4"}, "BBB": {"multiScreens": ""}}
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", trackers=["AAA", "BBB"], discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    assert screenshot_spy.calls[1][0][-1] == "FILE_1"
+    assert screenshot_spy.calls[1][0][8] == 4
+
+
+def test_extra_disc_capture_tolerates_empty_default_multiscreens() -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["DEFAULT"]["multiScreens"] = ""
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    assert len(screenshot_spy.calls) == 2
+    assert screenshot_spy.calls[1][0][8] == 2
+
+
+def _register_group(base_dir: Path, release_id: str, group: str, count: int) -> None:
+    screenshot_dir = base_dir / "tmp" / release_id / "screenshots"
+    screenshot_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for index in range(count):
+        path = screenshot_dir / f"{group}-{index}.png"
+        path.write_bytes(b"image")
+        paths.append(path)
+    register(base_dir, release_id, paths, group)
+
+
+def test_extra_disc_capture_reuses_complete_group(tmp_path: Path) -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    _register_group(tmp_path, "release", "FILE_1", 2)
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", base_dir=str(tmp_path), uuid="release", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    assert len(screenshot_spy.calls) == 2
+    assert all(call[1].get("capture_group") == "main" for call in screenshot_spy.calls)
+
+
+def test_extra_disc_capture_completes_partial_group_off_the_old_grid(tmp_path: Path) -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["DEFAULT"]["multiScreens"] = 4
+    _register_group(tmp_path, "release", "FILE_1", 2)
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", base_dir=str(tmp_path), uuid="release", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    extra_calls = [call for call in screenshot_spy.calls if call[0][-1] == "FILE_1"]
+    assert len(extra_calls) == 1
+    assert extra_calls[0][0][8] == 2
+    assert meta.retake_call_count == 2
+
+
+@pytest.mark.parametrize(("reviewed", "expected_calls"), [(1, 0), (0, 0), (3, 1)])
+def test_extra_disc_capture_keeps_the_reviewed_group_count(tmp_path: Path, reviewed: int, expected_calls: int) -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["DEFAULT"]["multiScreens"] = 4
+    _register_group(tmp_path, "release", "FILE_1", min(reviewed, 2))
+    (tmp_path / "tmp" / "release" / "screenshot_review.json").write_text(json.dumps({"group_targets": {"FILE_1": reviewed}}), encoding="utf-8")
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", base_dir=str(tmp_path), uuid="release", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    extra_calls = [call for call in screenshot_spy.calls if call[0][-1] == "FILE_1"]
+    assert len(extra_calls) == expected_calls
+    if extra_calls:
+        assert extra_calls[0][0][8] == 1
+
+
+def test_extra_dvd_discs_are_captured_before_review() -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    dvd_calls: list[tuple[object, ...]] = []
+
+    async def dvd_screenshots(*args: object, **_kwargs: object) -> None:
+        dvd_calls.append(args)
+
+    screenshot_spy.dvd_screenshots = dvd_screenshots  # type: ignore[attr-defined]
+    meta = Meta(category="TV", screens=6, is_disc="DVD", discs=[{"type": "DVD"}, {"type": "DVD"}, {"type": "DVD"}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    assert [call[1:] for call in dvd_calls[1:]] == [(1, 2, True, False), (2, 2, True, False)]
+
+
+def test_failed_extra_disc_does_not_stop_the_others() -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    attempted: list[str] = []
+
+    async def disc_screenshots(*args: object, **_kwargs: object) -> None:
+        group = str(args[-1]) if args else "main"
+        attempted.append(group)
+        if group == "FILE_1":
+            raise RuntimeError("unreadable stream")
+
+    screenshot_spy.disc_screenshots = disc_screenshots  # type: ignore[method-assign]
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    result = asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    assert result is not None
+    assert attempted[1:] == ["FILE_1", "FILE_2"]
+
+
 def test_early_capture_returns_meta_with_tonemapping() -> None:
     prep = Prep.__new__(Prep)
 
