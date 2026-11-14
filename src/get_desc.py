@@ -36,6 +36,7 @@ from src.music.analyzer import RIPPER_LOG_RE, read_rip_log
 from src.release_locks import release_image_lock
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
+from src.temp_paths import release_temp_dir
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
@@ -427,6 +428,13 @@ class DescriptionBuilder:
                 return int(default)
             except ValueError, TypeError:
                 return 0
+
+    @staticmethod
+    def _reviewed_group_count(meta: Meta, group: str, multi_screens: int) -> int:
+        """Frames to host for an extra disc or playlist; the review can add or remove some."""
+        from src.screenshot_review import group_target_count
+
+        return group_target_count(release_temp_dir(meta.base_dir, meta.uuid), group, multi_screens)
 
     def _get_tag_override(self, key: str, meta: Meta | None) -> Any:
         """Return a tag-specific value, preserving false and zero overrides."""
@@ -2265,7 +2273,7 @@ class DescriptionBuilder:
                                     multi_screens,
                                     1,
                                     0,
-                                    multi_screens,
+                                    self._reviewed_group_count(meta, f"PLAYLIST_{i}", multi_screens),
                                     new_screens,
                                     {new_images_key: meta[new_images_key]},
                                     allowed_hosts=approved_image_hosts,
@@ -2385,7 +2393,7 @@ class DescriptionBuilder:
                                     multi_screens,
                                     1,
                                     0,
-                                    multi_screens,
+                                    self._reviewed_group_count(meta, f"FILE_{i}", multi_screens),
                                     new_screens,
                                     {new_images_key: meta[new_images_key]},
                                     allowed_hosts=approved_image_hosts,
