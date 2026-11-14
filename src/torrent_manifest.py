@@ -12,7 +12,7 @@ from typing import Any, Literal, TypeIs, cast
 from torf import TorfError, Torrent
 
 from src.temp_paths import release_temp_dir
-from src.torrent_policy import TorrentPolicy, TorrentStats
+from src.torrent_policy import PIECE_SIZE_MAX, TorrentPolicy, TorrentStats
 
 TorrentLayout = Literal["base", "base_subs"]
 
@@ -154,7 +154,8 @@ class TorrentManifest:
             )
             torrents[entry_id] = asdict(entry)
             defaults = cast(dict[str, Any], manifest["defaults"])
-            if make_default or layout not in defaults:
+            # A default that no client can load gives way to the first usable variant.
+            if make_default or layout not in defaults or (stats.piece_size <= PIECE_SIZE_MAX and self._is_oversized(torrents.get(defaults[layout]))):
                 defaults[layout] = entry_id
             self._save(manifest)
             return entry
@@ -209,9 +210,18 @@ class TorrentManifest:
         tracker keeps the torrent already chosen for the run. Only when none
         qualifies, such as a tracker policy rejecting it, is the smallest
         acceptable variant used.
+
+        Without a tracker policy the largest supported piece size still
+        applies, so a variant libtorrent 1.x clients cannot load is never selected.
         """
-        candidates = [entry for entry in self.entries(layout) if policy is None or policy.accepts(entry.stats)]
+        candidates = [entry for entry in self.entries(layout) if (policy.accepts(entry.stats) if policy is not None else entry.piece_size <= PIECE_SIZE_MAX)]
         if not candidates:
+            # Drop a selection recorded by an earlier run, so a variant that is
+            # no longer acceptable cannot be picked up through selected_path().
+            with self._lock:
+                manifest = self._load()
+                if cast(dict[str, Any], manifest["selections"]).pop(tracker.upper(), None) is not None:
+                    self._save(manifest)
             return None
         candidates.sort(key=lambda entry: (entry.piece_size, entry.metainfo_size, entry.id))
         by_path = {self.entry_path(entry).resolve(): entry for entry in candidates}
@@ -245,8 +255,33 @@ class TorrentManifest:
         value: object = cast(dict[str, Any], manifest["torrents"]).get(entry_id)
         if not _is_str_dict(value):
             return None
+        if self._is_oversized(value):
+            # Left by a run from before the piece-size bound: every step that
+            # copies the default, such as randomized torrents, must get a
+            # variant a client can load, or none at all.
+            replacement = self._promote_usable_default(layout)
+            if replacement is None:
+                return None
+            value = asdict(replacement)
         try:
             path = self.entry_path(TorrentEntry(**value))
         except TypeError, ValueError:
             return None
         return path if path.is_file() else None
+
+    @staticmethod
+    def _is_oversized(value: object) -> bool:
+        piece_size = value.get("piece_size") if _is_str_dict(value) else None
+        return isinstance(piece_size, int) and piece_size > PIECE_SIZE_MAX
+
+    def _promote_usable_default(self, layout: TorrentLayout) -> TorrentEntry | None:
+        """Make the largest variant within the piece-size bound the default."""
+        with self._lock:
+            usable = [entry for entry in self.entries(layout) if entry.piece_size <= PIECE_SIZE_MAX]
+            if not usable:
+                return None
+            chosen = max(usable, key=lambda entry: (entry.piece_size, -entry.metainfo_size, entry.id))
+            manifest = self._load()
+            cast(dict[str, Any], manifest["defaults"])[layout] = chosen.id
+            self._save(manifest)
+            return chosen

@@ -12,7 +12,7 @@ from typing import Any, TypeIs, cast
 from src.console import logger
 from src.meta import Meta
 from src.torrent_manifest import TorrentLayout, TorrentManifest
-from src.torrent_policy import MIB, PIECE_SIZE_MAX, PIECE_SIZE_MIN, TorrentPolicy
+from src.torrent_policy import GENERIC_POLICY, MIB, PIECE_SIZE_MAX, PIECE_SIZE_MIN, TorrentPolicy
 from src.torrentcreate import TorrentCreator
 
 _locks: dict[str, asyncio.Lock] = {}
@@ -70,7 +70,11 @@ async def provision_tracker_torrents(
                 blocked[tracker] = "Skipped: no policy-compliant torrent is available and hashing is disabled"
                 continue
             if policy is None:
-                continue
+                # No base exists yet: creating it is not this step's task.
+                if not manifest.entries(layout):
+                    continue
+                # Every stored variant exceeds the largest supported piece size.
+                policy = GENERIC_POLICY
 
             async with _variant_lock(meta, layout, policy):
                 if manifest.select(tracker, layout, policy, preferred=_preferred_variants(meta, manifest, layout)) is not None:
