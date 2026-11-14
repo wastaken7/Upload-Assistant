@@ -17,6 +17,7 @@ from src.screenshot_review import (
     apply_staged_remote_uploads,
     delete_screenshot,
     discard_remote_images,
+    group_target_count,
     image_version,
     list_review_items,
     list_screenshots,
@@ -82,6 +83,18 @@ def test_delete_disc_screenshot_preserves_main_target_and_other_groups(release_d
     assert [item.path for item in remaining] == [main]
     assert target_count(release_dir, 6) == 6
     assert manifest_files(release_dir.parent.parent, release_dir.name, "PLAYLIST_1") == []
+    assert group_target_count(release_dir, "PLAYLIST_1", 4) == 0
+    assert group_target_count(release_dir, "FILE_1", 4) == 4
+
+
+def test_delete_extra_disc_screenshot_records_the_group_count(release_dir):
+    _register_images(release_dir, ["main.png"])
+    extras = _register_images(release_dir, ["one.png", "two.png"], "FILE_1")
+    target = next(item for item in list_screenshots(release_dir, {}) if item.path == extras[0])
+
+    delete_screenshot(release_dir, {"is_disc": "DVD"}, target.id)
+
+    assert group_target_count(release_dir, "FILE_1", 4) == 1
 
 
 def test_list_screenshots_only_includes_registered_frames_with_stable_ids(release_dir):

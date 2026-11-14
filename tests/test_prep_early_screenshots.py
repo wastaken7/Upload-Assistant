@@ -433,6 +433,22 @@ def test_extra_disc_capture_completes_partial_group_off_the_old_grid(tmp_path: P
     assert meta.retake_call_count == 2
 
 
+@pytest.mark.parametrize(("reviewed", "expected_calls"), [(1, 0), (0, 0), (3, 1)])
+def test_extra_disc_capture_keeps_the_reviewed_group_count(tmp_path: Path, reviewed: int, expected_calls: int) -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["DEFAULT"]["multiScreens"] = 4
+    _register_group(tmp_path, "release", "FILE_1", min(reviewed, 2))
+    (tmp_path / "tmp" / "release" / "screenshot_review.json").write_text(json.dumps({"group_targets": {"FILE_1": reviewed}}), encoding="utf-8")
+    meta = Meta(category="TV", screens=6, is_disc="BDMV", base_dir=str(tmp_path), uuid="release", discs=[{"bdinfo": {}}, {"type": "BDMV", "bdinfo": {}}])
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "", {}))
+
+    extra_calls = [call for call in screenshot_spy.calls if call[0][-1] == "FILE_1"]
+    assert len(extra_calls) == expected_calls
+    if extra_calls:
+        assert extra_calls[0][0][8] == 1
+
+
 def test_extra_dvd_discs_are_captured_before_review() -> None:
     prep, screenshot_spy = _prep_with_screenshot_spy()
     dvd_calls: list[tuple[object, ...]] = []

@@ -133,14 +133,24 @@ async def capture_extra_disc_screenshots(meta: Meta, config: dict[str, Any], tak
                 captures.append((group, partial(_capture_extra_bdmv_group, meta, takescreens_manager, group, disc["bdinfo"], target)))
             elif disc.get("type") == "DVD":
                 # dvd_screenshots counts the group's registered screenshots itself.
-                captures.append((group, partial(takescreens_manager.dvd_screenshots, meta, index, target, True, False)))
+                captures.append((group, partial(takescreens_manager.dvd_screenshots, meta, index, _reviewed_group_target(meta, group, target), True, False)))
     for group, capture in captures:
+        if _reviewed_group_target(meta, group, target) <= 0:
+            continue
         # One unreadable disc must not stop the others or the upload; the
         # description skips a group without screenshots and says so.
         try:
             await capture()
         except Exception as error:
             logger.warning(f"[yellow]Could not capture screenshots for {group}: {error}[/yellow]")
+
+
+def _reviewed_group_target(meta: Meta, group: str, target: int) -> int:
+    """The count the review left for a group; frames deleted there are not refilled."""
+    from src.screenshot_review import group_target_count
+    from src.temp_paths import release_temp_dir
+
+    return group_target_count(release_temp_dir(meta.base_dir, meta.uuid), group, target)
 
 
 async def _capture_extra_bdmv_group(meta: Meta, takescreens_manager: Any, group: str, bdinfo: dict[str, Any], target: int) -> None:
@@ -150,7 +160,7 @@ async def _capture_extra_bdmv_group(meta: Meta, takescreens_manager: Any, group:
     full count on every run added copies of the same frames.
     """
     existing = len(manifest_files(meta.base_dir, meta.uuid, group))
-    missing = target - existing
+    missing = _reviewed_group_target(meta, group, target) - existing
     if missing <= 0:
         logger.debug(f"[cyan]Reusing {existing} screenshots for {group}.[/cyan]")
         return

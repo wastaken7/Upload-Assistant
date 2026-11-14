@@ -15,7 +15,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeIs
+from typing import Any, TypeIs, cast
 
 from src.meta import Meta
 from src.screenshot_manifest import capture_pages, forget_file, group_for, set_page
@@ -160,6 +160,33 @@ def target_count(temp_dir: Path, fallback: int, allow_empty: bool = False) -> in
     return count if count > 0 or allow_empty else fallback
 
 
+def group_target_count(temp_dir: Path, group: str, fallback: int) -> int:
+    """Return the reviewed screenshot count of an additional disc or playlist group.
+
+    Zero is kept: deleting every frame of an extra disc means it gets none.
+    """
+    targets = _load_review(temp_dir).get("group_targets")
+    value = targets.get(group) if _is_str_dict(targets) else None
+    if not isinstance(value, (int, float, str)):
+        return fallback
+    try:
+        return max(0, int(value))
+    except TypeError, ValueError:
+        return fallback
+
+
+def _record_group_target(temp_dir: Path, review: dict[str, object], group: str) -> None:
+    """Remember the reviewed count of a group so later captures do not refill it."""
+    count = len(manifest_files(temp_dir.parent.parent, temp_dir.name, group))
+    if group == "main":
+        review["target_count"] = count
+        return
+    targets = review.get("group_targets")
+    group_targets = cast(dict[str, object], targets) if _is_str_dict(targets) else {}
+    group_targets[group] = count
+    review["group_targets"] = group_targets
+
+
 def image_version(temp_dir: Path, screenshot_id: str, fallback: int) -> int:
     """Return a monotonic cache-busting version for a reviewed image."""
     generations = _load_review(temp_dir).get("generations")
@@ -215,8 +242,7 @@ def delete_screenshot(temp_dir: Path, meta_data: Mapping[str, object], screensho
 
         remaining = list_screenshots(temp_dir, meta_data)
         review = _load_review(temp_dir)
-        if target.group == "main":
-            review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
+        _record_group_target(temp_dir, review, target.group)
         _save_review(temp_dir, review)
         return remaining
 
@@ -230,10 +256,9 @@ async def add_screenshot(temp_dir: Path, meta_data: Mapping[str, object], group:
             captured = await _capture_disc_review_frame(temp_dir, meta_data, group=group)
             remote_images = _remote_images(meta_data)
             if not remote_images:
-                if group == "main":
-                    review = _load_review(temp_dir)
-                    review["target_count"] = len(manifest_files(temp_dir.parent.parent, temp_dir.name, "main"))
-                    _save_review(temp_dir, review)
+                review = _load_review(temp_dir)
+                _record_group_target(temp_dir, review, group)
+                _save_review(temp_dir, review)
                 return captured
             if captured.path is None:
                 raise RuntimeError("Disc capture did not produce a screenshot")
