@@ -2479,6 +2479,9 @@ class DescriptionBuilder:
         char_count = 0
         max_char_limit = char_limit  # Character limit
         other_files_spoiler_open = False  # Track if "Other files" spoiler has been opened
+        # pack_mediainfo keeps each file's name and MediaInfo when multiScreens is 0, so only
+        # the first file gets screenshots. --sorted-filelist packs are not ordered episodes.
+        list_pack_files = multi_screens != 0 or (not meta.sorted_filelist and self._get_bool_config("pack_mediainfo", False, meta))
         total_files_to_process = min(len(filelist), process_limit)
         processed_count = 0
         if multi_screens != 0 and total_files_to_process > 1:
@@ -2587,13 +2590,13 @@ class DescriptionBuilder:
                 filename = Path(file.strip()).stem.replace("[", "").replace("]", "")
 
                 # If we are beyond the file limit, add all further files in a spoiler
-                if multi_screens != 0 and i >= file_limit and not other_files_spoiler_open:
+                if list_pack_files and i >= file_limit and not other_files_spoiler_open:
                     desc_parts.append("[center][spoiler=Other files]\n")
                     char_count += len("[center][spoiler=Other files]\n")
                     other_files_spoiler_open = True
 
                 # Write filename in BBCode format with MediaInfo in spoiler if not the first file
-                if multi_screens != 0:
+                if list_pack_files:
                     if i > 0 and char_count < max_char_limit:
                         mi_dump = await _pack_file_mediainfo(file)
                         parsed_mediainfo = self.parser.parse_mediainfo(mi_dump)

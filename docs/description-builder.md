@@ -25,6 +25,7 @@ Below is the detailed list of configuration variables that affect description bu
 - `screens_per_row` (Integer): Number of screenshots to lay out horizontally in each row of the grid. Defaults to `2`.
   - _Note:_ For the `HAWKEUNO` tracker, the code dynamically reduces this value if the total width exceeds 1100px to maintain layout responsiveness.
 - `multiScreens` (Integer): Number of screenshots generated per file/disc for pack uploads (multiple discs or files). Setting this to `0` disables screenshot generation for subsequent files in a pack. Defaults to `2`.
+- `pack_mediainfo` (Boolean): When `multiScreens` is `0`, still lists each later file in a pack with its filename and MediaInfo, so only the first file has screenshots. Ignored with `--sorted-filelist`. Defaults to `False`.
 - `pack_thumb_size` (Integer): Thumbnail width (in pixels) for pack screenshots. Defaults to `300`.
 - `processLimit` (Integer): The maximum number of files/discs in a pack that will be processed individually (meaning they will have screenshots generated and MediaInfo extracted). Prevents excessive resource consumption. Defaults to `10`.
 - `fileLimit` (Integer): For multi-file torrents, specifies how many files will be listed directly in the description before nesting the remaining files under a collapsible `[spoiler=Other files]` block. Defaults to `5`.

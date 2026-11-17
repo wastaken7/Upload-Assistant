@@ -87,6 +87,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "threads": (str, int),
     "ffmpeg_limit": (bool,),
     "multiScreens": (str, int),
+    "pack_mediainfo": (bool,),
     "pack_thumb_size": (str, int),
     "charLimit": (str, int),
     "fileLimit": (str, int),

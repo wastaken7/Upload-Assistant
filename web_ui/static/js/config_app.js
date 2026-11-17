@@ -965,6 +965,7 @@ const DISPLAY_LABEL_OVERRIDES = {
   tag_overrides: "Release Group Overrides",
   hide_screenshot_header_if_only_section: "Hide Standalone Image Header",
   multiScreens: "Multiple Screenshots",
+  pack_mediainfo: "Pack MediaInfo Without Screenshots",
   charLimit: "Character Limit",
   fileLimit: "File Limit",
   processLimit: "Process Limit",

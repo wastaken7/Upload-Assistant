@@ -168,6 +168,7 @@ Implementation notes:
 ### Packs (season packs / multi-disc)
 
 - `multiScreens` (str): Screenshots per disc/episode when uploading packs to supported sites.
+- `pack_mediainfo` (bool): With `multiScreens` set to 0, still list each later episode/file with its MediaInfo (screenshots only for the first). Can be set per tracker.
 - `pack_thumb_size` (str): Thumbnail width for pack screenshots.
 - `charLimit` (str): UNIT3D season-pack description character limit cutoff.
 - `fileLimit` (str): Files to include before grouping additional files into spoiler blocks.

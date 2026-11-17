@@ -403,6 +403,10 @@ config: dict[str, Any] = {
         # Set to 0 to use only the original description and images for later items.
         # PassThePopcorn always uses at least 2 images per item, regardless of this value.
         "multiScreens": "2",
+        # When multiScreens is 0, set to True to still list each later episode or file
+        # with its MediaInfo, so only the first one gets screenshots.
+        # charLimit, fileLimit and processLimit still apply.
+        "pack_mediainfo": False,
         # The following pack settings do not affect PassThePopcorn, which uses a fixed format.
         # Screenshot thumbnail width for pack descriptions. Default: 300.
         "pack_thumb_size": "300",
