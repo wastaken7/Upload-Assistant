@@ -15,7 +15,7 @@ def test_pack_multi_screens_survive_tracker_override() -> None:
         meta = Meta(category="TV", season=1, filelist=["episode-1.mkv", "episode-2.mkv"], image_list=release_images)
         calls = []
 
-        async def capture_screenshot_args(_meta, _approved_image_hosts, images, multi_screens, _include_header=True):
+        async def capture_screenshot_args(_meta, _approved_image_hosts, images, multi_screens, _include_header=True, **_kwargs):
             calls.append((images, multi_screens))
             return ""
 
