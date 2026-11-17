@@ -129,6 +129,7 @@ def test_nzbnest_searches_with_newznab_movie_parameters(monkeypatch: Any, tmp_pa
     assert dupes == [  # noqa: S101
         {
             "name": "Movie.Name.2026.1080p",
+            "id": "release-guid",
             "files": "Movie.Name.2026.1080p",
             "size": 12345,
             "link": "https://nzbnest.com/account/releases/release-guid",

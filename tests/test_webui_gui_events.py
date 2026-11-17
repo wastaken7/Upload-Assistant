@@ -636,3 +636,33 @@ async def test_bdinfo_comparison_emits_tracker_notices_for_gui_dupe_prompt(gui_e
         ("FAKE", "Audio track count differs on Fictional.Film.2020"),
         ("FAKE", "Playlist length matches: 01:45:00"),
     ]
+
+
+FICTIONAL_HASH_ID = "0123456789abcdef0123456789abcdef01234567"
+FICTIONAL_SECRET = "fedcba9876543210fedcba9876543210"
+
+
+def test_hash_torrent_ids_stay_visible_but_other_hashes_are_redacted(gui_env, capsys) -> None:
+    link = f"https://fictional.example/details?id={FICTIONAL_HASH_ID}&r={FICTIONAL_SECRET}"
+    webui_events.tracker_result("FAKE", "success", link=link, torrent_id=FICTIONAL_HASH_ID)
+
+    (event,) = _events(capsys.readouterr().out)
+
+    assert event["link"] == f"https://fictional.example/details?id={FICTIONAL_HASH_ID}&r=[REDACTED]"
+    assert event["torrent_id"] == FICTIONAL_HASH_ID
+
+
+def test_dupe_links_keep_the_release_id_only(gui_env, capsys) -> None:
+    webui_events.dupes(
+        "FAKE",
+        [
+            {"name": "With ID", "link": f"https://fictional.example/details?id={FICTIONAL_HASH_ID}", "id": FICTIONAL_HASH_ID},
+            {"name": "Without ID", "link": f"https://fictional.example/getnzb/{FICTIONAL_SECRET}.nzb"},
+        ],
+    )
+
+    (event,) = _events(capsys.readouterr().out)
+
+    with_id, without_id = event["entries"]
+    assert with_id["link"] == f"https://fictional.example/details?id={FICTIONAL_HASH_ID}"
+    assert without_id["link"] == "https://fictional.example/getnzb/[REDACTED].nzb"
