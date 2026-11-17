@@ -161,3 +161,20 @@ def test_fitting_keeps_comparison_payloads_untouched(dvd_pack):
 
     assert "Disc : 3" not in fitted
     assert comparison in fitted
+
+
+@pytest.mark.parametrize("disc_bdinfo", [True, False])
+def test_disc_bdinfo_flag_controls_later_bdmv_summaries(tmp_path, disc_bdinfo):
+    (tmp_path / "tmp" / "pack").mkdir(parents=True)
+    discs = [{"type": "BDMV", "name": f"FICTIONAL_FILM_D{i}", "summary": f"Disc Title: Fictional Film {i}"} for i in range(3)]
+    meta = Meta(base_dir=str(tmp_path), uuid="pack", category="MOVIE", screens=1, image_list=[_image("disc0")], discs=discs)
+    for i in range(1, 3):
+        meta[f"new_images_disc_{i}"] = [_image(f"disc{i}")]
+
+    builder = DescriptionBuilder("BLUTOPIA", CONFIG)
+    rendered = asyncio.run(builder._handle_discs_and_screenshots(meta, [], meta.image_list, 1, disc_bdinfo=disc_bdinfo))
+
+    for i in range(1, 3):
+        assert rendered.count(f"FICTIONAL_FILM_D{i}") == 1
+        assert ("Disc Title: Fictional Film" in rendered) is disc_bdinfo
+        assert _image(f"disc{i}")["raw_url"] in rendered

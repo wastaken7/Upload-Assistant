@@ -2,6 +2,7 @@
 from typing import Any
 
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -30,6 +31,32 @@ class AsianCinema(UNIT3D):
         super().__init__(config, tracker_name="ASIANCINEMA")
         self.config = config
         self.common = Common(config)
+
+    @staticmethod
+    def _bdmv_discs(meta: Meta) -> list[dict[str, Any]]:
+        """The Blu-ray discs of a multi-disc BDMV release that have a BDInfo summary."""
+        if meta.is_disc != "BDMV":
+            return []
+        discs = [disc for disc in meta.discs if disc.get("type") == "BDMV" and str(disc.get("summary", "")).strip()]
+        return discs if len(discs) > 1 else []
+
+    async def get_bdinfo(self, meta: Meta) -> dict[str, str]:
+        # AsianCinema wants the BDInfo of every disc in the BDInfo field, not in the description.
+        discs = self._bdmv_discs(meta)
+        if not meta.bdinfo or not discs:
+            return await super().get_bdinfo(meta)
+        return {"bdinfo": "\n\n".join(str(disc["summary"]).strip() for disc in discs)}
+
+    async def get_description(self, meta: Meta) -> Any:
+        return {
+            "description": await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+                meta,
+                # Later discs' BDInfo goes in the BDInfo field, so the description keeps only their names.
+                disc_bdinfo=not self._bdmv_discs(meta),
+                mediainfo=False,
+                nfo=False,
+            )
+        }
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {"MOVIE": "1", "TV": "2", "MUSIC": "3"}
