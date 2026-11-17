@@ -97,6 +97,31 @@ def test_zero_multi_screens_keeps_only_main_screenshots(pack):
     assert "42 min" not in result
 
 
+def test_pack_mediainfo_lists_later_files_without_their_screenshots(pack):
+    builder, meta = pack
+    builder.config["DEFAULT"].update(multiScreens=0, processLimit=2, pack_mediainfo=True)
+
+    result = _render(builder, meta)
+
+    assert _image("first")["raw_url"] in result
+    assert "Show.S01E01" in result
+    assert "[spoiler=Other files]" in result
+    assert "[spoiler=Show.S01E02]" in result
+    assert "[b]Duration:[/b] 42 min" in result
+    assert _image("second")["raw_url"] not in result
+
+
+def test_pack_mediainfo_tracker_override_and_sorted_filelist(pack):
+    builder, meta = pack
+    builder.config["DEFAULT"].update(multiScreens=0, processLimit=2, pack_mediainfo=True)
+    builder.tracker_config["pack_mediainfo"] = False
+    assert "Show.S01E02" not in _render(builder, meta)
+
+    builder.tracker_config["pack_mediainfo"] = ""
+    meta.sorted_filelist = True
+    assert "Show.S01E02" not in _render(builder, meta)
+
+
 def test_tracker_override_replaces_main_screenshots_and_keeps_pack_layout(pack):
     builder, meta = pack
     builder.config["DEFAULT"]["processLimit"] = 2
