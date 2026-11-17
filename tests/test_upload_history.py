@@ -573,3 +573,16 @@ def test_the_database_is_private_to_its_owner(history_on):
         pass
 
     assert history_on.stat().st_mode & 0o777 == 0o600
+
+
+def test_hash_torrent_ids_and_info_hashes_are_stored_unredacted(tmp_path):
+    hash_id = "0123456789abcdef0123456789abcdef"
+    info_hash = "abcdef0123456789abcdef0123456789abcdef01"
+    upload_history.begin_item()
+    meta = _finished_meta(tmp_path, infohash=info_hash, tracker_status={"FICT": {"upload": True, "upload_success": True, "torrent_id": hash_id}})
+
+    record = upload_history.build_item_record(meta, {"FICT": FictionalTracker})
+
+    assert record["infohash"] == info_hash
+    (row,) = record["trackers"]
+    assert (row["link"], row["torrent_id"]) == (f"https://fictional.example/torrents/{hash_id}", hash_id)

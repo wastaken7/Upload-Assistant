@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -95,9 +96,14 @@ class Redaction:
         return blocks
 
     @staticmethod
-    def redact_value(val: Any, sensitive_keys: set[str] | None = None) -> Any:
-        """Redact sensitive values, including passkeys in URLs and JSON substrings."""
+    def redact_value(val: Any, sensitive_keys: set[str] | None = None, public_ids: Iterable[object] = ()) -> Any:
+        """Redact sensitive values, including passkeys in URLs and JSON substrings.
+
+        ``public_ids`` are identifiers known to be public, such as a torrent ID that is
+        a hash; a long hex string equal to one of them is kept, any other is redacted.
+        """
         keys = sensitive_keys or SENSITIVE_KEYS
+        kept = {str(value).lower() for value in public_ids if value not in (None, "")}
         if isinstance(val, str):
             # First, try to find and redact embedded JSON substrings within the string.
             # This uses bracket counting (not regex) so it can handle nested JSON.
@@ -124,7 +130,7 @@ class Redaction:
             # Redact query params like ?passkey=... or &token=...
             val = re.sub(r"([?&](passkey|key|token|api_key|auth|info_hash|torrent_pass)=)[^&]+", r"\1[REDACTED]", val, flags=re.I)
             # Redact long hex or base64-like strings (common for tokens)
-            val = re.sub(r"\b[a-fA-F0-9]{32,}\b", "[REDACTED]", val)
+            val = re.sub(r"\b[a-fA-F0-9]{32,}\b", lambda match: match.group(0) if match.group(0).lower() in kept else "[REDACTED]", val)
         return val
 
     @staticmethod

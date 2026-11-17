@@ -103,12 +103,16 @@ def parse_newznab_dupes(
                 guid = attr_value
 
         item_link = str(item.findtext("link") or item_link)
+        release_id: str | None = None
         if item_link and not item_link.startswith(("http://", "https://")) and guid and torrent_url:
             item_link = f"{torrent_url}{guid}"
+            # The release page is addressed by its GUID, which may be a hash.
+            release_id = guid
 
         dupes.append(
             {
                 "name": title,
+                "id": release_id,
                 # Newznab search results do not expose the NZB's file list.
                 # Some trackers historically use the release title as a
                 # compatibility fallback for this field.

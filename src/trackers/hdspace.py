@@ -3,6 +3,7 @@ import platform
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import aiofiles
 import httpx
@@ -136,7 +137,9 @@ class HDSpace:
                             break
 
                 if name and torrent_link:
-                    dupes.append({"name": name, "size": size, "link": torrent_link})
+                    # HD-Space's torrent ID is the info hash, so the link shows it.
+                    torrent_id = parse_qs(urlparse(torrent_link).query).get("id", [""])[0]
+                    dupes.append({"name": name, "size": size, "link": torrent_link, "id": torrent_id or None})
 
             next_page = soup.find("a", href=re.compile(r"pages="), text=re.compile(r"Next|>>", re.I))
 

@@ -18,7 +18,7 @@ import os
 import sqlite3
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -166,8 +166,11 @@ def content_fingerprint(path: str | Path) -> str:
     return sha256("\n".join(f"{name}\t{size}" for name, size in chosen).encode("utf-8")).hexdigest()
 
 
-def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH, *, markup: bool = True) -> str:
-    """Return redacted plain text; ``markup=False`` keeps literal brackets, as in release names."""
+def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH, *, markup: bool = True, public_ids: Iterable[object] = ()) -> str:
+    """Return redacted plain text; ``markup=False`` keeps literal brackets, as in release names.
+
+    ``public_ids`` are hash-like identifiers that stay visible, such as a torrent ID.
+    """
     if value in (None, ""):
         return ""
     if isinstance(value, (Mapping, list)):
@@ -175,12 +178,12 @@ def _text(value: object, limit: int = webui_events.MAX_TEXT_LENGTH, *, markup: b
             value = json.dumps(value, default=str)
         except TypeError, ValueError:
             value = str(value)
-    return webui_events.plain_text(value, limit, markup=markup)
+    return webui_events.plain_text(value, limit, markup=markup, public_ids=public_ids)
 
 
-def _http_link(value: object) -> str:
+def _http_link(value: object, public_ids: Iterable[object] = ()) -> str:
     """Return ``value`` when it is an http(s) link, otherwise ""."""
-    link = _text(value, 2000, markup=False)
+    link = _text(value, 2000, markup=False, public_ids=public_ids)
     return link if link.lower().startswith(("http://", "https://")) else ""
 
 
@@ -258,10 +261,10 @@ def external_ids(meta: Any) -> dict[str, str]:
 
 def _tracker_link(status: Mapping[str, Any], tracker_class: Any) -> str:
     """Return the torrent page from the status, or from the tracker's torrent URL and the torrent ID."""
-    link = _http_link(status.get("torrent_link"))
     torrent_id = status.get("torrent_id")
+    link = _http_link(status.get("torrent_link"), public_ids=(torrent_id,))
     if not link and torrent_id not in (None, ""):
-        link = _http_link(f"{getattr(tracker_class, 'torrent_url', '')}{torrent_id}")
+        link = _http_link(f"{getattr(tracker_class, 'torrent_url', '')}{torrent_id}", public_ids=(torrent_id,))
     return link
 
 
@@ -315,7 +318,7 @@ def _tracker_rows(meta: Any, tracker_class_map: Mapping[str, Any], state: _ItemS
                 "status": resolved,
                 "message": message_text,
                 "link": link,
-                "torrent_id": _text(torrent_id, 64, markup=False) if resolved == "success" else "",
+                "torrent_id": _text(torrent_id, 64, markup=False, public_ids=(torrent_id,)) if resolved == "success" else "",
                 "duration": round(float(duration), 2) if isinstance(duration, (int, float)) and duration > 0 else None,
                 "dupes": state.dupes.get(tracker) if state else None,
                 "slot": state.slots.get(tracker) if state else None,
@@ -394,7 +397,7 @@ def build_item_record(meta: Any, tracker_class_map: Mapping[str, Any], *, outcom
         "episode": _text(getattr(meta, "episode", ""), 20, markup=False),
         "size": max(0, _positive_int(getattr(meta, "source_size", 0))),
         "fingerprint": str(getattr(meta, "release_fingerprint", "") or "") or content_fingerprint(path),
-        "infohash": _text(getattr(meta, "infohash", ""), 64, markup=False).lower(),
+        "infohash": _text(getattr(meta, "infohash", ""), 64, markup=False, public_ids=(getattr(meta, "infohash", ""),)).lower(),
         "outcome": outcome,
         "reason": _text(reason, 60),
         "duration_ms": duration_ms,
