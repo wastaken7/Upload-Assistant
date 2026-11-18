@@ -10,7 +10,10 @@ import httpx
 from src import payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.music.validation import lame_preset
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
 
@@ -19,7 +22,7 @@ Config = dict[str, Any]
 
 class Vultu:
     """
-    Vultu is a Brazilian Private Torrent Tracker for MOVIES / TV / ANIME / GAMES
+    Vultu is a Brazilian Private Torrent Tracker for MOVIES / TV / ANIME / GAMES / MUSIC
     """
 
     base_url = "https://vultu.org"
@@ -30,16 +33,21 @@ class Vultu:
     display_name = "vultu"
     source_flag = "vultu"
     banned_groups: tuple[str, ...] = ()
+    banned_url = f"{api_url}/banned-groups"
+    banned_groups_response_key = "groups"
     upload_url = f"{api_url}/torrents"
     torrent_url = f"{base_url}/torrents/"
+    requests_url = f"{base_url}/pedidos"
     tracker_urls = ("vultu.org",)
-    supported_categories = ("MOVIE", "TV", "GAME")
+    supported_categories = ("MOVIE", "TV", "GAME", "MUSIC")
     allows_bloated_audio = True
 
     min_screenshots = 3
     max_screenshots = 6
     max_name_length = 255
     max_nfo_size = 64 * 1024
+    # BBCode notes are converted to Markdown by the site; the raw text may be this long.
+    max_bbcode_notes_length = 131072
     max_duplicate_pages = 5
 
     def __init__(self, config: Config) -> None:
@@ -73,11 +81,38 @@ class Vultu:
     def _tmdb_kind(meta: Meta) -> str:
         return "tv" if str(meta.category).upper() == "TV" else "movie"
 
+    @staticmethod
+    def _music_release(meta: Meta) -> dict[str, Any]:
+        return cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
+
+    @classmethod
+    def _music_work(cls, meta: Meta) -> str:
+        """Return the album as MusicBrainz release group, MusicBrainz release, Discogs master or Discogs release."""
+        external_ids_raw = cls._music_release(meta).get("external_ids")
+        external_ids = cast(dict[str, Any], external_ids_raw) if isinstance(external_ids_raw, dict) else {}
+        mbid = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", re.IGNORECASE)
+        group = str(external_ids.get("musicbrainz_release_group") or "").strip()
+        if mbid.fullmatch(group):
+            return f"musicbrainz:release-group:{group.lower()}"
+        release = str(external_ids.get("musicbrainz_release") or "").strip()
+        if mbid.fullmatch(release):
+            return f"musicbrainz:release:{release.lower()}"
+        if meta.music_discogs_enabled:
+            master = str(external_ids.get("discogs_master") or meta.music_discogs_master_id or "").strip()
+            if master.isdecimal():
+                return f"discogs:master:{master}"
+            discogs_release = str(external_ids.get("discogs_release") or meta.music_discogs_release_id or meta.music_discogs_id or "").strip()
+            if discogs_release.isdecimal():
+                return f"discogs:release:{discogs_release}"
+        return ""
+
     async def get_work(self, meta: Meta) -> str:
-        """Return Vultu's work identifier (tmdb:movie:ID, tmdb:tv:ID or igdb:ID)."""
+        """Return Vultu's work identifier (tmdb:movie:ID, tmdb:tv:ID, igdb:ID or a MusicBrainz/Discogs album)."""
         category = str(meta.category).upper()
         if category == "GAME":
             return f"igdb:{meta.igdb_id}" if meta.igdb_id else ""
+        if category == "MUSIC":
+            return self._music_work(meta)
 
         tmdb_id = meta.tmdb or meta.tmdb_id
         if tmdb_id:
@@ -102,22 +137,56 @@ class Vultu:
         match = re.fullmatch(r"S(\d+)", str(meta.season or "").strip(), re.IGNORECASE)
         return int(match.group(1)) if match else None
 
+    @classmethod
+    def _music_encoding(cls, meta: Meta) -> str:
+        """Return the lossy encoding (V0, 320...) that Vultu's music names carry after the format."""
+        raw_tracks = cls._music_release(meta).get("tracks")
+        tracks = [cast(dict[str, Any], track) for track in cast(list[Any], raw_tracks) if isinstance(track, dict)] if isinstance(raw_tracks, list) else []
+        if not tracks:
+            return ""
+        presets = {lame_preset(str(track.get("encoder_settings") or "")) for track in tracks}
+        if len(presets) == 1 and (preset := next(iter(presets))):
+            # "V0 (VBR)" is written as "V0" in the release name.
+            return preset.split()[0]
+        if all(track.get("bitrate_mode") in {"CBR", "ABR"} for track in tracks):
+            average = round(sum(int(track.get("bitrate") or 0) for track in tracks) / len(tracks) / 1000)
+            return str(average) if average else ""
+        return ""
+
+    def _music_name(self, meta: Meta) -> str:
+        """Artist - Album Year Media Format Encoding-GROUP; lossless keeps the bit depth and rate already in the name."""
+        name = str(meta.name or "").strip()
+        tag = str(meta.tag or "").strip()
+        if not tag or not name.endswith(tag):
+            tag = ""
+        base = name[: len(name) - len(tag)].rstrip()
+        words = base.split()
+        # Lossless names end with the sample rate ("44.1 kHz"); only lossy names end with the codec.
+        if not words or words[-1].upper() in {"FLAC", "ALAC", "KHZ"} or not (encoding := self._music_encoding(meta)):
+            return name
+        return f"{base} {encoding}{tag}"
+
     async def get_name(self, meta: Meta) -> str:
+        if str(meta.category).upper() == "MUSIC":
+            return (meta.manual_name or self._music_name(meta)).strip()
         # Vultu follows the same naming as CapybaraBR.
         cbr = CapybaraBR(self.config)
         cbr.tracker = self.tracker
         return (await cbr.get_name(meta))["name"].strip()
 
     def _screenshot_urls(self, meta: Meta) -> list[str]:
+        # In Music the screenshots field holds the track spectrograms.
+        images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images" if str(meta.category).upper() == "MUSIC" else "screenshots")
         urls: list[str] = []
-        for image in meta.image_list:
-            raw_url = image.get("raw_url") if isinstance(image, dict) else None
+        for image in images:
+            raw_url = image.get("raw_url")
             if isinstance(raw_url, str) and raw_url.startswith("https://") and raw_url not in urls:
                 urls.append(raw_url)
         return urls[: self.max_screenshots]
 
     async def get_mediainfo(self, meta: Meta) -> str:
-        if str(meta.category).upper() == "GAME":
+        # Vultu discards MediaInfo for games and music.
+        if str(meta.category).upper() in ("GAME", "MUSIC"):
             return ""
         tmp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         if meta.is_disc == "BDMV":
@@ -132,6 +201,29 @@ class Vultu:
             return ""
         async with aiofiles.open(mi_path, encoding="utf-8") as mi_file:
             return await mi_file.read()
+
+    async def get_notes(self, meta: Meta) -> str:
+        """Build the release notes in BBCode; Vultu converts them to its Markdown (notes_format=bbcode).
+
+        The site drops images and videos from the notes, and MediaInfo, NFO, screenshots and music
+        spectrograms have their own fields, so those sections are left out.
+        """
+        builder = DescriptionBuilder(self.tracker, self.config)
+        notes = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=False,
+            logo=False,
+            mediainfo=False,
+            menu_screenshots=False,
+            nfo=False,
+            screenshots=False,
+            tonemapped_header=False,
+        )
+        notes = notes.strip()
+        if len(notes) > self.max_bbcode_notes_length:
+            logger.warning(f"{self.tracker}: [yellow]Release notes are longer than {self.max_bbcode_notes_length} characters and will not be sent.[/yellow]")
+            return ""
+        return notes
 
     async def get_nfo(self, meta: Meta) -> tuple[str, bytes, str] | None:
         nfo_files = sorted((Path(meta.base_dir) / "tmp" / meta.uuid).glob("*.nfo"))
@@ -151,6 +243,10 @@ class Vultu:
 
         if category == "GAME" and not meta.igdb_id:
             logger.warning(f"{self.tracker}: [red]Games must be linked to an IGDB entry.[/red]")
+            return False
+
+        if category == "MUSIC" and not self._music_work(meta):
+            logger.warning(f"{self.tracker}: [red]Music must be linked to a MusicBrainz or Discogs album.[/red]")
             return False
 
         if category in ("MOVIE", "TV"):
@@ -203,8 +299,42 @@ class Vultu:
 
         return dupes
 
+    async def get_requests(self, meta: Meta) -> list[dict[str, str]]:
+        """Show the open requests for this work; filling them is left to the user on the site."""
+        if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
+            return []
+        try:
+            work = await self.get_work(meta)
+            if not work:
+                return []
+            async with httpx.AsyncClient(headers=self._headers(meta), timeout=30.0) as client:
+                response = await client.get(f"{self.api_url}/requests", params={"status": "open", "work": work})
+        except (httpx.HTTPError, RuntimeError) as e:
+            logger.info(f"{self.tracker}: Unable to search requests: {e}", extra={"markup": False})
+            return []
+        if response.status_code != 200:
+            logger.info(f"{self.tracker}: Unable to search requests: {self._error_message(response)}", extra={"markup": False})
+            return []
+
+        season = self._season_number(meta)
+        results: list[dict[str, str]] = []
+        for item in cast(list[dict[str, Any]], cast(dict[str, Any], response.json()).get("requests") or []):
+            # A request is for one season at a time; a different season cannot be filled by this upload.
+            if season is not None and item.get("season") is not None and item.get("season") != season:
+                continue
+            results.append(
+                {"Name": str(item.get("title") or ""), "Reward": str(item.get("bounty") or ""), "Link": str(item.get("url") or f"{self.requests_url}/{item.get('id')}")}
+            )
+
+        if results:
+            message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+            for result in results:
+                message += f"[bold green]Nome:[/bold green] {result['Name']}\n[bold green]Recompensa:[/bold green] {result['Reward']}\n[bold green]Link:[/bold green] {result['Link']}\n\n"
+            logger.info(message)
+        return results
+
     async def get_data(self, meta: Meta, work: str, preview: bool = False) -> dict[str, Any]:
-        """Build the upload form; a ``preview`` leaves out the screenshots and MediaInfo."""
+        """Build the upload form; a ``preview`` leaves out the screenshots, MediaInfo and release notes."""
         anon = bool(meta.anon) or bool(self.tracker_config.get("anon", False))
         data: dict[str, Any] = {
             "work": work,
@@ -216,15 +346,25 @@ class Vultu:
             return data
         if screenshots := self._screenshot_urls(meta):
             data["screenshots"] = screenshots
+            if str(meta.category).upper() != "MUSIC":
+                # Shown on the site only when the MediaInfo says the video is HDR.
+                data["tonemapped"] = "true" if meta.tonemapped else "false"
         if mediainfo := await self.get_mediainfo(meta):
             data["mediainfo"] = mediainfo
+        if notes := await self.get_notes(meta):
+            data["notes"] = notes
+            data["notes_format"] = "bbcode"
         return data
 
     async def get_payload_preview(self, meta: Meta) -> payload_preview.TrackerPreview:
         """The upload form as it is known before screenshots, for the Web UI to show and edit."""
-        deferred = {"screenshots": "Uploaded after this question", "mediainfo": "Read from the MediaInfo report at upload time"}
+        deferred = {
+            "screenshots": "Uploaded after this question",
+            "mediainfo": "Read from the MediaInfo report at upload time",
+            "notes": payload_preview.DESCRIPTION_NOTE,
+        }
         # Without a TMDB or IGDB ID the work is looked up on Vultu, which only happens at upload time.
-        if str(meta.category).upper() == "GAME" or meta.tmdb or meta.tmdb_id:
+        if str(meta.category).upper() in ("GAME", "MUSIC") or meta.tmdb or meta.tmdb_id:
             work = await self.get_work(meta)
         else:
             work = ""
@@ -243,7 +383,7 @@ class Vultu:
 
         work = await self.get_work(meta)
         if not work:
-            tracker_status["status_message"] = "data error: Could not determine the TMDB/IGDB work required by Vultu."
+            tracker_status["status_message"] = "data error: Could not determine the TMDB/IGDB/MusicBrainz/Discogs work required by Vultu."
             return False
 
         data = payload_preview.apply_payload_edits(meta, self.tracker, await self.get_data(meta, work))
