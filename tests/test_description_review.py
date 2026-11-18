@@ -64,7 +64,7 @@ def test_webui_description_api_saves_an_execution_scoped_override(tmp_path, monk
 
         response = client.put(
             "/api/execution_description",
-            json={"session_id": "session", "content": "edited text", "version": 0},
+            json={"session_id": "session", "media_id": "release", "content": "edited text", "version": 0},
             headers={"Origin": "http://localhost"},
         )
 
@@ -91,23 +91,51 @@ def test_webui_description_api_rejects_stale_save_and_reset_versions(tmp_path, m
     with server.app.test_client() as client:
         saved = client.put(
             "/api/execution_description",
-            json={"session_id": "session", "content": "first edit", "version": 0},
+            json={"session_id": "session", "media_id": "release", "content": "first edit", "version": 0},
             headers=headers,
         )
         stale_save = client.put(
             "/api/execution_description",
-            json={"session_id": "session", "content": "stale edit", "version": 0},
+            json={"session_id": "session", "media_id": "release", "content": "stale edit", "version": 0},
             headers=headers,
         )
         stale_reset = client.post(
             "/api/execution_description/reset",
-            json={"session_id": "session", "source_key": "description", "version": 0},
+            json={"session_id": "session", "media_id": "release", "source_key": "description", "version": 0},
             headers=headers,
         )
 
     assert saved.status_code == 200
     assert stale_save.status_code == 409
     assert stale_reset.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "endpoint,method,body",
+    [
+        ("/api/execution_description", "put", {"content": "text for the previous item"}),
+        ("/api/execution_description/reset", "post", {"source_key": "description"}),
+    ],
+)
+@pytest.mark.parametrize("media_id,status", [("previous-item", 409), (None, 400)])
+def test_webui_description_writes_must_target_the_current_item(tmp_path, monkeypatch, endpoint, method, body, media_id, status):
+    temp_dir = tmp_path / "current-item"
+    temp_dir.mkdir()
+    meta = {"uuid": "current-item", "description": "tracker text"}
+    meta_file = temp_dir / "meta.json"
+    meta_file.write_text(json.dumps(meta), encoding="utf-8")
+    monkeypatch.setattr(webui_preview, "_resolve_execution_description_review", lambda _session_id: (temp_dir, meta_file, dict(meta)))
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    payload = {"session_id": "session", "version": 0, **body}
+    if media_id is not None:
+        payload["media_id"] = media_id
+
+    with server.app.test_client() as client:
+        response = getattr(client, method)(endpoint, json=payload, headers={"Origin": "http://localhost"})
+
+    assert response.status_code == status
+    assert sorted(path.name for path in temp_dir.iterdir()) == ["meta.json"]
 
 
 def test_base_description_is_kept_in_meta_without_creating_description_file(tmp_path):

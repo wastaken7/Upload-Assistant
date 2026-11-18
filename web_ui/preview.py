@@ -371,16 +371,15 @@ def _read_execution_preview_meta_file(meta_file: Path) -> Mapping[str, object] |
         return None
 
 
-def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
-    process_info = session_state_mod.active_processes.get(session_id, {})
-    execution_path = _stringify_preview_value(process_info.get("path"))
-    if not execution_path:
-        return "", None, None
+_PREVIEW_META_RESOLVE_ATTEMPTS = 3
 
+
+def _read_preview_meta_for_target(execution_path: str, known_uuid: str) -> tuple[Path | None, Mapping[str, object] | None, str]:
+    """Read one target's metadata; return the file, its data and the UUID to cache."""
     base_tmp_dir = context_mod.STATE_DIR / "tmp"
     alias_meta_file = base_tmp_dir / Path(execution_path).name / "meta.json"
     alias_meta = _read_execution_preview_meta_file(alias_meta_file) if alias_meta_file.exists() else None
-    meta_uuid = _stringify_preview_value(process_info.get("meta_uuid"))
+    meta_uuid = known_uuid
     if not meta_uuid and alias_meta is not None:
         meta_uuid = _stringify_preview_value(alias_meta.get("uuid"))
 
@@ -388,15 +387,41 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
         canonical_meta_file = base_tmp_dir / meta_uuid / "meta.json"
         canonical_meta = _read_execution_preview_meta_file(canonical_meta_file) if canonical_meta_file.exists() else None
         if canonical_meta is not None:
-            process_info["meta_uuid"] = meta_uuid
-            return execution_path, canonical_meta_file, canonical_meta
+            return canonical_meta_file, canonical_meta, meta_uuid
 
     if alias_meta is not None:
-        alias_uuid = _stringify_preview_value(alias_meta.get("uuid"))
-        if alias_uuid:
-            process_info["meta_uuid"] = alias_uuid
-        return execution_path, alias_meta_file, alias_meta
+        return alias_meta_file, alias_meta, _stringify_preview_value(alias_meta.get("uuid"))
 
+    return None, None, ""
+
+
+def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
+    execution_path = ""
+    for _attempt in range(_PREVIEW_META_RESOLVE_ATTEMPTS):
+        # Snapshot the target, read its files without the lock, then cache the
+        # UUID only if a queue advance has not moved the target meanwhile.
+        with session_state_mod.active_processes_lock:
+            process_info = session_state_mod.active_processes.get(session_id)
+            if process_info is None:
+                return "", None, None
+            execution_path = _stringify_preview_value(process_info.get("path"))
+            known_uuid = _stringify_preview_value(process_info.get("meta_uuid"))
+        if not execution_path:
+            return "", None, None
+
+        meta_file, meta_data, uuid_to_cache = _read_preview_meta_for_target(execution_path, known_uuid)
+
+        with session_state_mod.active_processes_lock:
+            target_unchanged = (
+                session_state_mod.active_processes.get(session_id) is process_info
+                and _stringify_preview_value(process_info.get("path")) == execution_path
+                and _stringify_preview_value(process_info.get("meta_uuid")) == known_uuid
+            )
+            if target_unchanged:
+                if uuid_to_cache:
+                    process_info["meta_uuid"] = uuid_to_cache
+                return execution_path, meta_file, meta_data
+    # The target kept moving; report no metadata rather than a previous item's.
     return execution_path, None, None
 
 

@@ -47,6 +47,8 @@ from web_ui.session_state import (
 
 SESSION_EVENT_LOG_MAX_BYTES = 4 * 1024 * 1024
 SESSION_KEEPALIVE_SECONDS = 1.0
+# How long the pump keeps reading after the upload exits while a pipe stays open.
+READER_DRAIN_GRACE_SECONDS = 2.0
 FINISHED_SESSION_TTL_SECONDS = 24 * 60 * 60
 SESSION_LABEL_MAX_LENGTH = 200
 
@@ -183,7 +185,9 @@ def _start_scheduled_sessions() -> None:
         with active_processes_lock:
             busy = sum(1 for info in session_state_mod.active_processes.values() if _session_is_running(info) and not info.get("scheduled"))
             waiting = sorted(
-                ((key, info) for key, info in session_state_mod.active_processes.items() if info.get("scheduled") and _session_is_running(info)),
+                # A scheduled entry is registered before its launch command is
+                # stored; execute_command calls this again once it is set.
+                ((key, info) for key, info in session_state_mod.active_processes.items() if info.get("scheduled") and "launch" in info and _session_is_running(info)),
                 key=lambda item: float(cast(float, item[1].get("scheduled_at") or 0)),
             )
             if busy >= MAX_CONCURRENT_SESSIONS or not waiting:
@@ -452,7 +456,20 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
         prompt_timed_out = False
         orphaned = False
 
-        while process.poll() is None or not output_queue.empty():
+        exited_with_open_pipe_at: float | None = None
+        while True:
+            # Process exit does not mean its pipes are drained: keep reading
+            # until both readers reach EOF. A descendant that inherited the
+            # pipe can hold it open, so only wait a bounded grace period.
+            if process.poll() is not None:
+                readers_done = not stdout_thread.is_alive() and (stderr_thread is None or not stderr_thread.is_alive())
+                if output_queue.empty():
+                    if readers_done:
+                        break
+                    if exited_with_open_pipe_at is None:
+                        exited_with_open_pipe_at = time.monotonic()
+                    elif time.monotonic() - exited_with_open_pipe_at >= READER_DRAIN_GRACE_SECONDS:
+                        break
             if not prompt_timed_out and _unanswered_prompt_expired(process_state):
                 prompt_timed_out = True
                 minutes = float(cast(float, process_state["prompt_timeout"])) / 60

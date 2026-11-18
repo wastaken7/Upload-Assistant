@@ -219,6 +219,18 @@ def execution_description():
     )
 
 
+def _description_item_error(payload: dict[str, object], meta_data: dict[str, object]) -> tuple[_ResponseLike, int] | None:
+    """Refuse a description write made for a queue item that is no longer current."""
+    requested_item = _stringify_preview_value(payload.get("media_id"))
+    if not requested_item:
+        return jsonify({"success": False, "error": "Description item is required"}), 400
+    # The description panel exists only for items with a release UUID, which is
+    # the media_id /api/execution_preview reports for them.
+    if requested_item != _stringify_preview_value(meta_data.get("uuid")):
+        return jsonify({"success": False, "error": "The upload moved on to another item"}), 409
+    return None
+
+
 @bp.route("/api/execution_description", methods=["PUT"])
 @limiter.limit("600 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def save_execution_description():
@@ -242,7 +254,10 @@ def save_execution_description():
     if not isinstance(requested_version, int):
         return jsonify({"success": False, "error": "Description version is required"}), 400
 
-    temp_dir, _meta_file, _meta_data = resolved
+    temp_dir, _meta_file, meta_data = resolved
+    item_error = _description_item_error(payload, meta_data)
+    if item_error is not None:
+        return item_error
     try:
         # save_review holds the execution's file lock while it checks the version and
         # writes, so the compare-and-swap also covers the upload process's own writes.
@@ -273,6 +288,9 @@ def reset_execution_description():
     from src.description_review import ReviewConflictError, save_review, source_items
 
     temp_dir, _meta_file, meta_data = resolved
+    item_error = _description_item_error(payload, meta_data)
+    if item_error is not None:
+        return item_error
     source = next((item for item in source_items(meta_data) if item["key"] == source_key), None)
     if source is None:
         return jsonify({"success": False, "error": "Description source was not found"}), 404

@@ -36,6 +36,7 @@ from web_ui.session_state import (
     _debug_process_snapshot,
     _discard_session_state,
     _execution_conflict_locked,
+    _execution_path_held_elsewhere,
     _make_process_state,
     _session_is_running,
     _set_process_awaiting_input,
@@ -468,7 +469,9 @@ def execute_command():
                         if process_state is not None:
                             _discard_session_state(session_id, process_state)
             finally:
-                if not handed_off and validated_path:
+                # A refused request must not release a queue that another
+                # session (for example the one it conflicted with) still uses.
+                if not handed_off and validated_path and not _execution_path_held_elsewhere(validated_path, process_state):
                     sessions_mod._remove_session_queue_file(validated_path)
 
         return Response(generate(), mimetype="text/event-stream")
@@ -584,10 +587,11 @@ def kill_process():
             # Keep the session available for another Kill attempt if the
             # process tree could not be terminated.
             # Attempt to join reader threads if present
+            # Use the state this request killed: the session id can already
+            # belong to a replacement upload.
             with contextlib.suppress(Exception):
-                info = session_state_mod.active_processes.get(session_id, {})
-                stdout_t = info.get("stdout_thread")
-                stderr_t = info.get("stderr_thread")
+                stdout_t = process_info.get("stdout_thread")
+                stderr_t = process_info.get("stderr_thread")
                 if isinstance(stdout_t, threading.Thread):
                     console.print(f"Joining stdout thread for session {session_id}", markup=False)
                     stdout_t.join(timeout=1)
@@ -597,7 +601,7 @@ def kill_process():
 
             if terminated:
                 with contextlib.suppress(Exception):
-                    session_state_mod.active_processes.pop(session_id, None)
+                    _discard_session_state(session_id, process_info)
 
         if not terminated:
             return jsonify({"error": "Failed to terminate process tree", "success": False}), 500
