@@ -415,7 +415,7 @@ def test_replacing_a_scheduled_session_releases_it(start_session, tmp_path, monk
     assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]
     replaced = webui_session_state.active_processes["reused-id"]
     released: list[str] = []
-    monkeypatch.setattr(webui_sessions, "_remove_session_queue_file", released.append)
+    monkeypatch.setattr(webui_sessions, "_release_session_queue_file", lambda path, _owner: released.append(path))
     monkeypatch.setattr(webui_session_state, "_execution_item_paths", lambda _path: [str(tmp_path / "Fictional Other 2024")])
     monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Other 2024"))
     replaced["execution_path"] = str(tmp_path / "webui_queue_old.txt")

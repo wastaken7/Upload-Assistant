@@ -35,6 +35,7 @@ from web_ui.session_state import (
     MAX_SCHEDULED_SESSIONS,
     _debug_process_snapshot,
     _discard_session_state,
+    _discard_session_state_locked,
     _execution_conflict_locked,
     _make_process_state,
     _session_is_running,
@@ -216,6 +217,15 @@ def save_queue():
         return jsonify({"error": "Error saving queue file", "success": False}), 500
 
 
+def _release_reservation(session_id: str, process_state: dict[str, object] | None) -> None:
+    """Drop a reservation that will not launch and let a scheduled upload use its slot."""
+    if process_state is not None:
+        with contextlib.suppress(Exception):
+            _discard_session_state(session_id, process_state)
+    with contextlib.suppress(Exception):
+        _start_scheduled_sessions()
+
+
 @bp.route("/api/execute", methods=["POST", "OPTIONS"])
 @limiter.limit("100 per hour", key_func=_rate_limit_key_func)
 def execute_command():
@@ -387,7 +397,7 @@ def execute_command():
                         # queue file (unless reused here) and end its listeners.
                         existing_path = str(existing.get("execution_path") or "")
                         if existing_path and os.path.normcase(os.path.realpath(existing_path)) != os.path.normcase(os.path.realpath(validated_path)):
-                            sessions_mod._remove_session_queue_file(existing_path)
+                            sessions_mod._release_session_queue_file(existing_path, existing)
                         if "events_cond" in existing:
                             _finish_session(existing, None)
 
@@ -407,7 +417,7 @@ def execute_command():
                     with _generated_queues_lock:
                         queue_hash = paths_mod._generated_queues.get(os.path.normcase(os.path.realpath(validated_path)))
                     if queue_hash is None:
-                        _discard_session_state(session_id, process_state)
+                        _release_reservation(session_id, process_state)
                         yield _sse({"type": "error", "data": "WebUI queue expired; select the paths again"})
                         return
                     env[QUEUE_ENV] = validated_path
@@ -439,7 +449,7 @@ def execute_command():
                         raise ValueError("Invalid script path")
                 except Exception as err:
                     console.print(f"Refusing to run unsafe command: {err}", markup=False)
-                    _discard_session_state(session_id, process_state)
+                    _release_reservation(session_id, process_state)
                     yield _sse({"type": "error", "data": "Unsafe execution request"})
                     return
 
@@ -449,8 +459,10 @@ def execute_command():
                     # tab watches /api/sessions instead of holding a stream open.
                     handed_off = True
                     console.print(f"Scheduled upload session {session_id}", markup=False)
-                    yield _sse({"type": "scheduled"})
+                    # Wake the scheduler first: the client may close the response
+                    # at the yield, and this generator would never resume.
                     _start_scheduled_sessions()
+                    yield _sse({"type": "scheduled"})
                     return
 
                 _launch_session(session_id, process_state)
@@ -463,13 +475,15 @@ def execute_command():
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
                 console.print(traceback.format_exc(), markup=False)
                 if not handed_off:
+                    # Release the reservation before yielding: the client may
+                    # close the response there.
+                    _release_reservation(session_id, process_state)
                     yield _sse({"type": "error", "data": "Execution error"})
-                    with contextlib.suppress(Exception):
-                        if process_state is not None:
-                            _discard_session_state(session_id, process_state)
             finally:
+                # A refused request must not release a queue that another
+                # session (for example the one it conflicted with) still uses.
                 if not handed_off and validated_path:
-                    sessions_mod._remove_session_queue_file(validated_path)
+                    sessions_mod._release_session_queue_file(validated_path, process_state)
 
         return Response(generate(), mimetype="text/event-stream")
 
@@ -558,20 +572,22 @@ def kill_process():
             if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
                 return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
 
-        if session_id not in session_state_mod.active_processes:
+        # One lookup, and the no-handle decision under the same lock that
+        # _launch_session holds while it publishes the handle.
+        with active_processes_lock:
+            process_info = session_state_mod.active_processes.get(session_id)
+            process = process_info.get("process") if process_info is not None else None
+            if process_info is not None and process is None:
+                # Kill can race with startup after the session has been registered
+                # but before Popen returns. Removing this state makes the launcher
+                # terminate the controller immediately if it does start. A scheduled
+                # upload is cancelled the same way and its queue file is released.
+                _discard_session_state_locked(session_id, process_info)
+        if process_info is None:
             return jsonify({"error": "No active process", "success": False}), 404
-
-        process_info = session_state_mod.active_processes[session_id]
-        # Retrieve subprocess handle
-        process = process_info.get("process")
         if process is None:
-            # Kill can race with startup after the session has been registered
-            # but before Popen returns. Removing this state makes the launcher
-            # terminate the controller immediately if it does start. A scheduled
-            # upload is cancelled the same way and its queue file is released.
-            _discard_session_state(session_id, process_info)
             if process_info.get("scheduled"):
-                sessions_mod._remove_session_queue_file(str(process_info.get("execution_path") or ""))
+                sessions_mod._release_session_queue_file(str(process_info.get("execution_path") or ""), process_info)
             return jsonify({"success": True, "message": "Execution startup cancelled"})
 
         terminated = False
@@ -584,10 +600,11 @@ def kill_process():
             # Keep the session available for another Kill attempt if the
             # process tree could not be terminated.
             # Attempt to join reader threads if present
+            # Use the state this request killed: the session id can already
+            # belong to a replacement upload.
             with contextlib.suppress(Exception):
-                info = session_state_mod.active_processes.get(session_id, {})
-                stdout_t = info.get("stdout_thread")
-                stderr_t = info.get("stderr_thread")
+                stdout_t = process_info.get("stdout_thread")
+                stderr_t = process_info.get("stderr_thread")
                 if isinstance(stdout_t, threading.Thread):
                     console.print(f"Joining stdout thread for session {session_id}", markup=False)
                     stdout_t.join(timeout=1)
@@ -597,7 +614,7 @@ def kill_process():
 
             if terminated:
                 with contextlib.suppress(Exception):
-                    session_state_mod.active_processes.pop(session_id, None)
+                    _discard_session_state(session_id, process_info)
 
         if not terminated:
             return jsonify({"error": "Failed to terminate process tree", "success": False}), 500
