@@ -32,7 +32,7 @@ class VideoNameRules:
     """How a tracker's naming guide differs from the shared Blutopia-style video template."""
 
     # Where a foreign-language label goes when no English audio exists ("" disables it).
-    language_slot: Literal["", "before_cut", "before_resolution"] = ""
+    language_slot: Literal["", "before_cut", "before_resolution", "before_audio"] = ""
     # Dual-Audio only for a non-English original plus an English dub (Blutopia-style Dub rule).
     english_dub_only: bool = False
     # Keep MULTI for three or more languages instead of folding it into Dual-Audio.
@@ -124,6 +124,8 @@ async def build_video_name(meta: Meta, rules: VideoNameRules, tracker: str, comp
 
     language = "" if is_disc or not rules.language_slot else await get_language_label(meta, tracker)
     audio = await _get_audio(meta, parts.audio, rules)
+    if rules.language_slot == "before_audio":
+        audio = f"{language} {audio}"
     cut = _cut_from_edition(parts.edition, rules)
     resolution = "" if dvd_sourced and not rules.dvd_resolution else parts.resolution
     hybrid = "" if name_type == "WEBDL" and not rules.hybrid_on_webdl else parts.hybrid
