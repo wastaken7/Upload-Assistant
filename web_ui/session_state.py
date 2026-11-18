@@ -102,13 +102,12 @@ def _set_process_progress_if_current(session_id: str, process_state: Mapping[str
         _apply_progress_event(current_state, event)
 
 
-def _progress_items_for_process(process_info: Mapping[str, object]) -> list[dict[str, object]]:
-    items: list[dict[str, object]] = []
-    with active_processes_lock:
-        progress_map_obj = process_info.get("progress")
-        if not _is_str_dict(progress_map_obj):
-            return []
-        items.extend(dict(value) for value in progress_map_obj.values() if _is_str_dict(value))
+def _progress_items_locked(process_info: Mapping[str, object]) -> list[dict[str, object]]:
+    """Copy a process's progress records; the caller holds active_processes_lock."""
+    progress_map_obj = process_info.get("progress")
+    if not _is_str_dict(progress_map_obj):
+        return []
+    items = [dict(value) for value in progress_map_obj.values() if _is_str_dict(value)]
     items.sort(key=lambda item: (0 if str(item.get("status", "")) == "running" else 1, str(item.get("id", ""))))
     return items
 

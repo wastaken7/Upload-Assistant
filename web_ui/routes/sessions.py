@@ -387,7 +387,7 @@ def execute_command():
                         # queue file (unless reused here) and end its listeners.
                         existing_path = str(existing.get("execution_path") or "")
                         if existing_path and os.path.normcase(os.path.realpath(existing_path)) != os.path.normcase(os.path.realpath(validated_path)):
-                            sessions_mod._remove_session_queue_file(existing_path)
+                            sessions_mod._release_session_queue_file(existing_path, existing)
                         if "events_cond" in existing:
                             _finish_session(existing, None)
 
@@ -470,6 +470,9 @@ def execute_command():
                     with contextlib.suppress(Exception):
                         if process_state is not None:
                             _discard_session_state(session_id, process_state)
+                    # The released slot may let a scheduled upload start.
+                    with contextlib.suppress(Exception):
+                        _start_scheduled_sessions()
                     yield _sse({"type": "error", "data": "Execution error"})
             finally:
                 # A refused request must not release a queue that another
@@ -564,10 +567,11 @@ def kill_process():
             if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
                 return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
 
-        if session_id not in session_state_mod.active_processes:
+        # One lookup: a concurrent Kill can remove the session after a membership check.
+        with active_processes_lock:
+            process_info = session_state_mod.active_processes.get(session_id)
+        if process_info is None:
             return jsonify({"error": "No active process", "success": False}), 404
-
-        process_info = session_state_mod.active_processes[session_id]
         # Retrieve subprocess handle
         process = process_info.get("process")
         if process is None:

@@ -8,6 +8,7 @@ import os
 import queue
 import threading
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -94,6 +95,28 @@ def test_scheduler_skips_an_entry_whose_launch_is_not_stored_yet(isolated_sessio
     assert launched == ["waiting"]
 
 
+def test_launch_stops_the_controller_when_the_pump_cannot_start(isolated_sessions, monkeypatch):
+    state = _registered_state("tab", "/media/Fictional Item")
+    state["launch"] = (["upload"], Path("/state"), {})
+    process = ExitedProcess()
+    terminated: list[object] = []
+
+    class FailingThread:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", lambda proc: terminated.append(proc) or True)
+    monkeypatch.setattr(webui_sessions, "threading", types.SimpleNamespace(Thread=FailingThread))
+
+    with pytest.raises(RuntimeError):
+        webui_sessions._launch_session("tab", state)
+    assert terminated == [process]
+
+
 def test_kill_keeps_a_replacement_session_registered_under_the_same_id(isolated_sessions, monkeypatch):
     killed = _registered_state("tab", "/media/Fictional Item")
     killed["process"] = ExitedProcess()
@@ -173,16 +196,32 @@ def test_preview_reports_nothing_when_the_target_keeps_moving(isolated_sessions,
     assert webui_preview._resolve_execution_preview_meta("tab") == ("", None, None)
 
 
-def test_alias_metadata_does_not_replace_the_published_uuid(tmp_path, monkeypatch):
+def test_alias_metadata_of_another_release_is_not_used(tmp_path, monkeypatch):
     monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
     alias_dir = tmp_path / "tmp" / "Fictional Item"
     alias_dir.mkdir(parents=True)
     (alias_dir / "meta.json").write_text(json.dumps({"uuid": "older-uuid"}), encoding="utf-8")
 
-    _meta_file, meta, uuid_to_cache = webui_preview._read_preview_meta_for_target("/media/Fictional Item", "published-uuid")
+    # The published UUID's own metadata is not written yet.
+    assert webui_preview._read_preview_meta_for_target("/media/Fictional Item", "published-uuid") == (None, None, "")
 
+    # The alias is still used when it belongs to the published release.
+    _meta_file, meta, uuid_to_cache = webui_preview._read_preview_meta_for_target("/media/Fictional Item", "older-uuid")
     assert meta is not None and meta["uuid"] == "older-uuid"
-    assert uuid_to_cache == "published-uuid"
+    assert uuid_to_cache == "older-uuid"
+
+
+def test_preview_status_comes_from_the_validated_target(isolated_sessions, monkeypatch):
+    state = _registered_state("tab", "/media/Fictional Item A")
+    state.update(awaiting_input=True, input_type="confirm", progress={"step": {"id": "step", "status": "running"}})
+    monkeypatch.setattr(webui_preview, "_read_preview_meta_for_target", lambda _path, _uuid: (Path("meta.json"), {"uuid": "uuid-a"}, "uuid-a"))
+
+    _path, _meta_file, _meta, status = webui_preview._resolve_execution_preview_target("tab")
+    # The live state moves on; the snapshot must not follow it.
+    state.update(awaiting_input=False, input_type=None)
+    state["progress"]["step"]["status"] = "done"
+
+    assert status == {"awaiting_input": True, "input_type": "confirm", "progress": [{"id": "step", "status": "running"}]}
 
 
 def _pump_with_timeout(state: dict[str, object], process: "ExitedProcess", timeout: float = 5.0) -> None:
@@ -211,6 +250,7 @@ def test_pump_reads_output_written_after_the_process_exited(isolated_sessions):
 
     assert "final summary line" in _logged_html(state)
     assert state["finished"] is True
+    assert state["exit_code"] == process.returncode
 
 
 def test_pump_stops_waiting_when_a_descendant_holds_the_pipe_open(isolated_sessions, monkeypatch):
@@ -223,28 +263,39 @@ def test_pump_stops_waiting_when_a_descendant_holds_the_pipe_open(isolated_sessi
 
     assert "before exit" in _logged_html(state)
     assert state["finished"] is True
+    assert state["exit_code"] == process.returncode
+
+
+class _SteppingClock:
+    """The real time module, except that each monotonic() call advances one second."""
+
+    def __init__(self) -> None:
+        self._now = 0.0
+
+    def monotonic(self) -> float:
+        self._now += 1.0
+        return self._now
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(time, name)
 
 
 def test_pump_stops_when_a_descendant_keeps_writing_after_exit(isolated_sessions, monkeypatch):
-    monkeypatch.setattr(webui_sessions, "READER_DRAIN_GRACE_SECONDS", 0.2)
+    # The clock passes the deadline within a few loop turns, while a large
+    # backlog keeps the output queue busy: the pump must still return without
+    # waiting for the queue to empty or for EOF.
+    monkeypatch.setattr(webui_sessions, "time", _SteppingClock())
+    monkeypatch.setattr(webui_sessions, "READER_DRAIN_GRACE_SECONDS", 0.5)
     state = _registered_state("tab", "/media/Fictional Item")
     process = ExitedProcess()
-    process.stdout.feed("before exit\n")
-    stop = threading.Event()
+    lines = 50_000
+    process.stdout.feed("noise\n" * lines)
 
-    def keep_writing() -> None:
-        while not stop.is_set():
-            process.stdout.feed("noise\n")
-            time.sleep(0.005)
+    _pump_with_timeout(state, process)
 
-    threading.Thread(target=keep_writing, daemon=True).start()
-    try:
-        _pump_with_timeout(state, process)
-    finally:
-        stop.set()
-
-    assert "before exit" in _logged_html(state)
+    assert _logged_html(state).count("noise") < lines
     assert state["finished"] is True
+    assert state["exit_code"] == process.returncode
 
 
 def test_pump_does_not_report_a_prompt_timeout_after_the_process_exited(isolated_sessions, monkeypatch):
@@ -257,6 +308,7 @@ def test_pump_does_not_report_a_prompt_timeout_after_the_process_exited(isolated
 
     assert "went unanswered" not in _logged_html(state)
     assert state["finished"] is True
+    assert state["exit_code"] == process.returncode
 
 
 def test_queue_release_keeps_a_queue_a_replacement_registered(isolated_sessions, tmp_path, monkeypatch):

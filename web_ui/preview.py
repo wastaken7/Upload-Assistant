@@ -12,7 +12,7 @@ from web_ui import session_state as session_state_mod
 from web_ui.context import console
 from web_ui.flask_compat import _is_obj_list, _is_obj_sequence, _is_str_mapping
 from web_ui.request_utils import _json_load_dict
-from web_ui.session_state import _progress_items_for_process, active_processes_lock
+from web_ui.session_state import active_processes_lock
 
 
 def _stringify_preview_value(value: object) -> str:
@@ -390,21 +390,24 @@ def _read_preview_meta_for_target(execution_path: str, known_uuid: str) -> tuple
             return canonical_meta_file, canonical_meta, meta_uuid
 
     if alias_meta is not None:
-        # Never let an alias file's UUID replace the one the active target published.
-        return alias_meta_file, alias_meta, known_uuid or _stringify_preview_value(alias_meta.get("uuid"))
+        alias_uuid = _stringify_preview_value(alias_meta.get("uuid"))
+        # An alias left by another release is not this target's metadata; wait
+        # until the published UUID's own metadata is readable.
+        if not known_uuid or alias_uuid == known_uuid:
+            return alias_meta_file, alias_meta, alias_uuid
 
     return None, None, ""
 
 
 def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
-    execution_path, meta_file, meta_data, _process_info = _resolve_execution_preview_target(session_id)
+    execution_path, meta_file, meta_data, _status = _resolve_execution_preview_target(session_id)
     return execution_path, meta_file, meta_data
 
 
 def _resolve_execution_preview_target(
     session_id: str,
 ) -> tuple[str, Path | None, Mapping[str, object] | None, dict[str, object]]:
-    """Resolve metadata together with the process state it was validated against."""
+    """Resolve metadata plus a prompt/progress snapshot taken when the target was validated."""
     for _attempt in range(_PREVIEW_META_RESOLVE_ATTEMPTS):
         # Snapshot the target, read its files without the lock, then cache the
         # UUID only if a queue advance has not moved the target meanwhile.
@@ -428,7 +431,13 @@ def _resolve_execution_preview_target(
             if target_unchanged:
                 if uuid_to_cache:
                     process_info["meta_uuid"] = uuid_to_cache
-                return execution_path, meta_file, meta_data, process_info
+                raw_input_type = process_info.get("input_type")
+                status: dict[str, object] = {
+                    "awaiting_input": bool(process_info.get("awaiting_input")),
+                    "input_type": raw_input_type if isinstance(raw_input_type, str) else None,
+                    "progress": session_state_mod._progress_items_locked(process_info),
+                }
+                return execution_path, meta_file, meta_data, status
     # The target kept moving; report nothing rather than a previous item's path.
     return "", None, None, {}
 
@@ -963,14 +972,16 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
 
 
 def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
-    # Status fields come from the same process that supplied the metadata.
-    execution_path, resolved_meta_file, resolved_meta, process_info = _resolve_execution_preview_target(session_id)
+    # Prompt and progress come from the snapshot taken with the metadata's target.
+    execution_path, resolved_meta_file, resolved_meta, status = _resolve_execution_preview_target(session_id)
     if not execution_path:
         return None
 
     execution_name = Path(execution_path).name
-    raw_input_type = process_info.get("input_type")
+    awaiting_input = bool(status.get("awaiting_input"))
+    raw_input_type = status.get("input_type")
     input_type = raw_input_type if isinstance(raw_input_type, str) else None
+    progress = cast(list[dict[str, object]], status.get("progress") or [])
     if resolved_meta_file is not None and resolved_meta is not None:
         try:
             meta_data: Mapping[str, object] = resolved_meta
@@ -986,9 +997,9 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
             if _stringify_preview_value(meta_data.get("category")).upper() == "MUSIC":
                 meta_data = {**meta_data, "webui_session_id": session_id}
             preview = _extract_execution_preview(meta_data, execution_path, session_id)
-            preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
+            preview["awaiting_input"] = awaiting_input
             preview["input_type"] = input_type
-            preview["progress"] = _progress_items_for_process(process_info)
+            preview["progress"] = progress
             return preview
         except Exception:  # noqa: S110
             pass
@@ -1041,9 +1052,9 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "developer": "",
         "music": empty_music,
         "detail_sections": [],
-        "awaiting_input": bool(process_info.get("awaiting_input")),
+        "awaiting_input": awaiting_input,
         "input_type": input_type,
-        "progress": _progress_items_for_process(process_info),
+        "progress": progress,
     }
 
 

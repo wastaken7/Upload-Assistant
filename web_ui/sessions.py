@@ -172,12 +172,20 @@ def _launch_session(session_id: str, process_state: dict[str, object]) -> None:
         processes_mod._terminate_process_tree(process)
         processes_mod._close_webui_process_io(process)
         raise RuntimeError("Execution session was replaced before subprocess startup completed")
-    threading.Thread(
-        target=_pump_session,
-        args=(session_id, process_state, process, process_mode),
-        name=f"webui-session-{session_id}",
-        daemon=True,
-    ).start()
+    try:
+        threading.Thread(
+            target=_pump_session,
+            args=(session_id, process_state, process, process_mode),
+            name=f"webui-session-{session_id}",
+            daemon=True,
+        ).start()
+    except BaseException:
+        # Without a pump nobody owns the controller; stop it before the caller
+        # releases the reservation and its queue.
+        with contextlib.suppress(Exception):
+            processes_mod._terminate_process_tree(process)
+        processes_mod._close_webui_process_io(process)
+        raise
 
 
 def _start_scheduled_sessions() -> None:
