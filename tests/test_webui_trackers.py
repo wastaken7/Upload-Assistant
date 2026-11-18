@@ -45,6 +45,20 @@ def test_invalid_manual_alias_does_not_hide_tracker_catalog(tmp_path, monkeypatc
     assert payload["tracker_aliases"]["BHD"] == "BEYONDHD"
 
 
+def test_catalog_links_bundled_tracker_icons(tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"TRACKERS": {}})
+    for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
+        monkeypatch.setattr(webui_security, guard, lambda: True)
+    with server.app.test_request_context("/api/trackers"):
+        payload = trackers_routes.get_trackers().get_json()
+    favicons = {tracker["name"]: tracker["favicon"] for tracker in payload["trackers"]}
+    assert favicons["AITHER"] == "/static/img/trackers/aither.png"
+    static_dir = Path(server.app.static_folder)
+    for url in filter(None, favicons.values()):
+        assert (static_dir / url.removeprefix("/static/")).is_file()
+
+
 def test_tracker_codebase_uses_registered_frameworks_only() -> None:
     for tracker_name, expected in (
         ("BLUTOPIA", "UNIT3D"),

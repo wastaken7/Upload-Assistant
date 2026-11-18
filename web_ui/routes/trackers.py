@@ -197,7 +197,7 @@ def get_trackers():
         tracker_config = trackers_section.get(tracker_name, {})
         api_key = str(tracker_config.get("api_key") or "").strip() if _is_str_mapping(tracker_config) else ""
         favicon_url = ""
-        static_dir = Path(__file__).parent / "static"
+        static_dir = Path(__file__).parent.parent / "static"
         for ext in ["png", "svg", "ico"]:
             local_path = static_dir / "img" / "trackers" / f"{tracker_name.lower()}.{ext}"
             if local_path.is_file():
