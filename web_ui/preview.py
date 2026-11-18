@@ -1,5 +1,6 @@
 """Execution preview extraction from upload metadata."""
 
+import os
 import re
 import urllib.parse
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -386,10 +387,10 @@ def _read_preview_meta_for_target(execution_path: str, known_uuid: str) -> tuple
     if meta_uuid:
         canonical_meta_file = base_tmp_dir / meta_uuid / "meta.json"
         canonical_meta = _read_execution_preview_meta_file(canonical_meta_file) if canonical_meta_file.exists() else None
-        if canonical_meta is not None:
+        if canonical_meta is not None and _preview_meta_matches_target(canonical_meta, execution_path):
             return canonical_meta_file, canonical_meta, meta_uuid
 
-    if alias_meta is not None:
+    if alias_meta is not None and _preview_meta_matches_target(alias_meta, execution_path):
         alias_uuid = _stringify_preview_value(alias_meta.get("uuid"))
         # An alias left by another release is not this target's metadata; wait
         # until the published UUID's own metadata is readable.
@@ -399,6 +400,17 @@ def _read_preview_meta_for_target(execution_path: str, known_uuid: str) -> tuple
     return None, None, ""
 
 
+def _preview_meta_matches_target(meta_data: Mapping[str, object], execution_path: str) -> bool:
+    """Reject metadata another item with the same basename (so the same tmp dir) left behind."""
+    meta_path = _stringify_preview_value(meta_data.get("path"))
+    if not meta_path:
+        return True
+    try:
+        return os.path.normcase(os.path.realpath(meta_path)) == os.path.normcase(os.path.realpath(execution_path))
+    except OSError, ValueError:
+        return False
+
+
 def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
     execution_path, meta_file, meta_data, _status = _resolve_execution_preview_target(session_id)
     return execution_path, meta_file, meta_data
@@ -406,8 +418,10 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
 
 def _resolve_execution_preview_target(
     session_id: str,
+    *,
+    with_status: bool = False,
 ) -> tuple[str, Path | None, Mapping[str, object] | None, dict[str, object]]:
-    """Resolve metadata plus a prompt/progress snapshot taken when the target was validated."""
+    """Resolve metadata; with_status adds a prompt/progress snapshot taken when the target was validated."""
     for _attempt in range(_PREVIEW_META_RESOLVE_ATTEMPTS):
         # Snapshot the target, read its files without the lock, then cache the
         # UUID only if a queue advance has not moved the target meanwhile.
@@ -431,12 +445,14 @@ def _resolve_execution_preview_target(
             if target_unchanged:
                 if uuid_to_cache:
                     process_info["meta_uuid"] = uuid_to_cache
-                raw_input_type = process_info.get("input_type")
-                status: dict[str, object] = {
-                    "awaiting_input": bool(process_info.get("awaiting_input")),
-                    "input_type": raw_input_type if isinstance(raw_input_type, str) else None,
-                    "progress": session_state_mod._progress_items_locked(process_info),
-                }
+                status: dict[str, object] = {}
+                if with_status:
+                    raw_input_type = process_info.get("input_type")
+                    status = {
+                        "awaiting_input": bool(process_info.get("awaiting_input")),
+                        "input_type": raw_input_type if isinstance(raw_input_type, str) else None,
+                        "progress": session_state_mod._progress_items_locked(process_info),
+                    }
                 return execution_path, meta_file, meta_data, status
     # The target kept moving; report nothing rather than a previous item's path.
     return "", None, None, {}
@@ -973,7 +989,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
 
 def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
     # Prompt and progress come from the snapshot taken with the metadata's target.
-    execution_path, resolved_meta_file, resolved_meta, status = _resolve_execution_preview_target(session_id)
+    execution_path, resolved_meta_file, resolved_meta, status = _resolve_execution_preview_target(session_id, with_status=True)
     if not execution_path:
         return None
 

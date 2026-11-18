@@ -187,11 +187,16 @@ def set_execution_preview_target(session_id: str, expected_run_token: str, path:
 
 def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
     with active_processes_lock:
-        current_state = active_processes.get(session_id)
-        if current_state is None or current_state is not process_state:
-            return False
-        run_token = process_state.get("run_token")
-        return bool(run_token and current_state.get("run_token") == run_token)
+        return _session_state_is_current_locked(session_id, process_state)
+
+
+def _session_state_is_current_locked(session_id: str, process_state: Mapping[str, object]) -> bool:
+    """Like _session_state_is_current; the caller holds active_processes_lock."""
+    current_state = active_processes.get(session_id)
+    if current_state is None or current_state is not process_state:
+        return False
+    run_token = process_state.get("run_token")
+    return bool(run_token and current_state.get("run_token") == run_token)
 
 
 def _execution_path_held_elsewhere_locked(key: str, own_state: Mapping[str, object] | None) -> bool:
@@ -210,12 +215,13 @@ def _execution_path_held_elsewhere_locked(key: str, own_state: Mapping[str, obje
 
 def _discard_session_state(session_id: str, process_state: Mapping[str, object]) -> None:
     with active_processes_lock:
-        current_state = active_processes.get(session_id)
-        if current_state is None or current_state is not process_state:
-            return
-        run_token = process_state.get("run_token")
-        if run_token and current_state.get("run_token") == run_token:
-            active_processes.pop(session_id, None)
+        _discard_session_state_locked(session_id, process_state)
+
+
+def _discard_session_state_locked(session_id: str, process_state: Mapping[str, object]) -> None:
+    """Like _discard_session_state; the caller holds active_processes_lock."""
+    if _session_state_is_current_locked(session_id, process_state):
+        active_processes.pop(session_id, None)
 
 
 def _session_is_running(process_state: Mapping[str, object]) -> bool:

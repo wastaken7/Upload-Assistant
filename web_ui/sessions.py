@@ -33,6 +33,7 @@ from web_ui.session_state import (
     _execution_path_held_elsewhere_locked,
     _session_is_running,
     _session_state_is_current,
+    _session_state_is_current_locked,
     _set_process_awaiting_input_if_current,
     _set_process_progress_if_current,
     active_processes_lock,
@@ -167,8 +168,12 @@ def _launch_session(session_id: str, process_state: dict[str, object]) -> None:
     command, base_dir, env = cast(tuple[list[str], Path, dict[str, str]], process_state["launch"])
     # codeql[py/command-line-injection]
     process, process_mode = processes_mod._spawn_webui_upload_process(command, base_dir, env)
-    process_state.update({"mode": process_mode, "process": process})
-    if not _session_state_is_current(session_id, process_state):
+    # Publish the handle and check the session under one lock, so Kill either
+    # sees the handle or has already cancelled the startup.
+    with active_processes_lock:
+        process_state.update({"mode": process_mode, "process": process})
+        still_current = _session_state_is_current_locked(session_id, process_state)
+    if not still_current:
         processes_mod._terminate_process_tree(process)
         processes_mod._close_webui_process_io(process)
         raise RuntimeError("Execution session was replaced before subprocess startup completed")
@@ -393,17 +398,33 @@ def _release_session_queue_file(validated_path: str, own_state: Mapping[str, obj
                 return
             with _generated_queues_lock:
                 generated = paths_mod._generated_queues.pop(key, None)
-        _cleanup_released_queue(key, generated, validated_path)
+                # Saving the same selection twice gives two files one log name
+                # (it comes from the content hash): keep the logs while another
+                # session runs a queue with that hash.
+                logs_in_use = generated is not None and _queue_hash_held_elsewhere_locked(generated, own_state)
+        _cleanup_released_queue(key, generated, validated_path, remove_logs=not logs_in_use)
     except Exception as cleanup_err:
         console.print(f"Failed to cleanup queue file: {cleanup_err}", markup=False)
 
 
-def _cleanup_released_queue(key: str, generated: str | None, validated_path: str) -> None:
+def _queue_hash_held_elsewhere_locked(queue_hash: str, own_state: Mapping[str, object] | None) -> bool:
+    """Caller holds active_processes_lock and _generated_queues_lock."""
+    for info in session_state_mod.active_processes.values():
+        other_path = str(info.get("execution_path") or "")
+        if info is own_state or not other_path or not _session_is_running(info):
+            continue
+        if paths_mod._generated_queues.get(os.path.normcase(os.path.realpath(other_path))) == queue_hash:
+            return True
+    return False
+
+
+def _cleanup_released_queue(key: str, generated: str | None, validated_path: str, *, remove_logs: bool = True) -> None:
     if generated is None:
         return
     lines = Path(key).read_text(encoding="utf-8").splitlines() if Path(key).is_file() else []
     _remove_generated_queue_file(key)
-    _remove_generated_queue_logs(generated, lines)
+    if remove_logs:
+        _remove_generated_queue_logs(generated, lines)
     console.print(f"Cleaned up queue file: {Path(validated_path).name}", markup=False)
 
 
@@ -412,6 +433,15 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
     exit_code: int | None = None
     try:
         output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
+        # At the drain cutoff the readers stop handing output to the pump. They
+        # keep reading, so a descendant writing to the pipe never blocks on it.
+        output_gate = threading.Lock()
+        output_closed = False
+
+        def accept_output(item: tuple[str, str]) -> None:
+            with output_gate:
+                if not output_closed:
+                    output_queue.put(item)
 
         if isinstance(process, _ConPtyProcess):
             # A pseudo terminal combines stdout and stderr into one ANSI stream.
@@ -422,7 +452,7 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                         # the pipe reader. ConPTY can return a whole prompt plus
                         # its trailing input marker in one read.
                         for char in process.read(1024):
-                            output_queue.put(("stdout", char))
+                            accept_output(("stdout", char))
                 except EOFError:
                     pass
                 except Exception as err:
@@ -441,7 +471,7 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                         chunk = stdout.read(1)
                         if not chunk:
                             break
-                        output_queue.put(("stdout", chunk))
+                        accept_output(("stdout", chunk))
                 except Exception as err:
                     console.print(f"stdout read error: {err}", markup=False)
 
@@ -455,7 +485,7 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                         chunk = stderr.read(1)
                         if not chunk:
                             break
-                        output_queue.put(("stderr", chunk))
+                        accept_output(("stderr", chunk))
                 except Exception as err:
                     console.print(f"stderr read error: {err}", markup=False)
 
@@ -491,8 +521,6 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
         orphaned = False
 
         exited_at: float | None = None
-        # Output still to process once the drain deadline passed; None before it.
-        backlog_left: int | None = None
         while True:
             # Process exit does not mean its pipes are drained: keep reading
             # until both readers reach EOF. A descendant that inherited the
@@ -506,9 +534,11 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                     break
                 if exited_at is None:
                     exited_at = time.monotonic()
-                elif backlog_left is None and time.monotonic() - exited_at >= READER_DRAIN_GRACE_SECONDS:
-                    backlog_left = output_queue.qsize()
-                if backlog_left is not None and backlog_left <= 0:
+                elif not output_closed and time.monotonic() - exited_at >= READER_DRAIN_GRACE_SECONDS:
+                    with output_gate:
+                        output_closed = True
+                # Closed: nothing new arrives, so the queue empties in finite time.
+                if output_closed and output_queue.empty():
                     break
             if not exited and not prompt_timed_out and _unanswered_prompt_expired(process_state):
                 prompt_timed_out = True
@@ -520,11 +550,6 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                     processes_mod._terminate_process_tree(process)
 
             has_output, output = _read_output(output_queue)
-            if has_output and backlog_left is not None:
-                backlog_left -= 1
-            elif not has_output and backlog_left is not None:
-                # The queued backlog is gone; flush pending buffers and stop.
-                backlog_left = 0
             previous_prompt_type = str(process_state.get("input_type") or "text") if process_state.get("awaiting_input") else None
             if has_output and output is not None:
                 output_type, char = output
@@ -622,6 +647,8 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
             if process.poll() is None:
                 processes_mod._terminate_process_tree(process)
         processes_mod._close_webui_process_io(process)
+        # A finished session must not keep unrendered output alive.
+        process_state.pop("output_queue", None)
         # A replacement session in the same tab can already run this queue again.
         _release_session_queue_file(str(process_state.get("execution_path") or ""), process_state)
         if exit_code is not None:

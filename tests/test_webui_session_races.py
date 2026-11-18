@@ -211,12 +211,26 @@ def test_alias_metadata_of_another_release_is_not_used(tmp_path, monkeypatch):
     assert uuid_to_cache == "older-uuid"
 
 
+def test_metadata_written_by_another_item_with_the_same_basename_is_not_used(tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    release_dir = tmp_path / "tmp" / "Fictional Item"
+    release_dir.mkdir(parents=True)
+    first, second = tmp_path / "first" / "Fictional Item", tmp_path / "second" / "Fictional Item"
+    (release_dir / "meta.json").write_text(json.dumps({"uuid": "Fictional Item", "path": str(first)}), encoding="utf-8")
+
+    assert webui_preview._read_preview_meta_for_target(str(second), "Fictional Item") == (None, None, "")
+    assert webui_preview._read_preview_meta_for_target(str(second), "") == (None, None, "")
+    _meta_file, meta, _uuid = webui_preview._read_preview_meta_for_target(str(first), "Fictional Item")
+    assert meta is not None and meta["path"] == str(first)
+
+
 def test_preview_status_comes_from_the_validated_target(isolated_sessions, monkeypatch):
     state = _registered_state("tab", "/media/Fictional Item A")
     state.update(awaiting_input=True, input_type="confirm", progress={"step": {"id": "step", "status": "running"}})
     monkeypatch.setattr(webui_preview, "_read_preview_meta_for_target", lambda _path, _uuid: (Path("meta.json"), {"uuid": "uuid-a"}, "uuid-a"))
 
-    _path, _meta_file, _meta, status = webui_preview._resolve_execution_preview_target("tab")
+    assert webui_preview._resolve_execution_preview_target("tab")[3] == {}
+    _path, _meta_file, _meta, status = webui_preview._resolve_execution_preview_target("tab", with_status=True)
     # The live state moves on; the snapshot must not follow it.
     state.update(awaiting_input=False, input_type=None)
     state["progress"]["step"]["status"] = "done"
@@ -267,12 +281,14 @@ def test_pump_stops_waiting_when_a_descendant_holds_the_pipe_open(isolated_sessi
 
 
 class _SteppingClock:
-    """The real time module, except that each monotonic() call advances one second."""
+    """The real time module, except that monotonic() advances one second per call once output is accepted."""
 
-    def __init__(self) -> None:
+    def __init__(self, ready: threading.Event) -> None:
         self._now = 0.0
+        self._ready = ready
 
     def monotonic(self) -> float:
+        self._ready.wait(5)
         self._now += 1.0
         return self._now
 
@@ -280,20 +296,62 @@ class _SteppingClock:
         return getattr(time, name)
 
 
-def test_pump_stops_when_a_descendant_keeps_writing_after_exit(isolated_sessions, monkeypatch):
-    # The clock passes the deadline within a few loop turns, while a large
-    # backlog keeps the output queue busy: the pump must still return without
-    # waiting for the queue to empty or for EOF.
-    monkeypatch.setattr(webui_sessions, "time", _SteppingClock())
+class _ObservedThreading:
+    """The real threading module, whose Lock reports the pump's output-gate hand-offs."""
+
+    def __init__(self, accepted_chars: int) -> None:
+        self.before_cutoff_accepted = threading.Event()
+        self.cutoff = threading.Event()
+        self._remaining = accepted_chars
+        outer = self
+
+        class GateLock:
+            def __init__(self) -> None:
+                self._lock = threading.Lock()
+
+            def __enter__(self) -> None:
+                self._lock.acquire()
+
+            def __exit__(self, *_exc: object) -> None:
+                if "read_" in threading.current_thread().name:
+                    outer._remaining -= 1
+                    if outer._remaining == 0:
+                        outer.before_cutoff_accepted.set()
+                else:
+                    # Only the pump thread takes the gate to close it.
+                    outer.cutoff.set()
+                self._lock.release()
+
+        self.Lock = GateLock
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(threading, name)
+
+
+def test_pump_closes_reader_output_at_the_drain_deadline(isolated_sessions, monkeypatch):
+    before, after = "accepted before cutoff\n", "written after cutoff\n"
+    observed = _ObservedThreading(len(before))
+    # The deadline passes only once every character of the first marker was
+    # accepted; the second marker is written only after the pump closed the gate.
+    monkeypatch.setattr(webui_sessions, "threading", observed)
+    monkeypatch.setattr(webui_sessions, "time", _SteppingClock(observed.before_cutoff_accepted))
     monkeypatch.setattr(webui_sessions, "READER_DRAIN_GRACE_SECONDS", 0.5)
     state = _registered_state("tab", "/media/Fictional Item")
     process = ExitedProcess()
-    lines = 50_000
-    process.stdout.feed("noise\n" * lines)
+    process.stdout.feed(before)
 
+    def write_after_cutoff() -> None:
+        if observed.cutoff.wait(5):
+            process.stdout.feed(after)
+
+    threading.Thread(target=write_after_cutoff, daemon=True).start()
+    # The pipe never reaches EOF while the pump runs.
     _pump_with_timeout(state, process)
 
-    assert _logged_html(state).count("noise") < lines
+    logged = _logged_html(state)
+    assert "accepted before cutoff" in logged
+    assert "written after cutoff" not in logged
+    assert "output_queue" not in state
     assert state["finished"] is True
     assert state["exit_code"] == process.returncode
 
@@ -332,3 +390,26 @@ def test_queue_release_keeps_a_queue_a_replacement_registered(isolated_sessions,
     webui_sessions._release_session_queue_file(str(queue_file), retiring)
     assert key not in webui_paths._generated_queues
     assert not queue_file.exists()
+
+
+def test_queue_release_keeps_logs_another_file_with_the_same_content_uses(isolated_sessions, tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+    content = '"/media/Fictional Item"\n'
+    queue_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    running_file, unused_file = tmp_dir / "webui_queue_running.txt", tmp_dir / "webui_queue_unused.txt"
+    for path in (running_file, unused_file):
+        path.write_text(content, encoding="utf-8")
+        monkeypatch.setitem(webui_paths._generated_queues, os.path.normcase(os.path.realpath(path)), queue_hash)
+    queue_log = tmp_dir / f"{webui_paths.generated_queue_name(queue_hash)}_queue.log"
+    queue_log.write_text("[]", encoding="utf-8")
+    running = _registered_state("running", str(running_file))
+    running["execution_path"] = str(running_file)
+
+    # A second tab's refused request releases the unused file only.
+    webui_sessions._release_session_queue_file(str(unused_file), None)
+
+    assert not unused_file.exists()
+    assert running_file.is_file()
+    assert queue_log.is_file()
