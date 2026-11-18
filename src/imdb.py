@@ -22,7 +22,14 @@ from src.metadata_cache import cache_for, is_cache_miss
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
-IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
+# IMDb's edge returns 403 to requests that don't look like its own web client
+IMDB_GRAPHQL_HEADERS = {
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "x-imdb-client-name": "imdb-web-next",
+    "Origin": "https://www.imdb.com",
+    "Referer": "https://www.imdb.com/",
+}
 
 
 def _is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
