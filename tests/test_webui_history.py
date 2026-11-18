@@ -1,3 +1,6 @@
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.security as webui_security
 from src import upload_history
 from web_ui import server
 
@@ -31,17 +34,17 @@ RECORD = {
 
 
 def _authenticated(monkeypatch, tmp_path, config=None):
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: config or {"DEFAULT": {}})
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: config or {"DEFAULT": {}})
     return server.app.test_client()
 
 
 def test_history_page_requires_a_session(monkeypatch):
-    monkeypatch.setattr(server, "_is_authenticated", lambda: False)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: False)
     response = server.app.test_client().get("/history")
     assert response.status_code == 302
 
@@ -78,21 +81,21 @@ def test_history_api_reports_disabled_recording_and_bad_filters(monkeypatch, tmp
 
 def test_history_api_rejects_tokens_and_cross_site_requests(monkeypatch, tmp_path):
     client = _authenticated(monkeypatch, tmp_path)
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: "fictional-token")
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: "fictional-token")
     assert client.get("/api/history").status_code == 401
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: False)
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: False)
     assert client.delete("/api/history/1").status_code == 403
 
 
 def test_history_deletions_require_the_csrf_token(monkeypatch, tmp_path):
     client = _authenticated(monkeypatch, tmp_path)
     item_id = upload_history.record_item(RECORD, tmp_path)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: False)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: False)
 
     assert client.delete(f"/api/history/{item_id}").status_code == 403
     assert client.delete("/api/history", json={"confirmation": "CLEAR"}).status_code == 403
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
     assert client.get(f"/api/history/{item_id}").status_code == 200
 
 
@@ -110,7 +113,7 @@ def test_history_api_handles_ids_and_offsets_beyond_sqlite_integers(monkeypatch,
 
 
 def test_history_page_refreshes_the_csrf_token_through_the_shared_helper():
-    history_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
+    history_js = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
 
     assert "window.uaApiFetch(url" in history_js
     assert "UA_CSRF_TOKEN" not in history_js
@@ -141,7 +144,7 @@ def test_history_api_reports_an_unreadable_database(monkeypatch, tmp_path):
 
 
 def test_every_page_links_to_history():
-    js_root = server.CODE_DIR / "web_ui" / "static" / "js"
+    js_root = webui_context.CODE_DIR / "web_ui" / "static" / "js"
     for script in ("app.js", "config_app.js", "stats_app.js", "history_app.js"):
         assert "/history" in (js_root / script).read_text(encoding="utf-8"), script
     assert 'history: "archive"' in (js_root / "shared_utils.js").read_text(encoding="utf-8")
@@ -165,8 +168,8 @@ def test_history_export_downloads_filtered_csv_and_json(monkeypatch, tmp_path):
 
 
 def test_upload_page_takes_the_history_handoff_while_restoring_tabs():
-    app_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
-    history_js = (server.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
+    app_js = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    history_js = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "history_app.js").read_text(encoding="utf-8")
     restore = app_js[app_js.index("const restoreUploadSessions = async") : app_js.index("setUploadTabsRestored(true);")]
 
     # Restoring sessions or drafts must not replace the tab that receives the path.

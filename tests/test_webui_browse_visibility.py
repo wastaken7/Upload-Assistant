@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 import ctypes
+import os
 import stat
 import subprocess
 import sys
@@ -9,16 +10,19 @@ from types import SimpleNamespace
 
 import pytest
 
+import web_ui.extensions as webui_extensions
+import web_ui.paths as webui_paths
+import web_ui.security as webui_security
 import web_ui.server as server
 
 
 @pytest.fixture
 def browser(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "_get_browse_roots", lambda: [str(tmp_path)])
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server.limiter, "enabled", False)
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", lambda: [str(tmp_path)])
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_extensions.limiter, "enabled", False)
     return server.app.test_client()
 
 
@@ -34,13 +38,13 @@ def _set_mock_attributes(monkeypatch, attributes):
         return SimpleNamespace(**fields)
 
     monkeypatch.setattr(Path, "stat", entry_stat)
-    original_hidden = server._is_hidden_browse_entry
+    original_hidden = webui_paths._is_hidden_browse_entry
 
     def hidden_entry(path):
         # Inject attributes into both Path-based search and DirEntry-based listing.
-        return original_hidden(Path(path.path) if isinstance(path, server.os.DirEntry) else path)
+        return original_hidden(Path(path.path) if isinstance(path, os.DirEntry) else path)
 
-    monkeypatch.setattr(server, "_is_hidden_browse_entry", hidden_entry)
+    monkeypatch.setattr(webui_paths, "_is_hidden_browse_entry", hidden_entry)
 
 
 @pytest.mark.parametrize("file_filter", ["video", "desc"])
@@ -72,14 +76,14 @@ def test_listing_and_search_hide_system_entries_and_do_not_descend_into_them(bro
     assert response.json["count"] == 3
 
     visited = []
-    original_walk = server.os.walk
+    original_walk = os.walk
 
     def tracked_walk(*args, **kwargs):
         for result in original_walk(*args, **kwargs):
             visited.append(Path(result[0]).name)
             yield result
 
-    monkeypatch.setattr(server.os, "walk", tracked_walk)
+    monkeypatch.setattr(os, "walk", tracked_walk)
     response = browser.get("/api/browse_search", query_string={"q": "Fictional", "filter": file_filter})
     assert response.status_code == 200
     assert {item["name"] for item in response.json["items"]} == {"Fictional Folder", "Fictional Child.txt", "Fictional Visible.txt"}
@@ -91,11 +95,11 @@ def test_listing_and_search_hide_system_entries_and_do_not_descend_into_them(bro
 
 @pytest.mark.parametrize("name", ["$recycle.bin", "$RECYCLE.BIN", "SYSTEM VOLUME INFORMATION", ".hidden"])
 def test_known_system_names_are_filtered_case_insensitively_without_reading_them(name):
-    assert server._is_hidden_browse_entry(Path(name))
+    assert webui_paths._is_hidden_browse_entry(Path(name))
 
 
 def test_missing_entries_are_skipped():
-    assert server._is_hidden_browse_entry(Path("nonexistent-fictional-entry"))
+    assert webui_paths._is_hidden_browse_entry(Path("nonexistent-fictional-entry"))
 
 
 def test_large_listing_reuses_metadata_and_root_resolution(browser, tmp_path, monkeypatch):
@@ -117,7 +121,7 @@ def test_large_listing_reuses_metadata_and_root_resolution(browser, tmp_path, mo
             child_stats.append(path.name)
         return original_stat(path, *args, **kwargs)
 
-    monkeypatch.setattr(server, "_get_browse_roots", roots)
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", roots)
     monkeypatch.setattr(Path, "stat", tracked_stat)
     response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
     assert response.status_code == 200
@@ -145,7 +149,7 @@ def test_listing_detects_replacement_link_from_nofollow_metadata(browser, tmp_pa
     entry_path = tmp_path / "Fictional Replacement.txt"
     entry_path.touch()
     inspected = []
-    original_assert = server._assert_safe_resolved_path
+    original_assert = webui_paths._assert_safe_resolved_path
 
     class ReplacedEntry:
         name = entry_path.name
@@ -171,8 +175,8 @@ def test_listing_detects_replacement_link_from_nofollow_metadata(browser, tmp_pa
             raise ValueError("Path outside allowed roots")
         return original_assert(path)
 
-    monkeypatch.setattr(server.os, "scandir", scandir)
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    monkeypatch.setattr(os, "scandir", scandir)
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", validate)
     response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
     assert response.status_code == 200
     assert inspected == [entry_path]
@@ -184,7 +188,7 @@ def test_listing_never_exposes_retargeted_link_metadata(browser, tmp_path, monke
     """Model a known symlink retargeted after its path passes validation."""
     entry_path = tmp_path / "Fictional Link.txt"
     entry_path.touch()
-    original_assert = server._assert_safe_resolved_path
+    original_assert = webui_paths._assert_safe_resolved_path
     attributes = stat.FILE_ATTRIBUTE_REPARSE_POINT | (stat.FILE_ATTRIBUTE_DIRECTORY if directory else 0)
     link_stat = SimpleNamespace(st_mode=stat.S_IFLNK, st_file_attributes=attributes, st_size=17, st_mtime=123)
     retargeted = False
@@ -219,8 +223,8 @@ def test_listing_never_exposes_retargeted_link_metadata(browser, tmp_path, monke
             return None
         return original_assert(path)
 
-    monkeypatch.setattr(server.os, "scandir", scandir)
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", validate)
+    monkeypatch.setattr(os, "scandir", scandir)
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", validate)
     response = browser.get("/api/browse", query_string={"path": str(tmp_path)})
     assert response.status_code == 200
     assert retargeted
@@ -258,7 +262,7 @@ def test_listing_still_validates_directory_link_targets(browser, tmp_path):
                 link.symlink_to(target, target_is_directory=True)
         # The browser fixture normally allows tmp_path; narrow it for this request.
         with pytest.MonkeyPatch.context() as patch:
-            patch.setattr(server, "_get_browse_roots", lambda: [str(root)])
+            patch.setattr(webui_paths, "_get_browse_roots", lambda: [str(root)])
             response = browser.get("/api/browse", query_string={"path": str(root)})
         assert response.status_code == 200
         assert {item["name"] for item in response.json["items"]} == {inside.name, links[0].name}
@@ -274,13 +278,13 @@ def test_search_does_not_inspect_attributes_of_nonmatching_files(browser, tmp_pa
     for name in ["Fictional Match.mkv", "Unrelated.mkv", ".Fictional Hidden.mkv"]:
         (tmp_path / name).touch()
     inspected = []
-    original = server._is_hidden_browse_entry
+    original = webui_paths._is_hidden_browse_entry
 
     def inspect(path):
         inspected.append(path.name)
         return original(path)
 
-    monkeypatch.setattr(server, "_is_hidden_browse_entry", inspect)
+    monkeypatch.setattr(webui_paths, "_is_hidden_browse_entry", inspect)
     response = browser.get("/api/browse_search", query_string={"q": "Fictional"})
     assert response.status_code == 200
     assert [item["name"] for item in response.json["items"]] == ["Fictional Match.mkv"]

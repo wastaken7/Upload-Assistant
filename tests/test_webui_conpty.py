@@ -6,14 +6,19 @@ import time
 import psutil
 import pytest
 
+import web_ui.context as webui_context
+import web_ui.flask_compat as webui_flask_compat
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
 from src.console import ansi_to_html
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="ConPTY is Windows-only")
 
 
-def _read_until(process: server._WebUIProcess, expected: str, timeout: float = 5.0) -> str:
+def _read_until(process: webui_flask_compat._WebUIProcess, expected: str, timeout: float = 5.0) -> str:
     deadline = time.monotonic() + timeout
     output = ""
     while expected not in output and time.monotonic() < deadline:
@@ -31,23 +36,23 @@ def test_conpty_preserves_ansi_and_accepts_webui_input() -> None:
         "-c",
         "from src.console import logger; import cli_ui; logger.info('[green]Gathering info[/green]'); answer = cli_ui.ask_yes_no('Continue?', default=False); print(f'ANSWER={answer}')",
     ]
-    process, mode = server._spawn_webui_upload_process(command, server.CODE_DIR, server._webui_subprocess_env())
+    process, mode = webui_processes._spawn_webui_upload_process(command, webui_context.CODE_DIR, webui_processes._webui_subprocess_env())
 
     try:
         output = _read_until(process, "(y/N)")
         assert mode == "conpty"
         assert "\x1b[32m" in output
-        assert server._subprocess_prompt_type(":: Continue? (y/N)") == "yes_no"
+        assert webui_processes._subprocess_prompt_type(":: Continue? (y/N)") == "yes_no"
         assert "color:" in ansi_to_html(output)
 
-        server._write_webui_process_input(process, "yes")
+        webui_processes._write_webui_process_input(process, "yes")
         output += _read_until(process, "ANSWER=True")
         assert "ANSWER=True" in output
         assert process.wait(timeout=5) == 0
     finally:
         if process.poll() is None:
-            server._terminate_process_tree(process)
-        server._close_webui_process_io(process)
+            webui_processes._terminate_process_tree(process)
+        webui_processes._close_webui_process_io(process)
 
 
 def test_conpty_preserves_prompt_sound_record() -> None:
@@ -57,21 +62,21 @@ def test_conpty_preserves_prompt_sound_record() -> None:
         "-c",
         "from src.prompt_sound import play_prompt_sound; print('Before', end='', flush=True); play_prompt_sound(); answer = input('Continue:'); print(f'ANSWER={answer}')",
     ]
-    process, mode = server._spawn_webui_upload_process(command, server.CODE_DIR, server._webui_subprocess_env())
+    process, mode = webui_processes._spawn_webui_upload_process(command, webui_context.CODE_DIR, webui_processes._webui_subprocess_env())
 
     try:
         output = _read_until(process, "Continue:")
         assert mode == "conpty"
         assert sum(line.strip() == PROMPT_SOUND_STDOUT_MARKER for line in output.splitlines()) == 1
         assert "\a" not in output
-        server._write_webui_process_input(process, "yes")
+        webui_processes._write_webui_process_input(process, "yes")
         output += _read_until(process, "ANSWER=yes")
         assert "ANSWER=yes" in output
         assert process.wait(timeout=5) == 0
     finally:
         if process.poll() is None:
-            server._terminate_process_tree(process)
-        server._close_webui_process_io(process)
+            webui_processes._terminate_process_tree(process)
+        webui_processes._close_webui_process_io(process)
 
 
 def test_kill_endpoint_stops_conpty_controller_and_worker(monkeypatch) -> None:
@@ -80,7 +85,7 @@ def test_kill_endpoint_stops_conpty_controller_and_worker(monkeypatch) -> None:
         f"import subprocess, sys, time; worker = subprocess.Popen([sys.executable, '-c', {child_code!r}]); print(f'WORKER={{worker.pid}}', flush=True); time.sleep(60)"
     )
     command = [sys.executable, "-u", "-c", controller_code]
-    process, mode = server._spawn_webui_upload_process(command, server.CODE_DIR, server._webui_subprocess_env())
+    process, mode = webui_processes._spawn_webui_upload_process(command, webui_context.CODE_DIR, webui_processes._webui_subprocess_env())
 
     try:
         output = _read_until(process, "WORKER=")
@@ -88,13 +93,13 @@ def test_kill_endpoint_stops_conpty_controller_and_worker(monkeypatch) -> None:
         assert mode == "conpty"
         assert worker_pid_match is not None
         worker_pid = int(worker_pid_match.group(1))
-        monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-        monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-        monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-        monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+        monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+        monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+        monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+        monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
         session_id = "conpty-kill-tree-test"
-        with server.active_processes_lock:
-            server.active_processes[session_id] = {"mode": mode, "process": process}
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes[session_id] = {"mode": mode, "process": process}
 
         response = server.app.test_client().post("/api/kill", json={"session_id": session_id})
 
@@ -105,8 +110,8 @@ def test_kill_endpoint_stops_conpty_controller_and_worker(monkeypatch) -> None:
             time.sleep(0.05)
         assert not psutil.pid_exists(worker_pid)
     finally:
-        with server.active_processes_lock:
-            server.active_processes.pop("conpty-kill-tree-test", None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop("conpty-kill-tree-test", None)
         if process.poll() is None:
-            server._terminate_process_tree(process)
-        server._close_webui_process_io(process)
+            webui_processes._terminate_process_tree(process)
+        webui_processes._close_webui_process_io(process)

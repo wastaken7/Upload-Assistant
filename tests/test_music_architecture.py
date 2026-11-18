@@ -20,7 +20,7 @@ from src.music.sources import DiscogsEnricher, MusicBrainzEnricher, _music_cache
 from src.prep import Prep
 from src.trackers.GAZELLE.orpheus import Orpheus
 from src.uphelper import _music_confirmation_lines
-from web_ui.server import _extract_execution_preview
+from web_ui.preview import _extract_execution_preview
 
 
 def test_description_builder_renders_music_release_details():

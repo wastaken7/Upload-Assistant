@@ -4,6 +4,8 @@ from typing import Any
 
 import pytest
 
+import web_ui.preview as webui_preview
+import web_ui.security as webui_security
 from src.mediainfo_review import MAX_REPORT_CHARS, report_items
 from web_ui import server
 
@@ -82,8 +84,8 @@ def test_oversized_report_is_truncated(tmp_path: Path) -> None:
 
 def test_webui_mediainfo_api_returns_reports_for_the_execution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "MEDIAINFO_CLEANPATH.txt").write_text("Format : Matroska", encoding="utf-8")
-    monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, {"uuid": "release"}))
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, {"uuid": "release"}))
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
 
     with server.app.test_client() as client:
         response = client.get("/api/execution_mediainfo?session_id=session")
@@ -98,12 +100,12 @@ def test_webui_mediainfo_api_returns_reports_for_the_execution(tmp_path: Path, m
 
 
 def test_webui_mediainfo_api_reports_pending_until_generated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
     with server.app.test_client() as client:
-        monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: None)
+        monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: None)
         assert client.get("/api/execution_mediainfo?session_id=missing").status_code == 404
 
-        monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, {"is_disc": "BDMV"}))
+        monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, {"is_disc": "BDMV"}))
         response = client.get("/api/execution_mediainfo?session_id=session")
         assert response.status_code == 404
         assert response.get_json()["kind"] == "bdinfo"

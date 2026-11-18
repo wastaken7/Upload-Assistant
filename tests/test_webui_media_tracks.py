@@ -1,7 +1,7 @@
 # ruff: noqa: S101
 import pytest
 
-from web_ui.server import _extract_preview_media_tracks
+from web_ui.preview import _extract_preview_media_tracks
 
 
 def test_extract_preview_media_tracks_from_mediainfo_media_track() -> None:

@@ -8,6 +8,9 @@ import httpx
 import pytest
 from torf import Torrent
 
+import web_ui.extensions as webui_extensions
+import web_ui.routes.config as config_routes
+import web_ui.security as webui_security
 from src.clients import Clients
 from src.meta import Meta
 from src.qbitwait import Wait
@@ -143,11 +146,11 @@ def webui_client_test(monkeypatch):
     import web_ui.server as server
 
     for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin", "_is_ip_allowed"):
-        monkeypatch.setattr(server, guard, lambda *args: True)
+        monkeypatch.setattr(webui_security, guard, lambda *args: True)
     qbit = MagicMock()
     qbit.return_value.app_version.return_value = "v5.1.0"
     monkeypatch.setattr("qbittorrentapi.Client", qbit)
-    server.limiter.reset()
+    webui_extensions.limiter.reset()
 
     def run(status_code):
         def fake_get(url, **_kwargs):
@@ -156,12 +159,12 @@ def webui_client_test(monkeypatch):
         monkeypatch.setattr(httpx, "get", fake_get)
         payload = {"name": "qbittorrent", "config": dict(WEBUI_CLIENT, torrent_client="qbit", qui_proxy_url=PROXY_URL)}
         with server.app.test_request_context("/api/config_test_torrent_client", method="POST", json=payload):
-            result = server.config_test_torrent_client()
+            result = config_routes.config_test_torrent_client()
         response, status = result if isinstance(result, tuple) else (result, 200)
         return response.get_json(), status, qbit
 
     yield run
-    server.limiter.reset()
+    webui_extensions.limiter.reset()
 
 
 def test_webui_connection_test_reports_the_webui_fallback(webui_client_test):

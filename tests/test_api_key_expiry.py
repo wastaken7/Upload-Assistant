@@ -7,6 +7,9 @@ import pytest
 
 import src.api_key_expiry as expiry
 import src.prowlarr as prowlarr
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.security as webui_security
 import web_ui.server as server
 from src.meta import Meta
 from src.trackers.UNIT3D.aither import Aither
@@ -126,17 +129,17 @@ def test_cli_expired_warning_and_silent_unknown_or_no_expiry(tmp_path, monkeypat
 
 @pytest.fixture
 def web(monkeypatch, tmp_path):
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"TRACKERS": {"LST": {"api_key": "saved-key"}}})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"TRACKERS": {"LST": {"api_key": "saved-key"}}})
     return server.app.test_client()
 
 
 @pytest.mark.parametrize("guard,code", [("_is_authenticated", 401), ("_verify_csrf_header", 403), ("_verify_same_origin", 403)])
 def test_web_check_requires_session_csrf_and_same_origin(web, monkeypatch, guard, code):
-    monkeypatch.setattr(server, guard, lambda: False)
+    monkeypatch.setattr(webui_security, guard, lambda: False)
     assert web.post("/api/tracker_api_key_status", json={"tracker": "LST"}).status_code == code
 
 
@@ -177,7 +180,7 @@ def test_web_check_uses_draft_key_fixed_search_endpoint_and_does_not_save_config
 
 @pytest.fixture(params=[None, [], {"LST": None}, {"LST": []}], ids=["null-section", "list-section", "null-tracker", "list-tracker"])
 def malformed_tracker_config(request, monkeypatch):
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"TRACKERS": request.param})
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"TRACKERS": request.param})
 
 
 def test_web_check_uses_draft_key_with_malformed_saved_config(web, malformed_tracker_config, monkeypatch):
@@ -218,7 +221,7 @@ def test_web_check_rejects_explicit_null_key_without_using_saved_key(web, monkey
 
 
 def test_web_check_uses_prowlarr_only_for_missing_key(web, monkeypatch):
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"prowlarr_url": "https://prowlarr.test", "prowlarr_api_key": "prowlarr-secret"}})
     monkeypatch.setattr(
         prowlarr, "fetch_prowlarr_credentials", lambda *_args: prowlarr.ProwlarrCredentialReport(credentials={"LST": prowlarr.ProwlarrCredential(api_key="remote-secret")})
     )

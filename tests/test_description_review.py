@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.preview as webui_preview
+import web_ui.security as webui_security
 from src.description_review import load_review
 from src.get_desc import DescriptionBuilder, gen_desc
 from src.meta import Meta
@@ -52,9 +54,9 @@ def test_webui_description_api_saves_an_execution_scoped_override(tmp_path, monk
     def resolve(_session_id):
         return temp_dir, meta_file, {"uuid": "release", "description": "tracker text"}
 
-    monkeypatch.setattr(server, "_resolve_execution_description_review", resolve)
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_description_review", resolve)
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
     with server.app.test_client() as client:
         initial = client.get("/api/execution_description?session_id=session")
         assert initial.status_code == 200
@@ -82,9 +84,9 @@ def test_webui_description_api_rejects_stale_save_and_reset_versions(tmp_path, m
     def resolve(_session_id):
         return temp_dir, meta_file, json.loads(meta_file.read_text(encoding="utf-8"))
 
-    monkeypatch.setattr(server, "_resolve_execution_description_review", resolve)
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_description_review", resolve)
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
     headers = {"Origin": "http://localhost"}
     with server.app.test_client() as client:
         saved = client.put(

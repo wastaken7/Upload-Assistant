@@ -1,20 +1,27 @@
+import time
 from pathlib import Path
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.flask_compat as webui_flask_compat
+import web_ui.routes.trackers as trackers_routes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.tracker_info as webui_tracker_info
 from src.trackers.retroflix import RetroFlix
 
 
 @pytest.mark.parametrize("alias", ["ATH", "FOX", ""])
 def test_catalog_exposes_current_cli_aliases_and_builtin_names(tmp_path, monkeypatch, alias):
     config = {"DEFAULT": {}, "TRACKERS": {"default_trackers": "BLU", "AITHER": {"cli_alias": alias}}}
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
     for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
-        monkeypatch.setattr(server, guard, lambda: True)
+        monkeypatch.setattr(webui_security, guard, lambda: True)
     with server.app.test_request_context("/api/trackers"):
-        payload = server.get_trackers().get_json()
+        payload = trackers_routes.get_trackers().get_json()
     assert payload["success"] is True
     assert payload["alias_error"] == ""
     assert payload["default_trackers"] == ["BLUTOPIA"]
@@ -26,16 +33,30 @@ def test_catalog_exposes_current_cli_aliases_and_builtin_names(tmp_path, monkeyp
 
 def test_invalid_manual_alias_does_not_hide_tracker_catalog(tmp_path, monkeypatch):
     config = {"TRACKERS": {"AITHER": {"cli_alias": "BHD"}}}
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda path: config if path.name == "config.py" else {})
     for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
-        monkeypatch.setattr(server, guard, lambda: True)
+        monkeypatch.setattr(webui_security, guard, lambda: True)
     with server.app.test_request_context("/api/trackers"):
-        payload = server.get_trackers().get_json()
+        payload = trackers_routes.get_trackers().get_json()
     assert payload["success"] is True
     assert payload["trackers"]
     assert "already selects BEYONDHD" in payload["alias_error"]
     assert payload["tracker_aliases"]["BHD"] == "BEYONDHD"
+
+
+def test_catalog_links_bundled_tracker_icons(tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"TRACKERS": {}})
+    for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin"):
+        monkeypatch.setattr(webui_security, guard, lambda: True)
+    with server.app.test_request_context("/api/trackers"):
+        payload = trackers_routes.get_trackers().get_json()
+    favicons = {tracker["name"]: tracker["favicon"] for tracker in payload["trackers"]}
+    assert favicons["AITHER"] == "/static/img/trackers/aither.png"
+    static_dir = Path(server.app.static_folder)
+    for url in filter(None, favicons.values()):
+        assert (static_dir / url.removeprefix("/static/")).is_file()
 
 
 def test_tracker_codebase_uses_registered_frameworks_only() -> None:
@@ -49,7 +70,7 @@ def test_tracker_codebase_uses_registered_frameworks_only() -> None:
         ("BROADCASTHENET", None),
         ("UNKNOWN", None),
     ):
-        assert server._tracker_codebase(tracker_name) == expected
+        assert webui_tracker_info._tracker_codebase(tracker_name) == expected
 
 
 def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
@@ -59,15 +80,15 @@ def test_tracker_destination_type_uses_existing_usenet_marker() -> None:
     class UsenetIndexer:
         is_usenet = True
 
-    assert server._tracker_destination_type(TorrentTracker) == "torrent"
-    assert server._tracker_destination_type(UsenetIndexer) == "usenet"
+    assert webui_tracker_info._tracker_destination_type(TorrentTracker) == "torrent"
+    assert webui_tracker_info._tracker_destination_type(UsenetIndexer) == "usenet"
 
 
 def test_tracker_supported_categories_are_normalized_and_deduplicated() -> None:
     class Tracker:
         supported_categories = ("TV", "movie", " TV ", "BOOK")
 
-    assert server._tracker_supported_categories(Tracker) == ["TV", "MOVIE", "BOOK"]
+    assert webui_tracker_info._tracker_supported_categories(Tracker) == ["TV", "MOVIE", "BOOK"]
 
 
 def test_configured_trackers_require_complete_setup_independently_of_defaults() -> None:
@@ -90,7 +111,7 @@ def test_configured_trackers_require_complete_setup_independently_of_defaults() 
     }
     supported_trackers = {"AITHER": object(), "BLUTOPIA": object(), "FLOOD": object()}
 
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         trackers_section,
         example_trackers,
         supported_trackers,
@@ -103,15 +124,15 @@ def test_tracker_setup_requires_torznab_key_when_the_tracker_has_one() -> None:
     example_trackers = {"FILEIPLAY": {"api_key": "", "torznab_api_key": "", "anon": True}}
     supported_trackers = {"FILEIPLAY": object()}
 
-    partial = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": ""}}, example_trackers, supported_trackers)
-    complete = server._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": "key"}}, example_trackers, supported_trackers)
+    partial = webui_tracker_info._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": ""}}, example_trackers, supported_trackers)
+    complete = webui_tracker_info._configured_tracker_names({"FILEIPLAY": {"api_key": "token", "torznab_api_key": "key"}}, example_trackers, supported_trackers)
 
     assert partial == set()
     assert complete == {"FILEIPLAY"}
 
 
 def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> None:
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         {
             "RETROFLIX": {
                 "api_key": "configured-key",
@@ -135,7 +156,7 @@ def test_tracker_optional_setup_keys_do_not_block_valid_api_credentials() -> Non
 
 
 def test_tracker_setup_still_requires_non_optional_account_credentials() -> None:
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         {
             "PASSTHEPOPCORN": {
                 "ApiUser": "api-user",
@@ -177,7 +198,7 @@ def test_cookie_trackers_require_cookie_and_template_fields() -> None:
         "MAKINGOFF": {},
     }
 
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         trackers_section,
         example_trackers,
         supported_trackers,
@@ -187,7 +208,7 @@ def test_cookie_trackers_require_cookie_and_template_fields() -> None:
     assert configured == {"MAKINGOFF"}
 
     trackers_section["CATHODERAYTUBE"]["announce_url"] = "https://tracker.example/announce"
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         trackers_section,
         example_trackers,
         supported_trackers,
@@ -207,7 +228,7 @@ def test_configured_trackers_support_cookie_and_legacy_btn_setup() -> None:
         "UNSUPPORTED": object(),
     }
 
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         {
             "BROADCASTHENET": {
                 "announce_url": "https://tracker.example/announce",
@@ -228,7 +249,7 @@ def test_configured_trackers_support_cookie_and_legacy_btn_setup() -> None:
 
 
 def test_whitespace_only_legacy_btn_key_is_not_configured() -> None:
-    configured = server._configured_tracker_names(
+    configured = webui_tracker_info._configured_tracker_names(
         {},
         {},
         {"BROADCASTHENET": object()},
@@ -251,7 +272,7 @@ def test_cookie_discovery_continues_after_one_lookup_failure(tmp_path: Path) -> 
             return str(valid_cookie)
         return str(tmp_path / "missing.txt")
 
-    configured = server._configured_cookie_tracker_names(
+    configured = webui_tracker_info._configured_cookie_tracker_names(
         {"BROKEN": object(), "MAKINGOFF": object(), "LATER": object()},
         {},
         tmp_path,
@@ -263,10 +284,10 @@ def test_cookie_discovery_continues_after_one_lookup_failure(tmp_path: Path) -> 
 
 
 def test_tracker_status_http_classification_is_advisory() -> None:
-    assert server._tracker_status_from_http_code(200)[0] == "available"
-    assert server._tracker_status_from_http_code(403)[0] == "available"
-    assert server._tracker_status_from_http_code(429)[0] == "issue"
-    assert server._tracker_status_from_http_code(503)[0] == "issue"
+    assert webui_tracker_info._tracker_status_from_http_code(200)[0] == "available"
+    assert webui_tracker_info._tracker_status_from_http_code(403)[0] == "available"
+    assert webui_tracker_info._tracker_status_from_http_code(429)[0] == "issue"
+    assert webui_tracker_info._tracker_status_from_http_code(503)[0] == "issue"
 
 
 def test_tracker_status_probe_identifies_timeouts(monkeypatch) -> None:
@@ -280,9 +301,9 @@ def test_tracker_status_probe_identifies_timeouts(monkeypatch) -> None:
         def Client(**_kwargs):
             raise FakeTimeoutError
 
-    monkeypatch.setattr(server, "_dynamic_import", lambda _name: FakeHttpx)
+    monkeypatch.setattr(webui_flask_compat, "_dynamic_import", lambda _name: FakeHttpx)
 
-    result = server._probe_tracker_url("AITHER", "https://aither.cc")
+    result = webui_tracker_info._probe_tracker_url("AITHER", "https://aither.cc")
 
     assert result["state"] == "unavailable"
     assert result["reason"] == "timeout"
@@ -290,33 +311,33 @@ def test_tracker_status_probe_identifies_timeouts(monkeypatch) -> None:
 
 
 def test_tracker_status_cache_marks_expired_results_stale(monkeypatch) -> None:
-    monkeypatch.setattr(server.time, "time", lambda: 2_000.0)
-    with server._tracker_status_cache_lock:
-        server._tracker_status_cache.clear()
-        server._tracker_status_cache["AITHER"] = {
+    monkeypatch.setattr(time, "time", lambda: 2_000.0)
+    with webui_tracker_info._tracker_status_cache_lock:
+        webui_tracker_info._tracker_status_cache.clear()
+        webui_tracker_info._tracker_status_cache["AITHER"] = {
             "name": "AITHER",
             "state": "available",
             "message": "The tracker website responded.",
             "checked_at": "2026-08-31T12:00:00+00:00",
-            "_checked_epoch": 2_000.0 - server._TRACKER_STATUS_CACHE_SECONDS - 1,
+            "_checked_epoch": 2_000.0 - webui_tracker_info._TRACKER_STATUS_CACHE_SECONDS - 1,
         }
 
-    payload = server._tracker_status_cache_payload(["AITHER", "BLUTOPIA"])
+    payload = webui_tracker_info._tracker_status_cache_payload(["AITHER", "BLUTOPIA"])
 
     assert payload["AITHER"]["stale"] is True
     assert "_checked_epoch" not in payload["AITHER"]
     assert payload["BLUTOPIA"]["state"] == "not_checked"
 
-    with server._tracker_status_cache_lock:
-        server._tracker_status_cache.clear()
+    with webui_tracker_info._tracker_status_cache_lock:
+        webui_tracker_info._tracker_status_cache.clear()
 
 
 def test_refresh_tracker_status_rejects_unknown_tracker(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     monkeypatch.setattr(
-        server,
+        webui_tracker_info,
         "_supported_tracker_status_targets",
         lambda: {"AITHER": "https://aither.cc"},
     )
@@ -374,22 +395,22 @@ def test_prowlarr_report_is_reused_for_the_same_connection_only(monkeypatch) -> 
         return object()
 
     monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", fake_fetch)
-    with server._prowlarr_report_cache_lock:
-        server._prowlarr_report_cache.clear()
+    with webui_tracker_info._prowlarr_report_cache_lock:
+        webui_tracker_info._prowlarr_report_cache.clear()
 
-    first = server._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"})
-    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"}) is first
+    first = webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"})
+    assert webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key-a", {"AITHER"}) is first
     assert len(calls) == 1
 
-    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"}) is not first
+    assert webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"}) is not first
     assert len(calls) == 2
 
-    monkeypatch.setattr(server, "_PROWLARR_REPORT_CACHE_SECONDS", 0)
-    server._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"})
+    monkeypatch.setattr(webui_tracker_info, "_PROWLARR_REPORT_CACHE_SECONDS", 0)
+    webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key-b", {"AITHER"})
     assert len(calls) == 3
 
-    with server._prowlarr_report_cache_lock:
-        server._prowlarr_report_cache.clear()
+    with webui_tracker_info._prowlarr_report_cache_lock:
+        webui_tracker_info._prowlarr_report_cache.clear()
 
 
 def test_prowlarr_fetch_started_before_invalidation_is_not_cached(monkeypatch) -> None:
@@ -401,20 +422,20 @@ def test_prowlarr_fetch_started_before_invalidation_is_not_cached(monkeypatch) -
         calls.append(base_url)
         if len(calls) == 1:
             # A manual Prowlarr test completes while this request is in flight.
-            server._invalidate_prowlarr_report_cache()
+            webui_tracker_info._invalidate_prowlarr_report_cache()
         return object()
 
     monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", fetch_then_invalidate)
-    server._invalidate_prowlarr_report_cache()
+    webui_tracker_info._invalidate_prowlarr_report_cache()
 
-    stale = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
-    fresh = server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+    stale = webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+    fresh = webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
 
     assert fresh is not stale
     assert len(calls) == 2
-    assert server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"}) is fresh
+    assert webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"}) is fresh
 
-    server._invalidate_prowlarr_report_cache()
+    webui_tracker_info._invalidate_prowlarr_report_cache()
 
 
 def test_prowlarr_failures_are_not_cached(monkeypatch) -> None:
@@ -427,10 +448,10 @@ def test_prowlarr_failures_are_not_cached(monkeypatch) -> None:
         raise prowlarr.ProwlarrError("unreachable")
 
     monkeypatch.setattr(prowlarr, "fetch_prowlarr_credentials", failing_fetch)
-    with server._prowlarr_report_cache_lock:
-        server._prowlarr_report_cache.clear()
+    with webui_tracker_info._prowlarr_report_cache_lock:
+        webui_tracker_info._prowlarr_report_cache.clear()
 
     for _ in range(2):
         with pytest.raises(prowlarr.ProwlarrError):
-            server._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
+            webui_tracker_info._cached_prowlarr_credentials("http://prowlarr.test", "key", {"AITHER"})
     assert len(calls) == 2

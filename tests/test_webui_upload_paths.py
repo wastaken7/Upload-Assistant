@@ -14,7 +14,15 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 import src.webui_paths as policy
+import web_ui.context as webui_context
+import web_ui.extensions as webui_extensions
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.routes.sessions as sessions_routes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
+import web_ui.sessions as webui_sessions
 from src.meta import Meta
 from src.queuemanage import QueueManager
 from src.webui_paths import (
@@ -39,13 +47,13 @@ def workspace(tmp_path, monkeypatch):
     second = root / "Fictional Artist's [Group] & Concert.mkv"
     first.touch()
     second.touch()
-    monkeypatch.setattr(server, "STATE_DIR", state)
-    monkeypatch.setattr(server, "_get_browse_roots", lambda: [str(root)])
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server.limiter, "enabled", False)
-    monkeypatch.setattr(server, "_generated_queues", {})
+    monkeypatch.setattr(webui_context, "STATE_DIR", state)
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", lambda: [str(root)])
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_extensions.limiter, "enabled", False)
+    monkeypatch.setattr(webui_paths, "_generated_queues", {})
     monkeypatch.delenv(ROOTS_ENV, raising=False)
     return server.app.test_client(), root, state, first, second
 
@@ -90,7 +98,7 @@ def test_queue_validation_is_atomic_and_reports_item(workspace, kind):
     assert response.status_code == 400
     assert response.json["item"] == 2
     assert not (state / "tmp").exists()
-    assert not server._generated_queues
+    assert not webui_paths._generated_queues
 
 
 @pytest.mark.parametrize("item", [None, "path", {}, {"path": 123}, {"path": ""}, {"path": [], "args": ""}])
@@ -105,7 +113,7 @@ def test_queue_limit_and_unconfigured_roots(workspace, monkeypatch):
     client, _, _, first, _ = workspace
     response = client.post("/api/save_queue", json={"items": [{"path": str(first)}] * 1001})
     assert response.status_code == 400
-    monkeypatch.setattr(server, "_get_browse_roots", lambda: [])
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", lambda: [])
     response = client.post("/api/save_queue", json={"items": [{"path": str(first)}]})
     assert response.status_code == 400
 
@@ -118,12 +126,12 @@ def test_generated_queue_is_registered_and_tampering_revokes_access(workspace):
     assert queue.parent == state / "tmp"
     lines = queue.read_text(encoding="utf-8").splitlines()
     assert shlex.split(lines[1]) == [str(second), "--music-artist", "Fictional Artist & Guest"]
-    assert server._validate_execution_path(str(queue)) == str(queue)
+    assert webui_paths._validate_execution_path(str(queue)) == str(queue)
     queue.write_text('"' + str(root_external := state / "external.mkv") + '"\n', encoding="utf-8")
     root_external.touch()
-    assert not server._is_generated_queue(str(queue))
+    assert not webui_paths._is_generated_queue(str(queue))
     with pytest.raises(ValueError):
-        server._validate_execution_path(str(queue))
+        webui_paths._validate_execution_path(str(queue))
 
 
 def test_queue_filename_does_not_grant_access_to_state_directory(workspace):
@@ -132,9 +140,9 @@ def test_queue_filename_does_not_grant_access_to_state_directory(workspace):
     forged = state / "tmp" / "webui_queue_forged.txt"
     forged.touch()
     with pytest.raises(ValueError):
-        server._resolve_user_path(str(forged))
+        webui_paths._resolve_user_path(str(forged))
     with pytest.raises(ValueError):
-        server._assert_safe_resolved_path(forged)
+        webui_paths._assert_safe_resolved_path(forged)
 
 
 class CompletedProcess:
@@ -165,24 +173,24 @@ def test_generated_queue_executes_with_policy_and_is_cleaned_up(workspace, monke
         assert env[QUEUE_HASH_ENV] == hashlib.sha256(queue.read_bytes()).hexdigest()
         return CompletedProcess(), "subprocess"
 
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", spawn)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", spawn)
     response = client.post("/api/execute", json={"path": str(queue), "session_id": "generated-queue-test"})
     try:
         output = response.get_data(as_text=True)
         assert '"type": "error"' not in output
         assert len(captured) == 1
         assert not queue.exists()
-        assert not server._generated_queues
+        assert not webui_paths._generated_queues
     finally:
         response.close()
-        server.active_processes.pop("generated-queue-test", None)
+        webui_session_state.active_processes.pop("generated-queue-test", None)
 
 
 def test_direct_execute_rejects_external_path_before_spawn(workspace, monkeypatch):
     client, root, _, _, _ = workspace
     external = root.parent / "external.mkv"
     external.touch()
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: pytest.fail("Forbidden upload started"))
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: pytest.fail("Forbidden upload started"))
     response = client.post("/api/execute", json={"path": str(external), "session_id": "forbidden-path-test"})
     assert '"type": "error"' in response.get_data(as_text=True)
     response.close()
@@ -193,8 +201,8 @@ def test_invalid_execute_preserves_running_session(workspace, monkeypatch, inval
     client, root, _, first, _ = workspace
     session = "preserve-running-test"
     running = {"process": object()}
-    server.active_processes[session] = running
-    monkeypatch.setattr(server, "_terminate_process_tree", lambda *_args: pytest.fail("Existing upload was terminated"))
+    webui_session_state.active_processes[session] = running
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", lambda *_args: pytest.fail("Existing upload was terminated"))
     external = root.parent / "external.mkv"
     external.touch()
     response = client.post(
@@ -202,10 +210,10 @@ def test_invalid_execute_preserves_running_session(workspace, monkeypatch, inval
     )
     try:
         assert '"type": "error"' in response.get_data(as_text=True)
-        assert server.active_processes[session] is running
+        assert webui_session_state.active_processes[session] is running
     finally:
         response.close()
-        server.active_processes.pop(session, None)
+        webui_session_state.active_processes.pop(session, None)
 
 
 def test_valid_execute_replaces_running_session(workspace, monkeypatch):
@@ -218,21 +226,21 @@ def test_valid_execute_replaces_running_session(workspace, monkeypatch):
     running = RunningProcess()
     terminated = []
     session = "replace-valid-test"
-    server.active_processes[session] = {"process": running}
-    monkeypatch.setattr(server, "_terminate_process_tree", terminated.append)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (CompletedProcess(), "subprocess"))
+    webui_session_state.active_processes[session] = {"process": running}
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", terminated.append)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (CompletedProcess(), "subprocess"))
     response = client.post("/api/execute", json={"path": str(first), "session_id": session})
     try:
         assert '"type": "error"' not in response.get_data(as_text=True)
         assert terminated == [running]
     finally:
         response.close()
-        server.active_processes.pop(session, None)
+        webui_session_state.active_processes.pop(session, None)
 
 
 def test_csrf_is_required_for_path_preparation(workspace, monkeypatch):
     client, _, _, first, _ = workspace
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: False)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: False)
     response = client.post("/api/save_queue", json={"items": [{"path": str(first)}]})
     assert response.status_code == 403
 
@@ -283,7 +291,7 @@ def test_file_symlink_outside_roots_is_rejected(workspace):
 def test_arguments_cannot_bypass_path_selection(workspace, args):
     _, _, _, _, _ = workspace
     with pytest.raises(ValueError):
-        server._validate_upload_assistant_args(shlex.split(args))
+        webui_paths._validate_upload_assistant_args(shlex.split(args))
 
 
 def test_local_description_and_artwork_arguments_use_allowed_roots(workspace):
@@ -292,10 +300,10 @@ def test_local_description_and_artwork_arguments_use_allowed_roots(workspace):
     description.touch()
     external = root.parent / "private.txt"
     external.touch()
-    server._validate_upload_assistant_args(["--descfile", str(description)])
+    webui_paths._validate_upload_assistant_args(["--descfile", str(description)])
     for flag in ("--descfile", "--poster", "--banner", "--comparison"):
         with pytest.raises(ValueError, match="outside allowed roots"):
-            server._validate_upload_assistant_args([flag, str(external)])
+            webui_paths._validate_upload_assistant_args([flag, str(external)])
 
 
 @pytest.mark.parametrize(
@@ -305,7 +313,7 @@ def test_local_description_and_artwork_arguments_use_allowed_roots(workspace):
 @pytest.mark.usefixtures("workspace")
 def test_invalid_arguments_explain_unknown_options_and_extra_paths(args, message):
     with pytest.raises(ValueError, match=message):
-        server._validate_upload_assistant_args(args)
+        webui_paths._validate_upload_assistant_args(args)
 
 
 def test_generated_queue_without_expected_hash_is_rejected(tmp_path, monkeypatch):
@@ -321,7 +329,7 @@ def test_webui_rejects_torrent_reuse_in_global_and_queue_arguments(workspace, mo
     client, root, _, first, _ = workspace
     args = [flag] if "=" in flag else [flag, "../../private"]
     with pytest.raises(ValueError, match="Torrent reuse is only available in CLI mode"):
-        server._validate_upload_assistant_args(args)
+        webui_paths._validate_upload_assistant_args(args)
     response = client.post("/api/save_queue", json={"items": [{"path": str(first), "args": shlex.join(args)}]})
     assert response.status_code == 400
     monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
@@ -433,9 +441,9 @@ def test_menu_screenshots_are_validated_in_server_and_subprocess(workspace, monk
     external = root.parent / "private-menus"
     external.mkdir()
     for value in (str(menus), "auto", "AUTO"):
-        server._validate_upload_assistant_args([flag, value])
+        webui_paths._validate_upload_assistant_args([flag, value])
     with pytest.raises(ValueError, match="outside allowed roots"):
-        server._validate_upload_assistant_args([flag, str(external)])
+        webui_paths._validate_upload_assistant_args([flag, str(external)])
     response = client.post("/api/save_queue", json={"items": [{"path": str(first), "args": shlex.join([flag, str(external)])}]})
     assert response.status_code == 400
     monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
@@ -466,37 +474,37 @@ def test_queue_eviction_during_execution_fails_cleanly_without_spawning(workspac
     queue = response.json["path"]
 
     def clear_registration():
-        server._generated_queues.clear()
+        webui_paths._generated_queues.clear()
         return {}
 
-    monkeypatch.setattr(server, "_webui_subprocess_env", clear_registration)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: pytest.fail("Expired queue spawned"))
+    monkeypatch.setattr(webui_processes, "_webui_subprocess_env", clear_registration)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: pytest.fail("Expired queue spawned"))
     response = client.post("/api/execute", json={"path": queue, "session_id": "eviction-race-test"})
     try:
         events = [json.loads(line[6:]) for line in response.get_data(as_text=True).splitlines() if line.startswith("data: ")]
         assert any(event.get("type") == "error" and "expired" in event.get("data", "") for event in events)
-        assert "eviction-race-test" not in server.active_processes
+        assert "eviction-race-test" not in webui_session_state.active_processes
     finally:
         response.close()
 
 
 def test_eviction_removes_abandoned_queue_files_and_protects_active_ones(workspace, monkeypatch):
     client, _, _, first, _ = workspace
-    monkeypatch.setattr(server, "MAX_UPLOAD_PATHS", 2)
-    monkeypatch.setattr(server, "active_processes", {})
+    monkeypatch.setattr(sessions_routes, "MAX_UPLOAD_PATHS", 2)
+    monkeypatch.setattr(webui_session_state, "active_processes", {})
 
     def create():
         return client.post("/api/save_queue", json={"items": [{"path": str(first)}]})
 
     active = Path(create().json["path"])
     abandoned = Path(create().json["path"])
-    server.active_processes["running-queue"] = {"path": str(active)}
+    webui_session_state.active_processes["running-queue"] = {"path": str(active)}
     newest = Path(create().json["path"])
     assert active.exists()
     assert not abandoned.exists()
     assert newest.exists()
-    assert len(server._generated_queues) == 2
-    server.active_processes["new-running-queue"] = {"path": str(newest)}
+    assert len(webui_paths._generated_queues) == 2
+    webui_session_state.active_processes["new-running-queue"] = {"path": str(newest)}
     response = create()
     assert response.status_code == 429
     assert set(active.parent.glob("webui_queue_*.txt")) == {active, newest}
@@ -504,15 +512,15 @@ def test_eviction_removes_abandoned_queue_files_and_protects_active_ones(workspa
 
 def test_eviction_protects_a_running_queue_while_it_shows_its_current_item(workspace, monkeypatch):
     client, _, _, first, _ = workspace
-    monkeypatch.setattr(server, "MAX_UPLOAD_PATHS", 2)
-    monkeypatch.setattr(server, "active_processes", {})
+    monkeypatch.setattr(sessions_routes, "MAX_UPLOAD_PATHS", 2)
+    monkeypatch.setattr(webui_session_state, "active_processes", {})
 
     def create():
         return client.post("/api/save_queue", json={"items": [{"path": str(first)}]})
 
     running = Path(create().json["path"])
     # During a queue run the preview target replaces "path" with the current item.
-    server.active_processes["running-queue"] = {"path": str(first), "execution_path": str(running)}
+    webui_session_state.active_processes["running-queue"] = {"path": str(first), "execution_path": str(running)}
     other = Path(create().json["path"])
     newest = Path(create().json["path"])
 
@@ -525,7 +533,7 @@ def test_queue_cleanup_never_deletes_outside_the_state_tmp_directory(workspace):
     _, root, _, _, _ = workspace
     outside = root / "webui_queue_external.txt"
     outside.touch()
-    server._remove_generated_queue_file(str(outside))
+    webui_paths._remove_generated_queue_file(str(outside))
     assert outside.exists()
 
 
@@ -547,7 +555,7 @@ def test_directory_inspection_is_reused_only_within_a_validation_phase(workspace
     assert response.status_code == 200
     assert walks == [str(menus)]
     # The issued queue is unchanged since save_queue; the subprocess walks it again.
-    server._validate_execution_path(response.json["path"])
+    webui_paths._validate_execution_path(response.json["path"])
     assert walks == [str(menus)]
     monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
     subprocess_queue = [{"path": item["path"], "args": [item["path"], "--menus", str(menus)]} for item in items]
@@ -587,7 +595,7 @@ def test_queue_rejects_repeated_or_overlapping_items(workspace, overlap):
 
 
 def _queue_logs(state, queue_path):
-    name = generated_queue_name(server._generated_queues[os.path.normcase(os.path.realpath(queue_path))])
+    name = generated_queue_name(webui_paths._generated_queues[os.path.normcase(os.path.realpath(queue_path))])
     return state / "tmp" / f"{name}_processed_files.log", state / "tmp" / f"{name}_queue.log"
 
 
@@ -599,7 +607,7 @@ def test_queue_logs_are_removed_when_finished_and_kept_to_resume(workspace, fini
     lines = Path(queue).read_text(encoding="utf-8").splitlines()
     processed_log.write_text(json.dumps(lines if finished else lines[:1]), encoding="utf-8")
     queue_log.write_text(json.dumps(lines), encoding="utf-8")
-    server._remove_session_queue_file(queue)
+    webui_sessions._remove_session_queue_file(queue)
     assert not Path(queue).exists()
     assert not queue_log.exists()
     assert processed_log.exists() is not finished
@@ -613,7 +621,7 @@ async def test_resending_a_selection_resumes_its_queue(workspace, monkeypatch):
     queue_hash = hashlib.sha256(Path(path).read_bytes()).hexdigest()
     processed_log, _ = _queue_logs(state, path)
     processed_log.write_text(json.dumps([Path(path).read_text(encoding="utf-8").splitlines()[0]]), encoding="utf-8")
-    server._remove_session_queue_file(path)
+    webui_sessions._remove_session_queue_file(path)
     resent = client.post("/api/save_queue", json={"items": items}).json["path"]
     assert resent != path
     monkeypatch.setenv(ROOTS_ENV, json.dumps([str(root)]))
@@ -630,7 +638,7 @@ def test_stale_queue_logs_are_pruned_when_a_queue_is_saved(workspace):
     client, _, state, first, second = workspace
     tmp_dir = state / "tmp"
     tmp_dir.mkdir()
-    old = time.time() - server.WEBUI_QUEUE_LOG_RETENTION_SECONDS - 60
+    old = time.time() - webui_paths.WEBUI_QUEUE_LOG_RETENTION_SECONDS - 60
     stale = [tmp_dir / "webui_0123456789abcdef_processed_files.log", tmp_dir / "webui_queue_1700000000000_0123abcd_queue.log"]
     kept = [tmp_dir / "webui_fedcba9876543210_processed_files.log", tmp_dir / "other_processed_files.log", tmp_dir / "webui_notes.log"]
     for path in [*stale, *kept]:
@@ -644,8 +652,8 @@ def test_stale_queue_logs_are_pruned_when_a_queue_is_saved(workspace):
 
 def test_only_issued_queues_count_against_the_save_queue_quota(workspace, monkeypatch):
     client, _, _, first, second = workspace
-    monkeypatch.setattr(server.limiter, "enabled", True)
-    server.limiter.reset()
+    monkeypatch.setattr(webui_extensions.limiter, "enabled", True)
+    webui_extensions.limiter.reset()
     try:
         for _ in range(101):
             assert client.post("/api/save_queue", json={"items": [{"path": str(first)}], "return_single_path": True}).status_code == 200
@@ -653,10 +661,10 @@ def test_only_issued_queues_count_against_the_save_queue_quota(workspace, monkey
         for _ in range(100):
             response = client.post("/api/save_queue", json={"items": [{"path": str(first)}, {"path": str(second)}]})
             assert response.status_code == 200
-            server._remove_session_queue_file(response.json["path"])
+            webui_sessions._remove_session_queue_file(response.json["path"])
         assert client.post("/api/save_queue", json={"items": [{"path": str(first)}]}).status_code == 429
     finally:
-        server.limiter.reset()
+        webui_extensions.limiter.reset()
 
 
 @pytest.mark.asyncio

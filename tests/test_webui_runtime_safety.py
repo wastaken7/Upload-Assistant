@@ -1,5 +1,6 @@
 import pytest
 
+import web_ui.flask_compat as webui_flask_compat
 import web_ui.server as server
 
 
@@ -54,7 +55,7 @@ def test_proxy_fix_uses_the_configured_hop_count(monkeypatch) -> None:
         captured.update(kwargs)
         return wrapped_app
 
-    monkeypatch.setattr(server, "ProxyFix", fake_proxy_fix)
+    monkeypatch.setattr(webui_flask_compat, "ProxyFix", fake_proxy_fix)
     direct_app = object()
 
     assert server._apply_proxy_fix(direct_app, 2) is wrapped_app

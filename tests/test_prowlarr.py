@@ -7,6 +7,9 @@ import httpx
 import pytest
 
 import src.prowlarr as prowlarr
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.security as webui_security
 import web_ui.server as server
 from src.cookie_auth import CookieValidator
 from src.meta import Meta
@@ -219,12 +222,12 @@ def test_tracker_catalog_marks_prowlarr_cookie_source(monkeypatch, tmp_path: Pat
     }
     example_config = {"TRACKERS": {"BJSHARE": {"announce_url": ""}}}
 
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
     monkeypatch.setattr(
-        server,
+        webui_config_store,
         "_load_config_from_file",
         lambda path: example_config if path.name == "example_config.py" else user_config,
     )
@@ -251,20 +254,20 @@ def test_tracker_catalog_marks_prowlarr_cookie_source(monkeypatch, tmp_path: Pat
 
 
 def test_config_test_prowlarr_requires_session_and_csrf(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_is_authenticated", lambda: False)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: False)
     response = server.app.test_client().post("/api/config_test_prowlarr", json={})
     assert response.status_code == 401
 
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: False)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: False)
     response = server.app.test_client().post("/api/config_test_prowlarr", json={})
     assert response.status_code == 403
 
 
 def test_config_test_prowlarr_returns_no_secrets(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     monkeypatch.setattr(
         prowlarr,
         "fetch_prowlarr_credentials",

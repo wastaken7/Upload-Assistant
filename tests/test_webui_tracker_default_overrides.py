@@ -2,6 +2,10 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.routes.config as config_routes
+import web_ui.security as webui_security
 import web_ui.server as server
 from src.config_sync import sync_user_config
 from src.get_desc import DescriptionBuilder
@@ -23,18 +27,18 @@ def tracker_config(tmp_path: Path, monkeypatch):
     for path, config in ((example_path, example), (config_path, user)):
         path.parent.mkdir(parents=True)
         path.write_text(f"config = {config!r}\n", encoding="utf-8")
-    monkeypatch.setattr(server, "CODE_DIR", example_path.parent.parent)
-    monkeypatch.setattr(server, "STATE_DIR", config_path.parent.parent)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_write_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(webui_context, "CODE_DIR", example_path.parent.parent)
+    monkeypatch.setattr(webui_context, "STATE_DIR", config_path.parent.parent)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_write_audit_log", lambda *args, **kwargs: None)
     return config_path, example_path, user
 
 
 def update(path, value, remove=False):
     with server.app.test_request_context("/api/config_update", method="POST", json={"path": path, "value": value, "remove": remove}):
-        result = server.config_update()
+        result = config_routes.config_update()
         response, status = result if isinstance(result, tuple) else (result, 200)
         return response.get_json(), status
 
@@ -48,7 +52,7 @@ def test_individual_override_round_trip_preserves_falsy_values_and_inheritance(t
     result, status = update(path, value)
     assert status == 200, result
     expected = {**original["TRACKERS"]["AITHER"], key: value}
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved["TRACKERS"]["AITHER"] == expected
     assert type(saved["TRACKERS"]["AITHER"][key]) is type(value)
     assert saved["DEFAULT"] == original["DEFAULT"]
@@ -57,15 +61,15 @@ def test_individual_override_round_trip_preserves_falsy_values_and_inheritance(t
     assert status == 200, result
     assert result["value"] is None
     expected[key] = None
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
     # Retrying inheritance retains the key and never turns it into False, 0 or "".
     assert update(path, None)[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
     sync_user_config(config_path, example_path)
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"][key] is None
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"][key] is None
     # Re-enabling also preserves explicit falsy values after synchronization.
     assert update(path, value)[1] == 200
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved["TRACKERS"]["AITHER"][key] == value
     assert type(saved["TRACKERS"]["AITHER"][key]) is type(value)
     assert example_path.read_bytes() == example_bytes
@@ -76,7 +80,7 @@ def test_legacy_removal_request_retains_inheritance_and_preserves_another_overri
     assert update(["TRACKERS", "AITHER", "add_logo"], False)[1] == 200
     assert update(["TRACKERS", "AITHER", "multiScreens"], 0)[1] == 200
     assert update(["TRACKERS", "AITHER", "add_logo"], False, remove=True)[1] == 200
-    tracker = server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
+    tracker = webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
     assert tracker["add_logo"] is None
     assert tracker["multiScreens"] == 0
 
@@ -87,17 +91,17 @@ def test_existing_override_missing_from_tracker_template_remains_editable(tracke
     config_path.write_text(f"config = {original!r}\n", encoding="utf-8")
     path = ["TRACKERS", "AITHER", "custom_header"]
     assert update(path, "Updated header")[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["custom_header"] == "Updated header"
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["custom_header"] == "Updated header"
     assert update(path, "Updated header", remove=True)[1] == 200
     original["TRACKERS"]["AITHER"]["custom_header"] = None
-    assert server._load_config_from_file(config_path) == original
+    assert webui_config_store._load_config_from_file(config_path) == original
     assert update(path, "Re-enabled header")[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["custom_header"] == "Re-enabled header"
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["custom_header"] == "Re-enabled header"
 
 
 def set_overrides(enabled, tracker="AITHER"):
     with server.app.test_request_context("/api/config_set_tracker_overrides", method="POST", json={"tracker": tracker, "enabled": enabled}):
-        result = server.config_set_tracker_overrides()
+        result = config_routes.config_set_tracker_overrides()
         response, status = result if isinstance(result, tuple) else (result, 200)
         return response.get_json(), status
 
@@ -111,7 +115,7 @@ def test_disable_save_sync_reload_keeps_keys_and_follows_default_changes(tracker
         assert update(["TRACKERS", "AITHER", key], None)[1] == 200
 
     # New general defaults are added while tracker options remain user-managed.
-    example = server._load_config_from_file(example_path)
+    example = webui_config_store._load_config_from_file(example_path)
     example["DEFAULT"]["new_option"] = True
     example["TRACKERS"]["AITHER"]["new_option"] = True
     example_path.write_text(f"config = {example!r}\n", encoding="utf-8")
@@ -119,13 +123,13 @@ def test_disable_save_sync_reload_keeps_keys_and_follows_default_changes(tracker
     assert result.added_paths == ("DEFAULT.new_option",)
     assert not sync_user_config(config_path, example_path).changed
 
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved["DEFAULT"]["new_option"] is True
     assert saved["TRACKERS"]["AITHER"] == {
         **original["TRACKERS"]["AITHER"],
         **dict.fromkeys(keys),
     }
-    items = server._build_config_items(example["TRACKERS"]["AITHER"], saved["TRACKERS"]["AITHER"], {}, {}, ["TRACKERS", "AITHER"])
+    items = webui_config_store._build_config_items(example["TRACKERS"]["AITHER"], saved["TRACKERS"]["AITHER"], {}, {}, ["TRACKERS", "AITHER"])
     for item in items:
         if item["key"] in keys:
             assert item["source"] == "config"
@@ -138,7 +142,7 @@ def test_disable_save_sync_reload_keeps_keys_and_follows_default_changes(tracker
         for key, value in defaults.items():
             assert update(["DEFAULT", key], value)[1] == 200
         assert not sync_user_config(config_path, example_path).changed
-        builder = DescriptionBuilder("AITHER", server._load_config_from_file(config_path))
+        builder = DescriptionBuilder("AITHER", webui_config_store._load_config_from_file(config_path))
         assert builder._get_bool_config("add_logo") is defaults["add_logo"]
         assert builder._get_int_config("multiScreens") == defaults["multiScreens"]
         assert builder._get_str_config("custom_signature") == defaults["custom_signature"]
@@ -155,10 +159,10 @@ def test_bulk_disable_keeps_inherited_keys_including_legacy_fields(tracker_confi
         **original["TRACKERS"]["AITHER"],
         **dict.fromkeys(("add_logo", "multiScreens", "custom_signature", "custom_header")),
     }
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
     assert not sync_user_config(config_path, example_path).changed
     assert set_overrides(False)[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == expected
 
 
 def test_bulk_disable_can_save_inheritance_for_an_unsaved_tracker(tracker_config):
@@ -166,7 +170,7 @@ def test_bulk_disable_can_save_inheritance_for_an_unsaved_tracker(tracker_config
     config_path.write_text(f"config = {{'DEFAULT': {original['DEFAULT']!r}}}\n", encoding="utf-8")
     assert set_overrides(False)[1] == 200
     assert not sync_user_config(config_path, example_path).changed
-    tracker = server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
+    tracker = webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
     assert tracker == {"add_logo": None, "multiScreens": None, "custom_signature": None}
 
 
@@ -192,7 +196,7 @@ def test_unknown_override_paths_do_not_modify_config(tracker_config, path):
 def test_override_inheritance_requires_authenticated_same_origin_session(tracker_config, monkeypatch, guard, status):
     config_path, _, _ = tracker_config
     original = config_path.read_bytes()
-    monkeypatch.setattr(server, guard, lambda: False)
+    monkeypatch.setattr(webui_security, guard, lambda: False)
     assert update(["TRACKERS", "AITHER", "add_logo"], None)[1] == status
     assert set_overrides(False)[1] == status
     assert config_path.read_bytes() == original

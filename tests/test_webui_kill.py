@@ -7,7 +7,12 @@ import time
 
 import psutil
 
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
+import web_ui.sessions as webui_sessions
 
 
 def test_execute_missing_path_preserves_running_session_process(monkeypatch) -> None:
@@ -19,21 +24,21 @@ def test_execute_missing_path_preserves_running_session_process(monkeypatch) -> 
     terminated_processes = []
     session_id = "replace-running-process-test"
 
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_terminate_process_tree", terminated_processes.append)
-    with server.active_processes_lock:
-        server.active_processes[session_id] = {"mode": "subprocess", "process": process}
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", terminated_processes.append)
+    with webui_session_state.active_processes_lock:
+        webui_session_state.active_processes[session_id] = {"mode": "subprocess", "process": process}
 
     try:
         response = server.app.test_client().post("/api/execute", json={"path": "", "session_id": session_id})
 
         assert response.status_code == 400
         assert terminated_processes == []
-        assert server.active_processes[session_id]["process"] is process
+        assert webui_session_state.active_processes[session_id]["process"] is process
     finally:
-        with server.active_processes_lock:
-            server.active_processes.pop(session_id, None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop(session_id, None)
 
 
 def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
@@ -48,15 +53,15 @@ def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
     worker_pid = int(controller.stdout.readline().strip())
 
     try:
-        terminate_process_tree = server._terminate_process_tree
-        monkeypatch.setattr(server, "_terminate_process_tree", lambda process: terminate_process_tree(process, timeout=0.5))
-        monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-        monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-        monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-        monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+        terminate_process_tree = webui_processes._terminate_process_tree
+        monkeypatch.setattr(webui_processes, "_terminate_process_tree", lambda process: terminate_process_tree(process, timeout=0.5))
+        monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+        monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+        monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+        monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
         session_id = "kill-tree-test"
-        with server.active_processes_lock:
-            server.active_processes[session_id] = {"mode": "subprocess", "process": controller}
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes[session_id] = {"mode": "subprocess", "process": controller}
 
         response = server.app.test_client().post("/api/kill", json={"session_id": session_id})
 
@@ -76,8 +81,8 @@ def test_kill_endpoint_stops_upload_controller_and_worker(monkeypatch) -> None:
             time.sleep(0.05)
         assert not _is_running(worker_pid)
     finally:
-        with server.active_processes_lock:
-            server.active_processes.pop("kill-tree-test", None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop("kill-tree-test", None)
         if controller.poll() is None:
             controller.kill()
             controller.wait(timeout=5)
@@ -87,24 +92,24 @@ def test_kill_keeps_session_when_process_tree_termination_fails(monkeypatch) -> 
     process = object()
     session_id = "failed-kill-test"
 
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_terminate_process_tree", lambda _: False)
-    monkeypatch.setattr(server, "_close_webui_process_io", lambda _: None)
-    with server.active_processes_lock:
-        server.active_processes[session_id] = {"mode": "subprocess", "process": process}
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", lambda _: False)
+    monkeypatch.setattr(webui_processes, "_close_webui_process_io", lambda _: None)
+    with webui_session_state.active_processes_lock:
+        webui_session_state.active_processes[session_id] = {"mode": "subprocess", "process": process}
 
     try:
         response = server.app.test_client().post("/api/kill", json={"session_id": session_id})
 
         assert response.status_code == 500
         assert response.get_json() == {"error": "Failed to terminate process tree", "success": False}
-        assert server.active_processes[session_id]["process"] is process
+        assert webui_session_state.active_processes[session_id]["process"] is process
     finally:
-        with server.active_processes_lock:
-            server.active_processes.pop(session_id, None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop(session_id, None)
 
 
 def test_sse_disconnect_terminates_running_process_tree_when_keep_running_is_disabled(tmp_path, monkeypatch) -> None:
@@ -121,15 +126,15 @@ def test_sse_disconnect_terminates_running_process_tree_when_keep_running_is_dis
     terminated_processes = []
     session_id = "sse-disconnect-test"
 
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
-    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
-    monkeypatch.setattr(server, "_terminate_process_tree", terminated_processes.append)
-    monkeypatch.setattr(server, "_close_webui_process_io", lambda _: None)
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (False, 0.0))
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(webui_paths, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", terminated_processes.append)
+    monkeypatch.setattr(webui_processes, "_close_webui_process_io", lambda _: None)
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (False, 0.0))
 
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
     try:
@@ -139,11 +144,11 @@ def test_sse_disconnect_terminates_running_process_tree_when_keep_running_is_dis
 
         # The session pump may terminate the orphaned tree again; the stream does it first.
         assert terminated_processes[0] is process
-        assert session_id not in server.active_processes
+        assert session_id not in webui_session_state.active_processes
     finally:
         response.close()
-        with server.active_processes_lock:
-            server.active_processes.pop(session_id, None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop(session_id, None)
         # The session thread must finish while this test's patches are active.
         for thread in threading.enumerate():
             if thread.name == f"webui-session-{session_id}":
@@ -159,4 +164,4 @@ def test_process_tree_termination_refuses_init_and_idle_pids() -> None:
             return None
 
     # Walking PID 1's children would stop every process on the machine.
-    assert server._terminate_process_tree(InitLookalike()) is False
+    assert webui_processes._terminate_process_tree(InitLookalike()) is False

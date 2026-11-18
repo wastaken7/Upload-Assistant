@@ -1,12 +1,13 @@
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import web_ui.flask_compat as webui_flask_compat
 import web_ui.server as server
 
 
 def _static_url(filename: str) -> str:
     with server.app.test_request_context():
-        return server.url_for("static", filename=filename)
+        return webui_flask_compat.url_for("static", filename=filename)
 
 
 def test_template_asset_urls_carry_the_file_modification_time() -> None:

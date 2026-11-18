@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.context as webui_context
+import web_ui.preview as webui_preview
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
 from src import webui_events
 
 TEST_NONCE = "fictional-nonce"
@@ -28,7 +32,7 @@ def gui_env(monkeypatch):
 
 @pytest.fixture
 def state_tmp(tmp_path, monkeypatch) -> Path:
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path / "state")
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path / "state")
     artwork = tmp_path / "state" / "tmp" / "fictional-release" / "artwork"
     artwork.mkdir(parents=True)
     return artwork
@@ -93,7 +97,7 @@ def test_server_swaps_a_local_cover_for_a_per_item_url(state_tmp) -> None:
     cover.write_bytes(b"png")
     process_state: dict[str, object] = {"path": "/media/Fictional.Movie.2020.mkv"}
 
-    event = server._resolve_gui_item_artwork("session 1", process_state, {"kind": "item", "index": 2, "artwork_file": str(cover)})
+    event = webui_preview._resolve_gui_item_artwork("session 1", process_state, {"kind": "item", "index": 2, "artwork_file": str(cover)})
 
     assert "artwork_file" not in event
     assert str(event["artwork"]).startswith("/api/execution_item_cover?session_id=session%201&item=2&v=")
@@ -110,8 +114,8 @@ def test_server_drops_covers_outside_temp_storage_and_the_release(state_tmp, tmp
     elsewhere.write_bytes(b"jpg")
     process_state: dict[str, object] = {"path": str(release)}
 
-    accepted = server._resolve_gui_item_artwork("s", process_state, {"kind": "item", "index": 1, "artwork_file": str(sidecar)})
-    rejected = server._resolve_gui_item_artwork("s", process_state, {"kind": "item", "index": 2, "artwork_file": str(elsewhere)})
+    accepted = webui_preview._resolve_gui_item_artwork("s", process_state, {"kind": "item", "index": 1, "artwork_file": str(sidecar)})
+    rejected = webui_preview._resolve_gui_item_artwork("s", process_state, {"kind": "item", "index": 2, "artwork_file": str(elsewhere)})
 
     assert "artwork" in accepted
     assert rejected == {"kind": "item", "index": 2}
@@ -121,14 +125,14 @@ def test_server_drops_covers_outside_temp_storage_and_the_release(state_tmp, tmp
 def test_server_leaves_other_events_untouched() -> None:
     event = {"kind": "notice", "artwork_file": "/etc/passwd"}
 
-    assert server._resolve_gui_item_artwork("s", {}, event) is event
+    assert webui_preview._resolve_gui_item_artwork("s", {}, event) is event
 
 
 def test_item_cover_endpoint_serves_only_recorded_covers(state_tmp, monkeypatch) -> None:
     cover = state_tmp / "POSTER.png"
     cover.write_bytes(b"fictional-png")
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setitem(server.active_processes, "session-1", {"item_covers": {1: cover}})
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setitem(webui_session_state.active_processes, "session-1", {"item_covers": {1: cover}})
     client = server.app.test_client()
 
     served = client.get("/api/execution_item_cover?session_id=session-1&item=1&v=1")
