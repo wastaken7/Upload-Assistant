@@ -338,6 +338,11 @@ TRANSMISSION_SAVED = {
         ({"transmission_path": "/private/rpc"}, False),  # paths are case-sensitive
         ({"transmission_path": None, "transmission_protocol": None}, False),  # omitted fields fall back to http + default path
         ({"transmission_host": "SEEDBOX.invalid"}, False),
+        ({"transmission_path": "/Private/RPC/"}, False),  # trailing slashes are significant
+        ({"transmission_port": True}, False),  # a JSON true is not port 443
+        ({"VERIFY_WEBUI_CERTIFICATE": REDACTED_PLACEHOLDER}, False),  # a placeholder cannot skip the check
+        ({"VERIFY_WEBUI_CERTIFICATE": False}, False),
+        ({"VERIFY_WEBUI_CERTIFICATE": True}, True),
     ],
 )
 def test_transmission_destination_check(draft_changes, expected):
@@ -383,7 +388,7 @@ def test_enabling_2fa_voids_a_password_only_confirmation(redaction_config, reaut
     monkeypatch.setattr(webui_security, "_totp_enabled", lambda: totp["enabled"])
 
     with server.app.test_request_context("/api/settings_reauth", method="POST"):
-        webui_security._mark_settings_reauthenticated()
+        webui_security._mark_settings_reauthenticated(totp_verified=False)
         assert webui_security._settings_reauth_valid()
         totp["enabled"] = True
         assert not webui_security._settings_reauth_valid()
@@ -408,3 +413,15 @@ def test_audit_log_redacts_torrent_client_usernames():
         "qbit_user": "<redacted>",
         "qbit_url": "http://127.0.0.1",
     }
+
+
+@pytest.mark.real_settings_reauth
+def test_confirmation_records_the_2fa_state_that_was_checked(redaction_config, reauth_account, monkeypatch):
+    import web_ui.routes.account as account_routes
+
+    states = iter([False, True, True])  # 2FA is enabled elsewhere right after the check
+    monkeypatch.setattr(webui_security, "_totp_enabled", lambda: next(states))
+
+    with server.app.test_request_context("/api/settings_reauth", method="POST", json={"password": "right-password"}):
+        assert account_routes.settings_reauth().get_json()["success"] is True
+        assert not webui_security._settings_reauth_valid()

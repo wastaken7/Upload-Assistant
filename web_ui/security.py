@@ -284,7 +284,7 @@ def _mark_session_authenticated(username: str) -> None:
             "username": username,
             "account": fingerprint,
             "csrf_token": secrets.token_urlsafe(32),
-            "settings_reauth": _settings_reauth_state(fingerprint),
+            "settings_reauth": _settings_reauth_state(fingerprint, _totp_enabled()),
         }
     )
     # Issue a new session id so an id known before sign-in cannot be reused.
@@ -298,15 +298,19 @@ SETTINGS_REAUTH_SECONDS = 15 * 60
 SETTINGS_REAUTH_HEADER = "X-UA-Reauth-Required"
 
 
-def _mark_settings_reauthenticated() -> None:
-    """Allow settings changes from this browser session for a short time."""
-    _session_set("settings_reauth", _settings_reauth_state(_account_fingerprint()))
+def _mark_settings_reauthenticated(totp_verified: bool) -> None:
+    """Allow settings changes from this browser session for a short time.
+
+    ``totp_verified`` is the 2FA state checked by the caller, read before
+    verification, so a concurrent 2FA change cannot be recorded as verified.
+    """
+    _session_set("settings_reauth", _settings_reauth_state(_account_fingerprint(), totp_verified))
 
 
-def _settings_reauth_state(fingerprint: str | None) -> dict[str, object]:
+def _settings_reauth_state(fingerprint: str | None, totp_enabled: bool) -> dict[str, object]:
     # Record the 2FA state that was verified: enabling 2FA elsewhere must
     # require the new factor before, for example, disabling it again.
-    return {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": fingerprint, "totp": _totp_enabled()}
+    return {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": fingerprint, "totp": totp_enabled}
 
 
 def _settings_reauth_valid() -> bool:

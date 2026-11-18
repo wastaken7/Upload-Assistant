@@ -25,28 +25,35 @@ const ok = () => new Response("{}", { status: 200 });
 function fixture(responses, promptResult = true) {
   const prompts = [];
   const calls = [];
+  const tokens = [];
   const context = vm.createContext({
     Response,
-    uaCsrfToken: "fictional-token",
-    loadCsrfToken: async () => {},
-    clearCsrfToken: () => {},
+    uaCsrfToken: "stale-token",
+    // A forced refresh installs a new token, like the real loader.
+    loadCsrfToken: async (force = false) => {
+      if (force) context.uaCsrfToken = "fresh-token";
+    },
+    clearCsrfToken: () => {
+      context.uaCsrfToken = null;
+    },
     window: {
       UAReauthPrompt: async (info) => {
         prompts.push(info);
         return promptResult;
       },
     },
-    fetch: async (url) => {
+    fetch: async (url, options) => {
       calls.push(url);
+      tokens.push(options.headers["X-CSRF-Token"]);
       return responses.shift()();
     },
   });
   vm.runInContext(shared.slice(helper.start, helper.end), context);
-  return { context, prompts, calls };
+  return { context, prompts, calls, tokens };
 }
 
 test("a stale CSRF token still reaches the password prompt", async () => {
-  const { context, prompts, calls } = fixture([
+  const { context, prompts, calls, tokens } = fixture([
     csrfFailure,
     reauthChallenge,
     ok,
@@ -58,15 +65,21 @@ test("a stale CSRF token still reaches the password prompt", async () => {
   assert.equal(prompts.length, 1);
   assert.equal(prompts[0].totpRequired, true);
   assert.equal(calls.length, 3);
+  assert.deepEqual(tokens, ["stale-token", "fresh-token", "fresh-token"]);
 });
 
 test("a confirmed request can still refresh its CSRF token", async () => {
-  const { context, calls } = fixture([reauthChallenge, csrfFailure, ok]);
+  const { context, calls, tokens } = fixture([
+    reauthChallenge,
+    csrfFailure,
+    ok,
+  ]);
   const response = await context.uaApiFetch("/api/config_update", {
     method: "POST",
   });
   assert.equal(response.status, 200);
   assert.equal(calls.length, 3);
+  assert.deepEqual(tokens, ["stale-token", "stale-token", "fresh-token"]);
 });
 
 test("the prompt is shown once and a cancel returns the challenge", async () => {

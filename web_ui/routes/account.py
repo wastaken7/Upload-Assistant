@@ -64,14 +64,15 @@ def settings_reauth():
     persisted = _load_user_record()
     username = persisted.get("username") if persisted else None
     password_ok = isinstance(username, str) and isinstance(password, str) and bool(password) and auth_mod.verify_user(username, password)
-    totp_ok = not security_mod._totp_enabled() or (bool(totp_code) and security_mod._verify_totp_code(totp_code))
+    totp_enabled = security_mod._totp_enabled()
+    totp_ok = not totp_enabled or (bool(totp_code) and security_mod._verify_totp_code(totp_code))
     if not (password_ok and totp_ok):
         # The rate limit above bounds guessing. Failed sign-in tracking is not
         # used here: it adds the address to the permanent IP blacklist, which
         # would lock the owner out after a few typos in an open session.
         return jsonify({"success": False, "error": "Password or 2FA code did not match"}), 400
 
-    security_mod._mark_settings_reauthenticated()
+    security_mod._mark_settings_reauthenticated(totp_enabled)
     return jsonify({"success": True, "valid_seconds": security_mod.SETTINGS_REAUTH_SECONDS})
 
 

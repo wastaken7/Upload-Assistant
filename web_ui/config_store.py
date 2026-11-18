@@ -476,16 +476,22 @@ def _contains_redacted(value: Any) -> bool:
     return value == REDACTED_PLACEHOLDER
 
 
-def _same_destination_value(draft: Any, saved: Any) -> bool:
-    """Compare a draft destination field with its saved value, ignoring whitespace and a trailing slash."""
+def _same_destination_value(draft: Any, saved: Any, *, boolean: bool = False) -> bool:
+    """Compare a draft destination field with its saved value, ignoring surrounding whitespace.
+
+    Case and trailing slashes are kept: URL paths are case- and slash-sensitive
+    and a reverse proxy may route them to different services.
+    """
+    if boolean:
+        return isinstance(draft, bool) and draft == (True if saved is None else saved)
     if isinstance(draft, bool) or isinstance(saved, bool):
-        return bool(draft) == bool(True if saved is None else saved)
+        # A JSON true must not match a saved port such as 9091.
+        return False
     return _normalize_destination(draft) == _normalize_destination(saved)
 
 
 def _normalize_destination(value: Any) -> str:
-    # Case is kept: URL paths are case-sensitive and may reach different services.
-    return "" if value is None else str(value).strip().rstrip("/")
+    return "" if value is None else str(value).strip()
 
 
 def _destination_matches(draft: Mapping[str, Any], saved: Any, keys: tuple[str, ...]) -> bool:
@@ -499,10 +505,8 @@ def _destination_matches(draft: Mapping[str, Any], saved: Any, keys: tuple[str, 
         return False
     for key in keys:
         default = TORRENT_CLIENT_DESTINATION_DEFAULTS.get(key)
-        draft_value = draft.get(key, default)
-        if draft_value == REDACTED_PLACEHOLDER:
-            continue
-        if not _same_destination_value(draft_value, saved_dict.get(key, default)):
+        # A placeholder in a destination field never matches, so it cannot skip the check.
+        if not _same_destination_value(draft.get(key, default), saved_dict.get(key, default), boolean=key == "VERIFY_WEBUI_CERTIFICATE"):
             return False
     return True
 
