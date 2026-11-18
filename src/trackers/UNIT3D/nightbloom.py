@@ -7,7 +7,7 @@ from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
-# The fields of the site's upload form. It has no staff flags.
+# The fields of the site's upload form.
 _UPLOAD_FIELDS = frozenset(
     {
         "name",
