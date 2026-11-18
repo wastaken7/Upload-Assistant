@@ -347,30 +347,50 @@
 
   async function uaApiFetch(url, options = {}, retryOnAuthFail = true) {
     if (window.UAScreenshotMode) return window.UAScreenshotMode.apiFetch();
-    await loadCsrfToken();
-    const headers = { ...(options.headers || {}) };
-    if (uaCsrfToken) headers["X-CSRF-Token"] = uaCsrfToken;
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "same-origin",
-    });
-    if (
-      retryOnAuthFail &&
-      (response.status === 401 || response.status === 403)
-    ) {
-      // Attempt a single refresh and retry
-      clearCsrfToken();
-      await loadCsrfToken(true);
-      const headers2 = { ...(options.headers || {}) };
-      if (uaCsrfToken) headers2["X-CSRF-Token"] = uaCsrfToken;
-      return fetch(url, {
+    // One CSRF refresh and one password confirmation per call, in either
+    // order, so a stale token cannot hide the confirmation prompt.
+    let csrfRetried = !retryOnAuthFail;
+    let reauthRetried = !retryOnAuthFail;
+    for (;;) {
+      await loadCsrfToken();
+      const headers = { ...(options.headers || {}) };
+      if (uaCsrfToken) headers["X-CSRF-Token"] = uaCsrfToken;
+      const response = await fetch(url, {
         ...options,
-        headers: headers2,
+        headers,
         credentials: "same-origin",
       });
+      if (response.headers.get("X-UA-Reauth-Required") === "1") {
+        // Settings changes need a recent password confirmation. Pages that
+        // register a prompt ask for it once and repeat the request.
+        if (reauthRetried || typeof window.UAReauthPrompt !== "function") {
+          return response;
+        }
+        reauthRetried = true;
+        let info = {};
+        try {
+          info = await response.clone().json();
+        } catch (_error) {
+          info = {};
+        }
+        const confirmed = await window.UAReauthPrompt({
+          totpRequired: Boolean(info.totp_required),
+        });
+        if (!confirmed) return response;
+        continue;
+      }
+      if (
+        !csrfRetried &&
+        (response.status === 401 || response.status === 403)
+      ) {
+        // Attempt a single CSRF refresh and retry
+        csrfRetried = true;
+        clearCsrfToken();
+        await loadCsrfToken(true);
+        continue;
+      }
+      return response;
     }
-    return response;
   }
 
   async function requestUATrackerStatuses(trackerNames = null) {

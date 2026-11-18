@@ -418,6 +418,121 @@ def _validate_release_group_overrides(value: object) -> None:
                 raise ValueError(f"Overrides for {name} must contain text fields or null values.")
 
 
+REDACTED_PLACEHOLDER = "<REDACTED>"
+# Keep in sync with sensitiveKeyPattern in web_ui/static/js/config_app.js.
+_SENSITIVE_CONFIG_KEY_PATTERN = re.compile(
+    r"(api|username|password|announce_url|rss_key|passkey|qui_proxy_url|userhash|secret|token|client_id|login_answer|rtorrent_url|^cookies$)",
+    re.IGNORECASE,
+)
+
+
+def _is_sensitive_config_path(path: list[str]) -> bool:
+    """Return True when the config field at ``path`` holds a credential."""
+    if not path:
+        return False
+    key = path[-1]
+    if _SENSITIVE_CONFIG_KEY_PATTERN.search(key):
+        return True
+    return "TORRENT_CLIENTS" in path and re.search(r"(user|pass)", key, re.IGNORECASE) is not None
+
+
+def _redact_config_value(path: list[str], value: Any, example_value: Any) -> Any:
+    """Hide a saved credential before it is sent to the browser.
+
+    Values equal to the public example (placeholders) stay visible so the UI can
+    still tell an unconfigured field from a configured one.
+    """
+    if not isinstance(value, str) or not value.strip() or value == example_value:
+        return value
+    return REDACTED_PLACEHOLDER if _is_sensitive_config_path(path) else value
+
+
+# Draft fields that decide where a torrent-client test sends saved credentials.
+TORRENT_CLIENT_DESTINATION_KEYS = (
+    "torrent_client",
+    "qbit_url",
+    "qbit_port",
+    "deluge_url",
+    "deluge_port",
+    "transmission_protocol",
+    "transmission_host",
+    "transmission_port",
+    "transmission_path",
+    "VERIFY_WEBUI_CERTIFICATE",
+)
+
+
+# Values the connection test uses when a destination field is missing.
+TORRENT_CLIENT_DESTINATION_DEFAULTS: dict[str, Any] = {
+    "transmission_protocol": "http",
+    "transmission_path": "/transmission/rpc",
+    "VERIFY_WEBUI_CERTIFICATE": True,
+}
+
+
+def _contains_redacted(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return any(_contains_redacted(item) for item in cast(Mapping[str, Any], value).values())
+    return value == REDACTED_PLACEHOLDER
+
+
+def _same_destination_value(draft: Any, saved: Any, *, boolean: bool = False) -> bool:
+    """Compare a draft destination field with its saved value, ignoring surrounding whitespace.
+
+    Case and trailing slashes are kept: URL paths are case- and slash-sensitive
+    and a reverse proxy may route them to different services.
+    """
+    if boolean:
+        return isinstance(draft, bool) and draft == (True if saved is None else saved)
+    if isinstance(draft, bool) or isinstance(saved, bool):
+        # A JSON true must not match a saved port such as 9091.
+        return False
+    return _normalize_destination(draft) == _normalize_destination(saved)
+
+
+def _normalize_destination(value: Any) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _destination_matches(draft: Mapping[str, Any], saved: Any, keys: tuple[str, ...]) -> bool:
+    """Return True when the draft would contact the same place as the saved config.
+
+    Missing fields resolve to the connection test's defaults on both sides, so
+    omitting a field cannot silently change the destination.
+    """
+    saved_dict = _as_dict(saved)
+    if saved_dict is None:
+        return False
+    for key in keys:
+        default = TORRENT_CLIENT_DESTINATION_DEFAULTS.get(key)
+        # A placeholder in a destination field never matches, so it cannot skip the check.
+        if not _same_destination_value(draft.get(key, default), saved_dict.get(key, default), boolean=key == "VERIFY_WEBUI_CERTIFICATE"):
+            return False
+    return True
+
+
+def _find_redacted_sensitive_path(path: list[str], value: Any) -> list[str] | None:
+    """Return the first sensitive path under ``value`` that holds the placeholder."""
+    if isinstance(value, Mapping):
+        for key, child in cast(Mapping[str, Any], value).items():
+            found = _find_redacted_sensitive_path([*path, str(key)], child)
+            if found is not None:
+                return found
+        return None
+    return path if value == REDACTED_PLACEHOLDER and _is_sensitive_config_path(path) else None
+
+
+def _restore_redacted_values(draft: Any, saved: Any) -> Any:
+    """Replace ``<REDACTED>`` placeholders in a draft with the saved values."""
+    if isinstance(draft, Mapping):
+        saved_dict = _as_dict(saved) or {}
+        draft_dict = cast(Mapping[str, Any], draft)
+        return {key: _restore_redacted_values(value, saved_dict.get(key)) for key, value in draft_dict.items()}
+    if draft == REDACTED_PLACEHOLDER:
+        return saved if isinstance(saved, str) else ""
+    return draft
+
+
 def _build_config_items(
     example_section: dict[str, Any],
     user_section: dict[str, Any],
@@ -515,7 +630,7 @@ def _build_config_items(
                 source = "example"
             item = {
                 "key": key,
-                "value": _json_safe(value),
+                "value": _json_safe(_redact_config_value(key_path, value, example_value)),
                 "example_value": _json_safe(example_value),
                 "source": source,
                 "help": help_text,
@@ -837,7 +952,6 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
 
     if not path:
         raise ValueError("Invalid path")
-
     example_value = _get_nested_value(example_config, path)
 
     if example_value is None and len(path) >= 3 and path[0] == "TORRENT_CLIENTS":
@@ -888,6 +1002,11 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
+    # The browser only ever sees the placeholder; never persist it, including
+    # inside a whole-section update.
+    redacted_path = _find_redacted_sensitive_path(path, coerced_value)
+    if redacted_path is not None:
+        raise ValueError(f"Refusing to save the redacted placeholder for {'/'.join(redacted_path)}; re-enter the value")
     if len(path) == 2 and path[0] == "TRACKERS" and coerced_value == {} and isinstance(example_value, Mapping):
         saved_trackers = _as_dict(prior_config.get("TRACKERS")) or {}
         if path[1].casefold() not in {str(name).casefold() for name in saved_trackers}:

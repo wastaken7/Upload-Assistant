@@ -49,6 +49,33 @@ def csrf_token():
         return jsonify({"csrf_token": "", "success": False}), 500  # nosec: B105 - not a hardcoded password
 
 
+@bp.route("/api/settings_reauth", methods=["POST"])
+@limiter.limit("5 per minute;30 per day", key_func=_rate_limit_key_func)
+def settings_reauth():
+    """Confirm the account password (and 2FA code) before settings changes."""
+    if not security_mod._is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    data = _request_json_dict()
+    password = data.get("password")
+    totp_code = str(data.get("totp_code") or "").strip()
+    persisted = _load_user_record()
+    username = persisted.get("username") if persisted else None
+    password_ok = isinstance(username, str) and isinstance(password, str) and bool(password) and auth_mod.verify_user(username, password)
+    totp_enabled = security_mod._totp_enabled()
+    totp_ok = not totp_enabled or (bool(totp_code) and security_mod._verify_totp_code(totp_code))
+    if not (password_ok and totp_ok):
+        # The rate limit above bounds guessing. Failed sign-in tracking is not
+        # used here: it adds the address to the permanent IP blacklist, which
+        # would lock the owner out after a few typos in an open session.
+        return jsonify({"success": False, "error": "Password or 2FA code did not match"}), 400
+
+    security_mod._mark_settings_reauthenticated(totp_enabled)
+    return jsonify({"success": True, "valid_seconds": security_mod.SETTINGS_REAUTH_SECONDS})
+
+
 @bp.route("/api/2fa/status")
 def twofa_status():
     """Check 2FA status"""
@@ -95,6 +122,8 @@ def access_log_level_api():
     # Require same-origin for token management actions
     if not security_mod._verify_same_origin():
         return jsonify({"success": False, "error": "Origin validation failed"}), 403
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
 
     if access_logger is None:
         return jsonify({"success": False, "error": "Access logging unavailable"}), 500
@@ -170,6 +199,8 @@ def ip_control_api():
         # Require CSRF and same-origin for POST
         if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
             return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+        if (reauth := security_mod._settings_reauth_required_response()) is not None:
+            return reauth
         try:
             data_raw = request.get_json()
             data = _as_dict(data_raw) or {}
@@ -217,6 +248,8 @@ def twofa_setup():
     # Require CSRF + same-origin for 2FA setup (sensitive auth action)
     if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
         return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
     if security_mod._totp_enabled():
         return jsonify({"error": "2FA already enabled", "success": False}), 400
 
@@ -247,6 +280,8 @@ def twofa_enable():
     # Require CSRF + same-origin for enabling 2FA
     if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
         return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
     data = _request_json_dict()
     code = str(data.get("code", "")).strip()
 
@@ -294,6 +329,8 @@ def twofa_disable():
     # Require CSRF + same-origin for disabling 2FA
     if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
         return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
     if not security_mod._totp_enabled():
         return jsonify({"error": "2FA not enabled", "success": False}), 400
 
@@ -324,6 +361,8 @@ def api_tokens():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
     if not security_mod._verify_csrf_header():
         return jsonify({"success": False, "error": "CSRF validation failed"}), 403
+    if request.method != "GET" and (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
 
     if request.method == "GET":
         store = _list_api_tokens()
