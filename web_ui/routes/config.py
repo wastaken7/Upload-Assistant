@@ -559,6 +559,7 @@ def config_test_torrent_client():
             ), 400
         client_config = config_store_mod._restore_redacted_values(client_config, saved_client)
 
+    destination_defaults = config_store_mod.TORRENT_CLIENT_DESTINATION_DEFAULTS
     client_type = str(client_config.get("torrent_client", "")).strip().lower()
     if client_type not in {"qbit", "rtorrent", "deluge", "transmission", "watch"}:
         return jsonify({"success": False, "error": "Unsupported torrent client type"}), 400
@@ -567,7 +568,7 @@ def config_test_torrent_client():
         message = "Connection successful"
         if client_type == "qbit":
             proxy_url = str(client_config.get("qui_proxy_url", "")).strip()
-            verify_certificate = bool(client_config.get("VERIFY_WEBUI_CERTIFICATE", True))
+            verify_certificate = bool(client_config.get("VERIFY_WEBUI_CERTIFICATE", destination_defaults["VERIFY_WEBUI_CERTIFICATE"]))
             version: str | None = None
             proxy_failure = ""
             if proxy_url:
@@ -649,12 +650,12 @@ def config_test_torrent_client():
         elif client_type == "transmission":
             transmission_rpc = flask_compat_mod._dynamic_import("transmission_rpc")
             transmission_client = transmission_rpc.Client(
-                protocol=str(client_config.get("transmission_protocol", "http")),
+                protocol=str(client_config.get("transmission_protocol", destination_defaults["transmission_protocol"])),
                 host=str(client_config.get("transmission_host", "")),
                 port=int(client_config.get("transmission_port", 0)),
                 username=str(client_config.get("transmission_username", "")),
                 password=str(client_config.get("transmission_password", "")),
-                path=str(client_config.get("transmission_path", "/transmission/rpc")),
+                path=str(client_config.get("transmission_path", destination_defaults["transmission_path"])),
                 timeout=10,
             )
             transmission_client.get_session()

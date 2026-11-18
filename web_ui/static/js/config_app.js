@@ -4721,9 +4721,9 @@ function SettingsReauthModal({ totpRequired, onCancel, onConfirmed }) {
             Confirm your password
           </h2>
           <p className="ua-config-service-description mt-1 text-xs">
-            Settings can change which programs Upload Assistant runs, so
-            changes need a recent password confirmation. You won&apos;t be
-            asked again for 15 minutes.
+            Settings can change which programs Upload Assistant runs, so changes
+            need a recent password confirmation. You won&apos;t be asked again
+            for 15 minutes.
           </p>
         </div>
         <div className="space-y-3 p-4">

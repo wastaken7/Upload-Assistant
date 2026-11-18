@@ -9,7 +9,7 @@ import web_ui.auth as auth_mod
 from web_ui import security as security_mod
 from web_ui.context import access_logger, console
 from web_ui.extensions import _rate_limit_key_func, limiter
-from web_ui.flask_compat import Blueprint, get_remote_address, jsonify, pyotp, request
+from web_ui.flask_compat import Blueprint, jsonify, pyotp, request
 from web_ui.request_utils import _as_dict, _request_json_dict
 from web_ui.security import (
     _create_api_token,
@@ -50,7 +50,7 @@ def csrf_token():
 
 
 @bp.route("/api/settings_reauth", methods=["POST"])
-@limiter.limit("10 per minute;50 per day", key_func=_rate_limit_key_func)
+@limiter.limit("5 per minute;30 per day", key_func=_rate_limit_key_func)
 def settings_reauth():
     """Confirm the account password (and 2FA code) before settings changes."""
     if not security_mod._is_authenticated():
@@ -66,8 +66,9 @@ def settings_reauth():
     password_ok = isinstance(username, str) and isinstance(password, str) and bool(password) and auth_mod.verify_user(username, password)
     totp_ok = not security_mod._totp_enabled() or (bool(totp_code) and security_mod._verify_totp_code(totp_code))
     if not (password_ok and totp_ok):
-        # Count misses like failed sign-ins, so a stolen session cannot guess the password.
-        security_mod._handle_failed_auth(get_remote_address())
+        # The rate limit above bounds guessing. Failed sign-in tracking is not
+        # used here: it adds the address to the permanent IP blacklist, which
+        # would lock the owner out after a few typos in an open session.
         return jsonify({"success": False, "error": "Password or 2FA code did not match"}), 400
 
     security_mod._mark_settings_reauthenticated()

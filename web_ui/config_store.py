@@ -462,6 +462,14 @@ TORRENT_CLIENT_DESTINATION_KEYS = (
 )
 
 
+# Values the connection test uses when a destination field is missing.
+TORRENT_CLIENT_DESTINATION_DEFAULTS: dict[str, Any] = {
+    "transmission_protocol": "http",
+    "transmission_path": "/transmission/rpc",
+    "VERIFY_WEBUI_CERTIFICATE": True,
+}
+
+
 def _contains_redacted(value: Any) -> bool:
     if isinstance(value, Mapping):
         return any(_contains_redacted(item) for item in cast(Mapping[str, Any], value).values())
@@ -469,22 +477,45 @@ def _contains_redacted(value: Any) -> bool:
 
 
 def _same_destination_value(draft: Any, saved: Any) -> bool:
-    """Compare a draft destination field with its saved value, ignoring formatting."""
+    """Compare a draft destination field with its saved value, ignoring whitespace and a trailing slash."""
     if isinstance(draft, bool) or isinstance(saved, bool):
         return bool(draft) == bool(True if saved is None else saved)
     return _normalize_destination(draft) == _normalize_destination(saved)
 
 
 def _normalize_destination(value: Any) -> str:
-    return "" if value is None else str(value).strip().rstrip("/").casefold()
+    # Case is kept: URL paths are case-sensitive and may reach different services.
+    return "" if value is None else str(value).strip().rstrip("/")
 
 
 def _destination_matches(draft: Mapping[str, Any], saved: Any, keys: tuple[str, ...]) -> bool:
-    """Return True when the draft would contact the same place as the saved config."""
+    """Return True when the draft would contact the same place as the saved config.
+
+    Missing fields resolve to the connection test's defaults on both sides, so
+    omitting a field cannot silently change the destination.
+    """
     saved_dict = _as_dict(saved)
     if saved_dict is None:
         return False
-    return all(_same_destination_value(draft[key], saved_dict.get(key)) for key in keys if key in draft and draft[key] != REDACTED_PLACEHOLDER)
+    for key in keys:
+        default = TORRENT_CLIENT_DESTINATION_DEFAULTS.get(key)
+        draft_value = draft.get(key, default)
+        if draft_value == REDACTED_PLACEHOLDER:
+            continue
+        if not _same_destination_value(draft_value, saved_dict.get(key, default)):
+            return False
+    return True
+
+
+def _find_redacted_sensitive_path(path: list[str], value: Any) -> list[str] | None:
+    """Return the first sensitive path under ``value`` that holds the placeholder."""
+    if isinstance(value, Mapping):
+        for key, child in cast(Mapping[str, Any], value).items():
+            found = _find_redacted_sensitive_path([*path, str(key)], child)
+            if found is not None:
+                return found
+        return None
+    return path if value == REDACTED_PLACEHOLDER and _is_sensitive_config_path(path) else None
 
 
 def _restore_redacted_values(draft: Any, saved: Any) -> Any:
@@ -917,10 +948,6 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
 
     if not path:
         raise ValueError("Invalid path")
-    if raw_value == REDACTED_PLACEHOLDER and _is_sensitive_config_path(path):
-        # The browser only ever sees the placeholder; never persist it.
-        raise ValueError(f"Refusing to save the redacted placeholder for {'/'.join(path)}; re-enter the value")
-
     example_value = _get_nested_value(example_config, path)
 
     if example_value is None and len(path) >= 3 and path[0] == "TORRENT_CLIENTS":
@@ -971,6 +998,11 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
         # The runtime accepts fractional minutes even though the example is 60.
         example_value = 60.0
     coerced_value = None if inherit_tracker_override else _coerce_config_value(raw_value, example_value)
+    # The browser only ever sees the placeholder; never persist it, including
+    # inside a whole-section update.
+    redacted_path = _find_redacted_sensitive_path(path, coerced_value)
+    if redacted_path is not None:
+        raise ValueError(f"Refusing to save the redacted placeholder for {'/'.join(redacted_path)}; re-enter the value")
     if len(path) == 2 and path[0] == "TRACKERS" and coerced_value == {} and isinstance(example_value, Mapping):
         saved_trackers = _as_dict(prior_config.get("TRACKERS")) or {}
         if path[1].casefold() not in {str(name).casefold() for name in saved_trackers}:

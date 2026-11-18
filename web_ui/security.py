@@ -284,7 +284,7 @@ def _mark_session_authenticated(username: str) -> None:
             "username": username,
             "account": fingerprint,
             "csrf_token": secrets.token_urlsafe(32),
-            "settings_reauth": {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": fingerprint},
+            "settings_reauth": _settings_reauth_state(fingerprint),
         }
     )
     # Issue a new session id so an id known before sign-in cannot be reused.
@@ -300,7 +300,13 @@ SETTINGS_REAUTH_HEADER = "X-UA-Reauth-Required"
 
 def _mark_settings_reauthenticated() -> None:
     """Allow settings changes from this browser session for a short time."""
-    _session_set("settings_reauth", {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": _account_fingerprint()})
+    _session_set("settings_reauth", _settings_reauth_state(_account_fingerprint()))
+
+
+def _settings_reauth_state(fingerprint: str | None) -> dict[str, object]:
+    # Record the 2FA state that was verified: enabling 2FA elsewhere must
+    # require the new factor before, for example, disabling it again.
+    return {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": fingerprint, "totp": _totp_enabled()}
 
 
 def _settings_reauth_valid() -> bool:
@@ -310,7 +316,7 @@ def _settings_reauth_valid() -> bool:
         return False
     state_map = cast(Mapping[str, Any], state)
     until = state_map.get("until")
-    return isinstance(until, (int, float)) and until > time.time() and _account_fingerprint_matches(state_map.get("account"))
+    return isinstance(until, (int, float)) and until > time.time() and _account_fingerprint_matches(state_map.get("account")) and state_map.get("totp") == _totp_enabled()
 
 
 def _settings_reauth_required_response() -> Any | None:
@@ -884,6 +890,9 @@ _SENSITIVE_KEY_PARTS = (
     "login_answer",
     "proxy_url",
     "rtorrent_url",
+    "username",
+    "qbit_user",
+    "deluge_user",
 )
 
 

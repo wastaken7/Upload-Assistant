@@ -79,9 +79,8 @@ def redaction_config(tmp_path, monkeypatch):
 def _call(path, view, payload=None):
     method = "POST" if payload is not None else "GET"
     with server.app.test_request_context(path, method=method, json=payload):
-        result = view()
-    response, status = result if isinstance(result, tuple) else (result, 200)
-    return response.get_json(), status
+        response = server.app.make_response(view())
+    return response.get_json(), response.status_code
 
 
 def _flatten(items, prefix=()):
@@ -287,7 +286,7 @@ def test_settings_reauth_unlocks_changes_for_the_session(redaction_config, reaut
         result = account_routes.settings_reauth()
         assert result[1] == 400
         assert not webui_security._settings_reauth_valid()
-    assert len(reauth_account) == 1
+    assert reauth_account == []
 
     with server.app.test_request_context("/api/settings_reauth", method="POST", json={"password": "right-password"}):
         response = account_routes.settings_reauth()
@@ -319,3 +318,93 @@ def test_password_sign_in_counts_as_a_settings_confirmation(redaction_config, re
         assert not webui_security._settings_reauth_valid()
         webui_security._mark_session_authenticated("tester")
         assert webui_security._settings_reauth_valid()
+
+
+TRANSMISSION_SAVED = {
+    "torrent_client": "transmission",
+    "transmission_protocol": "https",
+    "transmission_host": "seedbox.invalid",
+    "transmission_port": 443,
+    "transmission_path": "/Private/RPC",
+    "transmission_username": "fictional-user",
+    "transmission_password": "fictional-pass",
+}
+
+
+@pytest.mark.parametrize(
+    ("draft_changes", "expected"),
+    [
+        ({}, True),
+        ({"transmission_path": "/private/rpc"}, False),  # paths are case-sensitive
+        ({"transmission_path": None, "transmission_protocol": None}, False),  # omitted fields fall back to http + default path
+        ({"transmission_host": "SEEDBOX.invalid"}, False),
+    ],
+)
+def test_transmission_destination_check(draft_changes, expected):
+    from web_ui.config_store import TORRENT_CLIENT_DESTINATION_KEYS, _destination_matches
+
+    draft = dict(TRANSMISSION_SAVED, transmission_password=REDACTED_PLACEHOLDER)
+    for key, value in draft_changes.items():
+        if value is None:
+            draft.pop(key)
+        else:
+            draft[key] = value
+
+    assert _destination_matches(draft, TRANSMISSION_SAVED, TORRENT_CLIENT_DESTINATION_KEYS) is expected
+
+
+def test_destination_check_uses_defaults_for_fields_missing_from_saved_config():
+    from web_ui.config_store import TORRENT_CLIENT_DESTINATION_KEYS, _destination_matches
+
+    saved = {"torrent_client": "transmission", "transmission_host": "seedbox.invalid", "transmission_port": 9091}
+    draft = dict(saved, transmission_protocol="http", transmission_path="/transmission/rpc", VERIFY_WEBUI_CERTIFICATE=True)
+
+    assert _destination_matches(draft, saved, TORRENT_CLIENT_DESTINATION_KEYS) is True
+
+
+def test_config_update_refuses_placeholder_inside_a_section_update(redaction_config):
+    before = redaction_config.read_bytes()
+    section = dict(EXAMPLE["TORRENT_CLIENTS"]["qbittorrent"], qbit_user="typed-user", qbit_pass=REDACTED_PLACEHOLDER)
+
+    data, status = _call(
+        "/api/config_update",
+        config_routes.config_update,
+        {"updates": [{"path": ["TORRENT_CLIENTS", "qbittorrent"], "value": section}]},
+    )
+
+    assert status == 400
+    assert "qbittorrent/qbit_pass" in data["error"]
+    assert redaction_config.read_bytes() == before
+
+
+@pytest.mark.real_settings_reauth
+def test_enabling_2fa_voids_a_password_only_confirmation(redaction_config, reauth_account, monkeypatch):
+    totp = {"enabled": False}
+    monkeypatch.setattr(webui_security, "_totp_enabled", lambda: totp["enabled"])
+
+    with server.app.test_request_context("/api/settings_reauth", method="POST"):
+        webui_security._mark_settings_reauthenticated()
+        assert webui_security._settings_reauth_valid()
+        totp["enabled"] = True
+        assert not webui_security._settings_reauth_valid()
+
+
+@pytest.mark.real_settings_reauth
+def test_failed_confirmations_do_not_blacklist_the_address(redaction_config, reauth_account, monkeypatch):
+    import web_ui.routes.account as account_routes
+
+    monkeypatch.setattr(webui_security, "_totp_enabled", lambda: False)
+    for _ in range(5):
+        with server.app.test_request_context("/api/settings_reauth", method="POST", json={"password": "wrong"}):
+            assert account_routes.settings_reauth()[1] == 400
+
+    assert reauth_account == []
+
+
+def test_audit_log_redacts_torrent_client_usernames():
+    assert webui_security._is_sensitive_key("qbit_user")
+    assert webui_security._is_sensitive_key("deluge_user")
+    assert webui_security._redact_sensitive({"qbit_user": "fictional-user", "qbit_url": "http://127.0.0.1"}) == {
+        "qbit_user": "<redacted>",
+        "qbit_url": "http://127.0.0.1",
+    }
