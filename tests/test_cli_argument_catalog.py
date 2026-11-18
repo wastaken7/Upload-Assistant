@@ -2,6 +2,7 @@
 import re
 from pathlib import Path
 
+import web_ui.routes.pages as pages_routes
 from src.args import WEBUI_UNSUPPORTED_OPTIONS, Args, cli_argument_catalog
 from src.meta import Meta
 from web_ui import server
@@ -61,7 +62,7 @@ def test_webui_catalog_describes_value_shapes() -> None:
 
 def test_webui_template_receives_cli_catalog() -> None:
     with server.app.test_request_context("/"):
-        html = server.index()
+        html = pages_routes.index()
 
     assert "window.UA_CLI_ARGUMENTS = [{" in html
     assert '"label": "--developer"' in html

@@ -3,6 +3,10 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.routes.config as config_routes
+import web_ui.security as webui_security
 import web_ui.server as server
 
 
@@ -32,7 +36,7 @@ config: dict[str, Any] = {
         encoding="utf-8",
     )
 
-    comments, subsections = server._extract_example_metadata(example_path)
+    comments, subsections = webui_config_store._extract_example_metadata(example_path)
 
     assert subsections["DEFAULT/update_notification"] == "MAIN SETTINGS"
     assert subsections["DEFAULT/default_torrent_client"] == "CLIENT SELECTION"
@@ -42,9 +46,9 @@ config: dict[str, Any] = {
 
 
 def test_current_example_config_exposes_workflow_subsections() -> None:
-    example_path = server.CODE_DIR / "data" / "example_config.py"
+    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
 
-    _, subsections = server._extract_example_metadata(example_path)
+    _, subsections = webui_config_store._extract_example_metadata(example_path)
 
     assert subsections["DEFAULT/update_notification"] == "MAIN SETTINGS"
     assert subsections["DEFAULT/console_show_time"] == "LOGGING"
@@ -56,15 +60,15 @@ def test_current_example_config_exposes_workflow_subsections() -> None:
 
 
 def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
-    example_path = server.CODE_DIR / "data" / "example_config.py"
-    example_config = server._load_config_from_file(example_path)
+    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
+    example_config = webui_config_store._load_config_from_file(example_path)
     assert example_config is not None
     defaults = example_config["DEFAULT"]
     original_keys = list(defaults)
-    comments, subsections = server._extract_example_metadata(example_path)
+    comments, subsections = webui_config_store._extract_example_metadata(example_path)
 
-    prepared = server._prepare_default_webui_section(defaults, comments, subsections)
-    items = server._build_config_items(prepared, {"stats_enabled": True}, comments, subsections, ["DEFAULT"])
+    prepared = webui_config_store._prepare_default_webui_section(defaults, comments, subsections)
+    items = webui_config_store._build_config_items(prepared, {"stats_enabled": True}, comments, subsections, ["DEFAULT"])
 
     headings = [item["key"] for item in items if item.get("subsection")]
     assert headings[:3] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
@@ -90,7 +94,7 @@ def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
 def test_removed_settings_are_not_exposed_from_existing_config(removed_key: str, legacy_value: object) -> None:
     """Hide retired defaults without discarding saved values or custom fields."""
     user_section = {removed_key: legacy_value, "stats_enabled": True, "custom_setting": "preserved"}
-    items = server._build_config_items(
+    items = webui_config_store._build_config_items(
         {"stats_enabled": False},
         user_section,
         {},
@@ -106,19 +110,19 @@ def test_removed_settings_are_not_exposed_from_existing_config(removed_key: str,
 
 @pytest.mark.parametrize("keep_running,timeout", [(True, 60), (False, 0), (True, 150.5)])
 def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_running, timeout) -> None:
-    example_path = server.CODE_DIR / "data" / "example_config.py"
-    example_config = server._load_config_from_file(example_path)
+    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
+    example_config = webui_config_store._load_config_from_file(example_path)
     assert example_config is not None
     defaults = example_config["DEFAULT"]
     original_defaults = dict(defaults)
-    comments, subsections = server._extract_example_metadata(example_path)
+    comments, subsections = webui_config_store._extract_example_metadata(example_path)
     user_defaults = {
         "webui_keep_uploads_on_disconnect": keep_running,
         "webui_unattended_prompt_timeout": timeout,
     }
 
-    prepared = server._prepare_default_webui_section(defaults, comments, subsections)
-    items = server._build_config_items(prepared, user_defaults, comments, subsections, ["DEFAULT"])
+    prepared = webui_config_store._prepare_default_webui_section(defaults, comments, subsections)
+    items = webui_config_store._build_config_items(prepared, user_defaults, comments, subsections, ["DEFAULT"])
 
     assert [item["key"] for item in items[:3]] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
     session_sections = [item for item in items if item["key"] == "WEBUI SETTINGS"]
@@ -137,8 +141,8 @@ def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_ru
 
 
 def test_current_example_config_exposes_merged_metadata_settings() -> None:
-    example_path = server.CODE_DIR / "data" / "example_config.py"
-    example_config = server._load_config_from_file(example_path)
+    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
+    example_config = webui_config_store._load_config_from_file(example_path)
 
     assert example_config is not None
     defaults = example_config["DEFAULT"]
@@ -149,7 +153,7 @@ def test_current_example_config_exposes_merged_metadata_settings() -> None:
         "ttl_hours": 24,
     }
 
-    _, subsections = server._extract_example_metadata(example_path)
+    _, subsections = webui_config_store._extract_example_metadata(example_path)
     assert subsections["DEFAULT/ggn_api_key"] == "METADATA API CREDENTIALS"
     assert subsections["DEFAULT/audible_domain"] == "GENERAL DESCRIPTION SETTINGS"
     assert subsections["DEFAULT/metadata_cache_services"] == "METADATA CACHING"
@@ -172,8 +176,8 @@ def test_default_client_lists_are_grouped_with_client_selection() -> None:
         "searching_client_list": ["qbittorrent_searching"],
     }
 
-    prepared = server._prepare_default_webui_section(example_section, comments, subsections)
-    items = server._build_config_items(prepared, user_section, comments, subsections, ["DEFAULT"])
+    prepared = webui_config_store._prepare_default_webui_section(example_section, comments, subsections)
+    items = webui_config_store._build_config_items(prepared, user_section, comments, subsections, ["DEFAULT"])
     client_selection = next(item for item in items if item["key"] == "CLIENT SELECTION")
 
     assert [child["key"] for child in client_selection["children"]] == [
@@ -198,7 +202,7 @@ def test_default_arr_fields_expose_all_supported_optional_instances() -> None:
     comments = {}
     subsections = {f"DEFAULT/{key}": "ARR INTEGRATION" for key in example_section}
 
-    prepared = server._prepare_default_webui_section(example_section, comments, subsections)
+    prepared = webui_config_store._prepare_default_webui_section(example_section, comments, subsections)
 
     assert list(prepared) == [
         "use_sonarr",
@@ -246,12 +250,12 @@ def test_config_update_removes_all_optional_arr_instance_keys(
         "config = {'DEFAULT': {'sonarr_url_1': 'http://configured:8989', 'sonarr_api_key_1': ''}}\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr(server, "CODE_DIR", code_dir)
-    monkeypatch.setattr(server, "STATE_DIR", state_dir)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_write_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(webui_context, "CODE_DIR", code_dir)
+    monkeypatch.setattr(webui_context, "STATE_DIR", state_dir)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_write_audit_log", lambda *args, **kwargs: None)
 
     for key in ("sonarr_url_1", "sonarr_api_key_1"):
         with server.app.test_request_context(
@@ -259,10 +263,10 @@ def test_config_update_removes_all_optional_arr_instance_keys(
             method="POST",
             json={"path": ["DEFAULT", key], "value": "", "remove": True},
         ):
-            response = server.config_update()
+            response = config_routes.config_update()
         assert response.get_json()["success"] is True
 
-    updated_config = server._load_config_from_file(config_path)
+    updated_config = webui_config_store._load_config_from_file(config_path)
     assert updated_config == {"DEFAULT": {}}
 
 
@@ -274,18 +278,18 @@ def test_config_update_accepts_dvd_par_boolean(tmp_path: Path, monkeypatch) -> N
     (code_dir / "data" / "example_config.py").write_text("config = {'DEFAULT': {'scale_dvd_screenshots_for_par': True}}\n", encoding="utf-8")
     config_path = state_dir / "data" / "config.py"
     config_path.write_text("config = {'DEFAULT': {}}\n", encoding="utf-8")
-    monkeypatch.setattr(server, "CODE_DIR", code_dir)
-    monkeypatch.setattr(server, "STATE_DIR", state_dir)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_write_audit_log", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_context, "CODE_DIR", code_dir)
+    monkeypatch.setattr(webui_context, "STATE_DIR", state_dir)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_write_audit_log", lambda *_args, **_kwargs: None)
 
     for value, expected in ((True, True), (False, False)):
         with server.app.test_request_context("/api/config_update", method="POST", json={"path": ["DEFAULT", "scale_dvd_screenshots_for_par"], "value": value}):
-            response = server.config_update()
+            response = config_routes.config_update()
         assert response.get_json()["success"] is True
-        assert server._load_config_from_file(config_path)["DEFAULT"]["scale_dvd_screenshots_for_par"] is expected
+        assert webui_config_store._load_config_from_file(config_path)["DEFAULT"]["scale_dvd_screenshots_for_par"] is expected
 
 
 def test_torrent_client_template_prefers_primary_qbittorrent_example() -> None:
@@ -295,7 +299,7 @@ def test_torrent_client_template_prefers_primary_qbittorrent_example() -> None:
         "rtorrent": {"torrent_client": "rtorrent", "host": "rtorrent"},
     }
 
-    match = server._torrent_client_template(example_clients, "QBIT")
+    match = webui_config_store._torrent_client_template(example_clients, "QBIT")
 
     assert match == (
         "qbittorrent",
@@ -324,7 +328,7 @@ def test_custom_torrent_clients_inherit_template_fields_and_help() -> None:
         "TORRENT_CLIENTS/qbittorrent/qbit_url": ["qBittorrent WebUI URL."],
     }
 
-    prepared = server._prepare_torrent_client_webui_section(
+    prepared = webui_config_store._prepare_torrent_client_webui_section(
         example_clients,
         user_clients,
         comments,
@@ -344,7 +348,7 @@ config: dict[str, Any] = {
 }
 """
 
-    updated = server._replace_config_value_in_source(
+    updated = webui_config_store._replace_config_value_in_source(
         source,
         ["TORRENT_CLIENTS", "seedbox"],
         repr({"torrent_client": "qbit"}),
@@ -374,7 +378,7 @@ def test_untouched_torrent_client_templates_are_not_configured_clients() -> None
         },
     }
 
-    assert server._configured_torrent_client_names(user_config, example_config) == ["seedbox"]
+    assert webui_config_store._configured_torrent_client_names(user_config, example_config) == ["seedbox"]
 
 
 def test_referenced_or_edited_torrent_client_templates_remain_visible() -> None:
@@ -392,7 +396,7 @@ def test_referenced_or_edited_torrent_client_templates_remain_visible() -> None:
         },
     }
 
-    assert server._configured_torrent_client_names(user_config, example_config) == [
+    assert webui_config_store._configured_torrent_client_names(user_config, example_config) == [
         "qbittorrent",
         "rtorrent",
     ]

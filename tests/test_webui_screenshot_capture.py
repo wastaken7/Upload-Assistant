@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.preview as webui_preview
+import web_ui.security as webui_security
 from web_ui import server
 
 IGDB_IMAGE = {"img_url": "https://images.example.invalid/med.jpg", "raw_url": "https://images.example.invalid/full.jpg"}
@@ -25,16 +27,16 @@ THUMB_ONLY_IMAGE = {"img_url": "https://images.example.invalid/thumb-only.jpg"}
     ],
 )
 def test_screenshot_capture_support_by_category(meta_data: dict[str, object], expected: bool) -> None:
-    assert server._screenshot_capture_supported(meta_data) is expected
+    assert webui_preview._screenshot_capture_supported(meta_data) is expected
 
 
 @pytest.fixture
 def game_review(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     meta = {"uuid": "release", "category": "GAME", "image_list": [IGDB_IMAGE]}
-    monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     return tmp_path
 
 
@@ -62,8 +64,8 @@ def test_game_rejects_capture_endpoints(game_review: Path) -> None:
 
 def test_remote_images_expose_thumbnail_and_full_size_urls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     meta = {"uuid": "release", "category": "MOVIE", "image_list": [IGDB_IMAGE, THUMB_ONLY_IMAGE]}
-    monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
 
     with server.app.test_client() as client:
         screenshots = client.get("/api/execution_screenshots?session_id=session").get_json()["screenshots"]
@@ -87,10 +89,10 @@ def test_game_igdb_images_cannot_be_discarded(game_review: Path) -> None:
 @pytest.mark.parametrize("is_disc", ["", "DVD"])
 def test_video_hosted_images_can_be_discarded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_disc: str) -> None:
     meta = {"uuid": "release", "category": "MOVIE", "is_disc": is_disc, "image_list": [IGDB_IMAGE]}
-    monkeypatch.setattr(server, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_preview, "_resolve_execution_screenshot_review", lambda _session_id: (tmp_path, meta))
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
 
     with server.app.test_client() as client:
         before = client.get("/api/execution_screenshots?session_id=session").get_json()

@@ -1,18 +1,21 @@
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.security as webui_security
 from src import stats
 from web_ui import server
 
 
 def _authenticated(monkeypatch):
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
 
 
 def test_stats_api_reports_unreadable_database(monkeypatch, tmp_path):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
     (tmp_path / "data").mkdir()
     (tmp_path / "data/upload_assistant.sqlite3").write_bytes(b"fictional invalid database")
 
@@ -31,15 +34,15 @@ def test_stats_page_renders_for_authenticated_session(monkeypatch):
 
 
 def test_existing_workspaces_link_to_stats():
-    upload_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
-    config_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
+    upload_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    config_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
 
     assert "/stats" in upload_app
     assert "/stats" in config_app
 
 
 def test_stats_desktop_rail_has_shared_controls_without_desktop_switcher():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'className="mx-4 mt-4 md:hidden"' in stats_app
     assert 'className="ua-workspace-switcher rounded-lg"' in stats_app
@@ -50,8 +53,8 @@ def test_stats_desktop_rail_has_shared_controls_without_desktop_switcher():
 
 
 def test_stats_filters_use_theme_aware_selects():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'className="ua-stats-control w-full min-w-0 rounded-xl px-4 text-sm"' in stats_app
     assert 'className="ua-theme-picker rounded-lg px-3 py-2 text-sm"' in stats_app
@@ -61,7 +64,7 @@ def test_stats_filters_use_theme_aware_selects():
 
 
 def test_stats_period_selector_is_segmented_and_remembered():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'const STATS_PERIOD_KEY = "ua_stats_period"' in stats_app
     assert '["1y", "1y"]' in stats_app
@@ -71,9 +74,9 @@ def test_stats_period_selector_is_segmented_and_remembered():
 
 
 def test_stats_settings_are_persistent_and_control_the_requested_views():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
-    settings_icon = server.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "sliders-horizontal.svg"
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    settings_icon = webui_context.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "sliders-horizontal.svg"
 
     assert 'const STATS_SETTINGS_KEY = "ua_stats_settings_v1"' in stats_app
     assert 'name="settings"' in stats_app
@@ -105,7 +108,7 @@ def test_stats_settings_are_persistent_and_control_the_requested_views():
 
 
 def test_modal_scroll_lock_preserves_the_page_width():
-    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
+    shared_utils = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
 
     assert "window.innerWidth - document.documentElement.clientWidth" in shared_utils
     assert "bodyPaddingRight + scrollbarWidth" in shared_utils
@@ -113,11 +116,11 @@ def test_modal_scroll_lock_preserves_the_page_width():
 
 
 def test_application_rails_use_the_supplied_icons():
-    upload_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    config_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
+    upload_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    config_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "config_app.js").read_text(encoding="utf-8")
 
-    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
+    shared_utils = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
     icon_names = ("upload", "config", "stats", "changelog", "help", "logout")
     for icon_name in icon_names:
         assert f'name="{icon_name}"' in upload_app
@@ -128,11 +131,11 @@ def test_application_rails_use_the_supplied_icons():
     assert 'name="palette"' in stats_app
     assert 'name="palette"' in config_app
     assert "const WEB_UI_ICON_MAP = Object.freeze({" in shared_utils
-    assert 'class="ua-lucide-icon"' in (server.CODE_DIR / "web_ui" / "templates" / "login.html").read_text(encoding="utf-8")
+    assert 'class="ua-lucide-icon"' in (webui_context.CODE_DIR / "web_ui" / "templates" / "login.html").read_text(encoding="utf-8")
 
 
 def test_ui_icon_assets_are_lucide_only():
-    icon_root = server.CODE_DIR / "web_ui" / "static" / "img"
+    icon_root = webui_context.CODE_DIR / "web_ui" / "static" / "img"
     lucide_icons = tuple((icon_root / "lucide-icons").glob("*.svg"))
 
     assert lucide_icons
@@ -142,7 +145,7 @@ def test_ui_icon_assets_are_lucide_only():
 
 
 def test_stats_combines_charts_with_expandable_tables():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "function DonutChart" in stats_app
     assert "const ChartWithTable" in stats_app
@@ -164,7 +167,7 @@ def test_stats_combines_charts_with_expandable_tables():
 
 
 def test_upload_destination_views_use_local_tracker_favicons():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "const TrackerFavicon" in stats_app
     assert "`/static/img/trackers/${slug}.png`" in stats_app
@@ -175,7 +178,7 @@ def test_upload_destination_views_use_local_tracker_favicons():
 
 
 def test_stats_tables_sort_comparable_columns():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "aria-sort={active ? sort.direction : undefined}" in stats_app
     assert "sortedRows.map" in stats_app
@@ -185,7 +188,7 @@ def test_stats_tables_sort_comparable_columns():
 
 
 def test_external_operation_bytes_distinguish_unknown_from_zero():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'label: "Bytes sent"' in stats_app
     assert 'r.bytes > 0 ? formatBytes(r.bytes) : "—"' in stats_app
@@ -193,7 +196,7 @@ def test_external_operation_bytes_distinguish_unknown_from_zero():
 
 
 def test_stats_operations_use_friendly_labels_with_a_readable_fallback():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'torrent_client_add: "Add to torrent client"' in stats_app
     assert 'torrent_client_search: "Search torrent client"' in stats_app
@@ -206,8 +209,8 @@ def test_stats_operations_use_friendly_labels_with_a_readable_fallback():
 
 
 def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'className="ua-stats-table-scroll overflow-x-auto"' in stats_app
     assert 'className="ua-stats-table w-full text-left text-sm"' in stats_app
@@ -221,7 +224,7 @@ def test_stats_tables_fit_their_panels_and_theme_required_scrollbars():
 
 
 def test_stats_summary_cards_have_distinct_icons():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "const MetricIcon" in stats_app
     assert 'className="ua-stats-summary-card relative rounded-xl p-4 shadow-sm"' in stats_app
@@ -256,14 +259,14 @@ def test_stats_summary_cards_have_distinct_icons():
     )
     for icon in icons:
         assert f'icon="{icon}"' in stats_app
-    shared_utils = (server.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
+    shared_utils = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "shared_utils.js").read_text(encoding="utf-8")
     assert "const STATS_ICON_MAP = Object.freeze({" in shared_utils
-    assert "@license lucide-static" in (server.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "circle-play.svg").read_text(encoding="utf-8")
+    assert "@license lucide-static" in (webui_context.CODE_DIR / "web_ui" / "static" / "img" / "lucide-icons" / "circle-play.svg").read_text(encoding="utf-8")
 
 
 def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     assert 'label="Data uploaded"' in stats_app
     assert 'label="Unique data uploaded"' in stats_app
@@ -293,7 +296,7 @@ def test_stats_ui_exposes_volume_profiles_comparisons_and_actions():
 
 
 def test_stats_generated_artifacts_combines_screenshot_types():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert '"Screenshots created"' in stats_app
     assert '"Screenshots created (global)"' in stats_app
@@ -308,8 +311,8 @@ def test_stats_generated_artifacts_combines_screenshot_types():
 
 
 def test_activity_heatmap_fits_panel_without_horizontal_scroll():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme_css = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme_css = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     heatmap = stats_app.split("function ActivityHeatmap", 1)[1].split("const ReliabilityBadge", 1)[0]
     assert 'className="ua-stats-heatmap w-full pb-1"' in heatmap
@@ -330,7 +333,7 @@ def test_activity_heatmap_fits_panel_without_horizontal_scroll():
 
 
 def test_daily_activity_uses_curved_paths_without_changing_data_points():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
     assert "const curvePath" in trend
@@ -340,7 +343,7 @@ def test_daily_activity_uses_curved_paths_without_changing_data_points():
 
 
 def test_daily_activity_labels_date_and_count_axes():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
     assert "const yTicks" in trend
@@ -355,7 +358,7 @@ def test_daily_activity_labels_date_and_count_axes():
 
 
 def test_stats_disabled_state_blurs_results_and_links_to_configuration():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "Statistics collection is disabled" in stats_app
     assert "blur-[3px]" in stats_app
@@ -363,7 +366,7 @@ def test_stats_disabled_state_blurs_results_and_links_to_configuration():
 
 
 def test_stats_requests_cancel_stale_filters_and_report_reset_failures():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert "new AbortController()" in stats_app
     assert "controller.abort()" in stats_app
@@ -373,7 +376,7 @@ def test_stats_requests_cancel_stale_filters_and_report_reset_failures():
 
 
 def test_browser_local_today_refreshes_at_local_midnight():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert 'period !== "today" || settings.timezone !== "browser"' in stats_app
     assert "nextMidnight.setHours(24, 0, 0, 0)" in stats_app
@@ -383,7 +386,7 @@ def test_browser_local_today_refreshes_at_local_midnight():
 
 
 def test_stats_ui_exposes_advanced_ranges_tracker_filter_and_sankey():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
 
     assert '["today", "Today"]' in stats_app
     assert '["this_month", "This month"]' in stats_app
@@ -400,8 +403,8 @@ def test_stats_ui_exposes_advanced_ranges_tracker_filter_and_sankey():
 
 
 def test_stats_summary_cards_have_distinct_visual_containers():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
-    theme = (server.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    theme = (webui_context.CODE_DIR / "web_ui" / "static" / "css" / "theme.css").read_text(encoding="utf-8")
 
     card_styles = theme.split(".ua-stats-summary-card {", 1)[1].split("}", 1)[0]
     assert 'className="ua-stats-summary-card relative rounded-xl p-4 shadow-sm"' in stats_app
@@ -410,7 +413,7 @@ def test_stats_summary_cards_have_distinct_visual_containers():
 
 
 def test_donut_legend_rows_do_not_use_colored_backgrounds():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     donut = stats_app.split("function DonutChart", 1)[1].split("function BarChart", 1)[0]
 
     assert "ua-stats-series-active" not in donut
@@ -418,7 +421,7 @@ def test_donut_legend_rows_do_not_use_colored_backgrounds():
 
 
 def test_daily_activity_can_switch_between_counts_and_volume():
-    stats_app = (server.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
+    stats_app = (webui_context.CODE_DIR / "web_ui" / "static" / "js" / "stats_app.js").read_text(encoding="utf-8")
     trend = stats_app.split("function TrendChart", 1)[1].split("function ActivityHeatmap", 1)[0]
 
     assert 'key: "processed_bytes"' in trend
@@ -461,8 +464,8 @@ def test_stats_api_accepts_browser_time_and_rejects_unknown_timezones(monkeypatc
 
 def test_stats_api_accepts_custom_utc_range_and_tracker(monkeypatch, tmp_path):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
     stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
     stats.record_event(
         "upload",
@@ -490,15 +493,15 @@ def test_stats_reset_requires_exact_confirmation(monkeypatch):
 
 def test_stats_api_rejects_bearer_tokens(monkeypatch):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: "token")
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: "token")
     response = server.app.test_client().get("/api/stats")
     assert response.status_code == 401
 
 
 def test_stats_api_reads_and_resets_aggregates(monkeypatch, tmp_path):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
     stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
     stats.set_stats_context(debug=False, category="MOVIE")
     stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
@@ -516,8 +519,8 @@ def test_stats_api_reads_and_resets_aggregates(monkeypatch, tmp_path):
 
 def test_stats_api_uses_canonical_destination_display_names(monkeypatch, tmp_path):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": True}})
     stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
     stats.record_event(
         "upload",
@@ -537,11 +540,11 @@ def test_stats_api_uses_canonical_destination_display_names(monkeypatch, tmp_pat
 
 def test_stats_api_hides_preserved_aggregates_while_collection_is_disabled(monkeypatch, tmp_path):
     _authenticated(monkeypatch)
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
     stats.configure_stats({"DEFAULT": {"stats_enabled": True}})
     stats.record_event("item", operation="completed", outcome="success", state_dir=tmp_path)
 
-    monkeypatch.setattr(server, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": False}})
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", lambda _path: {"DEFAULT": {"stats_enabled": False}})
     response = server.app.test_client().get("/api/stats?range=all&mode=real")
 
     assert response.status_code == 200

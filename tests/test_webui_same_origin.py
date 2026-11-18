@@ -1,11 +1,12 @@
 # ruff: noqa: S101
 
+import web_ui.security as webui_security
 import web_ui.server as server
 
 
 def _verify_with_headers(headers: dict[str, str]) -> bool:
     with server.app.test_request_context("/api/config_options", headers=headers):
-        return server._verify_same_origin()
+        return webui_security._verify_same_origin()
 
 
 def test_same_origin_accepts_matching_origin() -> None:

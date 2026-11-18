@@ -7,6 +7,9 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
 from src.meta import Meta
 from src.prompt_sound import PROMPT_SOUND_STDOUT_MARKER, play_prompt_sound
@@ -67,12 +70,12 @@ def test_webui_child_uses_printable_sound_record() -> None:
         [sys.executable, "-u", "-c", "from src.prompt_sound import play_prompt_sound; play_prompt_sound()"],
         text=True,
         capture_output=True,
-        env=server._webui_subprocess_env(),
+        env=webui_processes._webui_subprocess_env(),
         check=True,
     )
 
     assert result.stdout == f"\n{PROMPT_SOUND_STDOUT_MARKER}\n"
-    assert server._subprocess_prompt_type(result.stdout) is None
+    assert webui_processes._subprocess_prompt_type(result.stdout) is None
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
@@ -90,14 +93,14 @@ def test_execute_stream_delivers_sound_once_without_rendering_marker(tmp_path, m
             return 0
 
     process = Process()
-    monkeypatch.setattr(server, "_get_browse_roots", lambda: [str(tmp_path)])
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
-    monkeypatch.setattr(server, "_close_webui_process_io", lambda _: None)
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", lambda: [str(tmp_path)])
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_paths, "_resolve_user_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(webui_processes, "_close_webui_process_io", lambda _: None)
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": "sound-test"})
     events = [json.loads(line[6:]) for line in response.get_data(as_text=True).splitlines() if line.startswith("data: ")]
 

@@ -5,7 +5,11 @@ import sys
 
 import pytest
 
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
 
 
 class CompletedProcess:
@@ -34,15 +38,15 @@ def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, 
     spawned_commands: list[list[str]] = []
     session_id = "shell-sensitive-path-test"
 
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_get_browse_roots", lambda: [str(tmp_path)])
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_paths, "_get_browse_roots", lambda: [str(tmp_path)])
 
     def fake_spawn(command, *_args):
         spawned_commands.append(command)
         return process, "subprocess"
 
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", fake_spawn)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", fake_spawn)
 
     response = server.app.test_client().post(
         "/api/execute",
@@ -62,8 +66,8 @@ def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, 
         assert command[4:] == ["--music-artist", "Artist One & Artist Two"]
     finally:
         response.close()
-        with server.active_processes_lock:
-            server.active_processes.pop(session_id, None)
+        with webui_session_state.active_processes_lock:
+            webui_session_state.active_processes.pop(session_id, None)
 
 
 @pytest.mark.parametrize(
@@ -72,13 +76,13 @@ def test_execute_preserves_shell_punctuation_in_path_and_option_value(tmp_path, 
 )
 def test_validate_upload_assistant_args_rejects_control_characters(value: str) -> None:
     with pytest.raises(ValueError, match="Invalid control character"):
-        server._validate_upload_assistant_args([value])
+        webui_paths._validate_upload_assistant_args([value])
 
 
 @pytest.mark.parametrize("value", [".", ".."])
 def test_validate_upload_assistant_args_rejects_bare_directory_references(value: str) -> None:
     with pytest.raises(ValueError, match="Invalid arg"):
-        server._validate_upload_assistant_args([value])
+        webui_paths._validate_upload_assistant_args([value])
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="The fallback Popen path is POSIX-only")
@@ -86,11 +90,11 @@ def test_spawn_webui_upload_process_does_not_use_a_shell(tmp_path) -> None:
     marker = tmp_path / "marker"
     payload = f"literal; touch {marker}"
     command = [sys.executable, "-c", "import sys; print(sys.argv[1])", payload]
-    process, mode = server._spawn_webui_upload_process(command, tmp_path, server._webui_subprocess_env())
+    process, mode = webui_processes._spawn_webui_upload_process(command, tmp_path, webui_processes._webui_subprocess_env())
     try:
         stdout, _stderr = process.communicate(timeout=5)
         assert mode == "subprocess"
         assert stdout.strip() == payload
         assert not marker.exists()
     finally:
-        server._close_webui_process_io(process)
+        webui_processes._close_webui_process_io(process)

@@ -6,22 +6,26 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.routes.config as config_routes
+import web_ui.security as webui_security
 import web_ui.server as server
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 
 
 def test_copied_example_documents_groups_without_enabling_them(tmp_path, monkeypatch):
-    example_path = server.CODE_DIR / "data" / "example_config.py"
+    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
     original_example = example_path.read_bytes()
     config_path = tmp_path / "data" / "config.py"
     config_path.parent.mkdir()
-    monkeypatch.setattr(server, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
 
     shutil.copy2(example_path, config_path)
 
-    example = server._load_config_from_file(example_path)
-    saved = server._load_config_from_file(config_path)
+    example = webui_config_store._load_config_from_file(example_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved == example
     assert saved["DEFAULT"]["tag_overrides"] == {}
     assert example_path.read_bytes() == original_example
@@ -30,13 +34,13 @@ def test_copied_example_documents_groups_without_enabling_them(tmp_path, monkeyp
     assert "# Override description presentation settings for specific release groups." in generated_source
     assert "# Per-tracker tag_overrides take precedence over these DEFAULT overrides." in generated_source
     assert "# Set to True to display a notice when an update is available." in generated_source
-    items = server._build_config_items(example["DEFAULT"], saved["DEFAULT"], {}, {}, ["DEFAULT"])
+    items = webui_config_store._build_config_items(example["DEFAULT"], saved["DEFAULT"], {}, {}, ["DEFAULT"])
     assert next(item for item in items if item["key"] == "tag_overrides")["value"] == {}
 
 
 def test_saved_sample_named_group_remains_editable():
     user = {"tag_overrides": {"MyAwesomeGroupTag": {"custom_signature": "saved text"}}}
-    items = server._build_config_items({"tag_overrides": {}}, user, {}, {}, ["DEFAULT"])
+    items = webui_config_store._build_config_items({"tag_overrides": {}}, user, {}, {}, ["DEFAULT"])
 
     assert items[0]["value"] == user["tag_overrides"]
 
@@ -58,18 +62,18 @@ def config_files(tmp_path: Path, monkeypatch):
     for path, config in ((example_path, example), (config_path, user)):
         path.parent.mkdir(parents=True)
         path.write_text(f"config = {config!r}\n", encoding="utf-8")
-    monkeypatch.setattr(server, "CODE_DIR", code_dir)
-    monkeypatch.setattr(server, "STATE_DIR", state_dir)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_write_audit_log", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_context, "CODE_DIR", code_dir)
+    monkeypatch.setattr(webui_context, "STATE_DIR", state_dir)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_write_audit_log", lambda *_args, **_kwargs: None)
     return example_path, config_path
 
 
 def update(path, value):
     with server.app.test_request_context("/api/config_update", method="POST", json={"path": path, "value": value}):
-        result = server.config_update()
+        result = config_routes.config_update()
         response, status = result if isinstance(result, tuple) else (result, 200)
         return response.get_json(), status
 
@@ -77,7 +81,7 @@ def update(path, value):
 @pytest.mark.parametrize("user", [{}, {"tag_overrides": {}}, {"tag_overrides": {"RealGroup": {"custom_signature": "saved"}}}])
 def test_metadata_uses_only_saved_groups(user):
     example = {"tag_overrides": {"SampleGroup": {"custom_signature": "example"}}}
-    items = server._build_config_items(example, user, {}, {}, ["DEFAULT"])
+    items = webui_config_store._build_config_items(example, user, {}, {}, ["DEFAULT"])
 
     assert items[0]["value"] == user.get("tag_overrides", {})
     assert items[0]["example_value"] == {}
@@ -108,7 +112,7 @@ def test_metadata_uses_only_saved_groups(user):
 
 
 def test_tracker_metadata_exposes_editor_without_example_groups():
-    items = server._build_config_items({"api_key": ""}, {}, {}, {}, ["TRACKERS", "AITHER"])
+    items = webui_config_store._build_config_items({"api_key": ""}, {}, {}, {}, ["TRACKERS", "AITHER"])
     group_item = next(item for item in items if item["key"] == "tag_overrides")
 
     assert group_item["value"] == {}
@@ -134,8 +138,8 @@ def test_create_edit_rename_and_remove_round_trip(config_files, path):
     for groups in ({"CustomGroup": {}}, {"CustomGroup": fields}, {"RenamedGroup": fields}, {}):
         result, status = update(path, json.dumps(groups))
         assert status == 200, result
-        saved = server._load_config_from_file(config_path)
-        assert server._get_nested_value(saved, path) == groups
+        saved = webui_config_store._load_config_from_file(config_path)
+        assert webui_config_store._get_nested_value(saved, path) == groups
         assert saved["DEFAULT"]["screens"] == 6
         assert saved["TRACKERS"]["AITHER"]["api_key"] == "test-only-key"
         if groups and next(iter(groups.values())):
@@ -197,7 +201,7 @@ def test_unknown_tracker_scope_does_not_modify_config(config_files):
 def test_updates_require_authenticated_same_origin_session(config_files, monkeypatch, guard, status):
     _, config_path = config_files
     original = config_path.read_bytes()
-    monkeypatch.setattr(server, guard, lambda: False)
+    monkeypatch.setattr(webui_security, guard, lambda: False)
 
     _, actual_status = update(["DEFAULT", "tag_overrides"], {"Group": {}})
 
@@ -223,8 +227,8 @@ def test_numeric_bounds_match_editor_and_allow_minimum(config_files, field, mini
     for value in (minimum, str(minimum), None):
         _, status = update(["DEFAULT", "tag_overrides"], {"FictionalGroup": {field: value}})
         assert status == 200
-        saved = server._load_config_from_file(config_path)
+        saved = webui_config_store._load_config_from_file(config_path)
         assert saved["DEFAULT"]["tag_overrides"]["FictionalGroup"][field] == value
-    items = server._build_config_items({"tag_overrides": {}}, {}, {}, {}, ["DEFAULT"])
+    items = webui_config_store._build_config_items({"tag_overrides": {}}, {}, {}, {}, ["DEFAULT"])
     metadata = next(entry for entry in items[0]["override_fields"] if entry["key"] == field)
     assert metadata["field_min"] == minimum

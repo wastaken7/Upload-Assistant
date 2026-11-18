@@ -5,13 +5,19 @@ from threading import Event
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.extensions as webui_extensions
+import web_ui.routes.config as config_routes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.tracker_info as webui_tracker_info
 from src.config_sync import sync_user_config
 
 
 @pytest.fixture
 def batch_config(tmp_path, monkeypatch):
-    keys = server._TRACKER_DEFAULT_OVERRIDE_KEYS[:22]
+    keys = webui_tracker_info._TRACKER_DEFAULT_OVERRIDE_KEYS[:22]
     example = {
         "DEFAULT": {"screens": 6, **dict.fromkeys(keys, True)},
         "TRACKERS": {name: {"api_key": "", **dict.fromkeys(keys, True)} for name in ("AITHER", "BLU", "LST")},
@@ -24,20 +30,20 @@ def batch_config(tmp_path, monkeypatch):
     for path, config in ((example_path, example), (config_path, user)):
         path.parent.mkdir(parents=True)
         path.write_text(f"config = {config!r}\n", encoding="utf-8")
-    monkeypatch.setattr(server, "CODE_DIR", example_path.parent.parent)
-    monkeypatch.setattr(server, "STATE_DIR", config_path.parent.parent)
+    monkeypatch.setattr(webui_context, "CODE_DIR", example_path.parent.parent)
+    monkeypatch.setattr(webui_context, "STATE_DIR", config_path.parent.parent)
     for guard in ("_is_authenticated", "_verify_csrf_header", "_verify_same_origin", "_is_ip_allowed"):
-        monkeypatch.setattr(server, guard, lambda *args: True)
+        monkeypatch.setattr(webui_security, guard, lambda *args: True)
     records = []
-    monkeypatch.setattr(server, "_write_audit_log", lambda *args: records.append(args))
-    server.limiter.reset()
+    monkeypatch.setattr(webui_security, "_write_audit_log", lambda *args: records.append(args))
+    webui_extensions.limiter.reset()
     yield config_path, example_path, keys, records
-    server.limiter.reset()
+    webui_extensions.limiter.reset()
 
 
 def post_updates(updates):
     with server.app.test_request_context("/api/config_update", method="POST", json={"updates": updates}):
-        result = server.config_update()
+        result = config_routes.config_update()
         response, status = result if isinstance(result, tuple) else (result, 200)
         return response.get_json(), status
 
@@ -55,7 +61,7 @@ def test_config_parse_failures_return_json_400(batch_config, invalid_source):
         method="POST",
         json={"tracker": "AITHER", "enabled": False},
     ):
-        response, status = server.config_set_tracker_overrides()
+        response, status = config_routes.config_set_tracker_overrides()
 
     assert status == 400
     assert response.is_json
@@ -89,7 +95,7 @@ def test_66_overrides_use_one_rate_limit_slot_and_one_file_write(batch_config, m
     assert len(records) == 66
     assert all(record[4] is True for record in records)
     assert not sync_user_config(config_path, example_path).changed
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     for tracker in saved["TRACKERS"].values():
         assert tracker == {"api_key": "test-key", **dict.fromkeys(keys)}
 
@@ -132,7 +138,7 @@ def test_missing_tracker_creation_and_falsy_values_save_together(batch_config):
         {"path": ["DEFAULT", "sonarr_url_1"], "value": "", "remove": True},
     ]
     assert post_updates(updates)[1] == 200
-    assert server._load_config_from_file(config_path) == {
+    assert webui_config_store._load_config_from_file(config_path) == {
         "DEFAULT": {"screens": 0},
         "TRACKERS": {"AITHER": {"api_key": "", "add_logo": False, "custom_header": None}},
     }
@@ -140,7 +146,7 @@ def test_missing_tracker_creation_and_falsy_values_save_together(batch_config):
 
 def test_new_tracker_persists_displayed_template_values(batch_config):
     config_path, example_path, keys, _ = batch_config
-    example = server._load_config_from_file(example_path)
+    example = webui_config_store._load_config_from_file(example_path)
     example["TRACKERS"]["AITHER"] = {
         "api_key": "",
         "anon": True,
@@ -156,7 +162,7 @@ def test_new_tracker_persists_displayed_template_values(batch_config):
     ]
     assert post_updates(updates)[1] == 200
     # Unedited values shown by the WebUI are saved; DEFAULT overrides stay inherited.
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == {
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"] == {
         "api_key": "new-key",
         "anon": True,
         "modq": False,
@@ -167,7 +173,7 @@ def test_existing_tracker_is_not_refilled_from_template(batch_config):
     config_path, _, _, _ = batch_config
     config_path.write_text("config = {'TRACKERS': {'aither': {'api_key': 'x'}}}\n", encoding="utf-8")
     assert post_updates([{"path": ["TRACKERS", "AITHER"], "value": "{}"}])[1] == 200
-    assert "api_key" not in server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
+    assert "api_key" not in webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]
 
 
 def test_write_failure_does_not_report_success_and_can_be_retried(batch_config, monkeypatch):
@@ -185,14 +191,14 @@ def test_write_failure_does_not_report_success_and_can_be_retried(batch_config, 
     assert list(config_path.parent.glob(".config.py.*.tmp")) == []
     assert records[0][4] is False
     assert post_updates(updates)[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["add_logo"] is None
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["add_logo"] is None
     assert records[-1][4] is True
 
 
 @pytest.mark.parametrize("user", [{}, {"DEFAULT": {"screens": 6}}, {"TORRENT_CLIENTS": {}}])
 def test_batch_creates_missing_torrent_client_parents(batch_config, user):
     config_path, example_path, _, _ = batch_config
-    example = server._load_config_from_file(example_path)
+    example = webui_config_store._load_config_from_file(example_path)
     example["TORRENT_CLIENTS"] = {"qbittorrent": {"torrent_client": "qbit", "host": ""}}
     example_path.write_text(f"config = {example!r}\n", encoding="utf-8")
     config_path.write_text(f"config = {user!r}\n", encoding="utf-8")
@@ -205,7 +211,7 @@ def test_batch_creates_missing_torrent_client_parents(batch_config, user):
     assert post_updates(updates + [{"path": ["DEFAULT", "unknown"], "value": True}])[1] == 400
     assert config_path.read_bytes() == before
     assert post_updates(updates)[1] == 200
-    assert server._load_config_from_file(config_path) == {
+    assert webui_config_store._load_config_from_file(config_path) == {
         **user,
         "TORRENT_CLIENTS": {"qbittorrent": {"torrent_client": "qbit", "host": "localhost"}},
     }
@@ -222,7 +228,7 @@ def test_missing_parents_do_not_replace_existing_scalar_sections(batch_config):
 def test_concurrent_batches_preserve_both_writers_edits(batch_config, monkeypatch):
     config_path, _, _, _ = batch_config
     first_staged, release_first, second_staged = Event(), Event(), Event()
-    apply_update = server._apply_config_update
+    apply_update = webui_config_store._apply_config_update
 
     def pause_first(source, example, update):
         result = apply_update(source, example, update)
@@ -233,7 +239,7 @@ def test_concurrent_batches_preserve_both_writers_edits(batch_config, monkeypatc
             second_staged.set()
         return result
 
-    monkeypatch.setattr(server, "_apply_config_update", pause_first)
+    monkeypatch.setattr(webui_config_store, "_apply_config_update", pause_first)
     with ThreadPoolExecutor(max_workers=2) as executor:
         first = executor.submit(post_updates, [{"path": ["DEFAULT", "screens"], "value": 8}])
         try:
@@ -243,18 +249,18 @@ def test_concurrent_batches_preserve_both_writers_edits(batch_config, monkeypatc
         finally:
             release_first.set()
         assert first.result(timeout=5)[1] == second.result(timeout=5)[1] == 200
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved["DEFAULT"]["screens"] == 8
     assert saved["TRACKERS"]["AITHER"]["add_logo"] is None
 
 
 def test_startup_sync_coordinates_with_a_webui_save(batch_config, monkeypatch):
     config_path, example_path, _, _ = batch_config
-    example = server._load_config_from_file(example_path)
+    example = webui_config_store._load_config_from_file(example_path)
     example["DEFAULT"]["new_option"] = "from-sync"
     example_path.write_text(f"config = {example!r}\n", encoding="utf-8")
     staged, release = Event(), Event()
-    apply_update = server._apply_config_update
+    apply_update = webui_config_store._apply_config_update
 
     def pause_update(*args):
         result = apply_update(*args)
@@ -262,7 +268,7 @@ def test_startup_sync_coordinates_with_a_webui_save(batch_config, monkeypatch):
         assert release.wait(5)
         return result
 
-    monkeypatch.setattr(server, "_apply_config_update", pause_update)
+    monkeypatch.setattr(webui_config_store, "_apply_config_update", pause_update)
     with ThreadPoolExecutor(max_workers=2) as executor:
         save = executor.submit(post_updates, [{"path": ["TRACKERS", "AITHER", "add_logo"], "value": None}])
         try:
@@ -272,7 +278,7 @@ def test_startup_sync_coordinates_with_a_webui_save(batch_config, monkeypatch):
             release.set()
         assert save.result(timeout=5)[1] == 200
         assert sync.result(timeout=5).changed
-    saved = server._load_config_from_file(config_path)
+    saved = webui_config_store._load_config_from_file(config_path)
     assert saved["TRACKERS"]["AITHER"]["add_logo"] is None
     assert saved["DEFAULT"]["new_option"] == "from-sync"
 
@@ -280,13 +286,13 @@ def test_startup_sync_coordinates_with_a_webui_save(batch_config, monkeypatch):
 def test_external_edit_during_save_is_preserved_and_reported(batch_config, monkeypatch):
     config_path, _, _, records = batch_config
     external_source = "config = {'DEFAULT': {'screens': 99}, 'CUSTOM': 'external edit'}\n"
-    replace = server.replace_config_source
+    replace = config_routes.replace_config_source
 
     def external_edit(path, source, original):
         path.write_text(external_source, encoding="utf-8")
         return replace(path, source, original)
 
-    monkeypatch.setattr(server, "replace_config_source", external_edit)
+    monkeypatch.setattr(config_routes, "replace_config_source", external_edit)
     result, status = post_updates([{"path": ["DEFAULT", "screens"], "value": 8}])
     assert status == 409
     assert "Configuration changed" in result["error"]
@@ -323,7 +329,7 @@ def test_failed_temp_file_flush_keeps_original_and_cleans_temp(batch_config, mon
 def test_all_config_writers_wait_for_shared_lock_and_read_latest_file(batch_config, endpoint, payload):
     config_path, example_path, _, _ = batch_config
     for path, name in ((config_path, "seedbox"), (example_path, "qbittorrent")):
-        config = server._load_config_from_file(path)
+        config = webui_config_store._load_config_from_file(path)
         config["TORRENT_CLIENTS"] = {name: {"torrent_client": "qbit", "host": "localhost"}}
         path.write_text(f"config = {config!r}\n", encoding="utf-8")
     started = Event()
@@ -331,28 +337,28 @@ def test_all_config_writers_wait_for_shared_lock_and_read_latest_file(batch_conf
     def run_request():
         with server.app.test_request_context(f"/api/{endpoint}", method="POST", json=payload):
             started.set()
-            result = getattr(server, endpoint)()
+            result = getattr(config_routes, endpoint)()
             response, status = result if isinstance(result, tuple) else (result, 200)
             return response.get_json(), status
 
     with ThreadPoolExecutor(max_workers=1) as executor:
-        with server.config_write_lock(config_path):
+        with config_routes.config_write_lock(config_path):
             pending = executor.submit(run_request)
             assert started.wait(5)
             with pytest.raises(TimeoutError):
                 pending.result(timeout=0.15)
-            latest = server._load_config_from_file(config_path)
+            latest = webui_config_store._load_config_from_file(config_path)
             latest["CUSTOM"] = "another writer's edit"
             config_path.write_text(f"config = {latest!r}\n", encoding="utf-8")
         result, status = pending.result(timeout=5)
         assert status == 200, result
-    assert server._load_config_from_file(config_path)["CUSTOM"] == "another writer's edit"
+    assert webui_config_store._load_config_from_file(config_path)["CUSTOM"] == "another writer's edit"
 
 
 def prepare_aliases(batch_config):
     config_path, example_path, _, _ = batch_config
     for path in (config_path, example_path):
-        config = server._load_config_from_file(path)
+        config = webui_config_store._load_config_from_file(path)
         config["TRACKERS"]["AITHER"]["cli_alias"] = "ATH"
         config["TRACKERS"]["LST"]["cli_alias"] = "LION"
         path.write_text(f"config = {config!r}\n", encoding="utf-8")
@@ -385,10 +391,10 @@ def test_alias_swap_is_validated_against_final_batch(batch_config):
         )[1]
         == 200
     )
-    saved = server._load_config_from_file(config_path)
-    assert server.tracker_cli_aliases(saved) == {"LION": "AITHER", "ATH": "LST"}
+    saved = webui_config_store._load_config_from_file(config_path)
+    assert config_routes.tracker_cli_aliases(saved) == {"LION": "AITHER", "ATH": "LST"}
     assert post_updates([{"path": ["TRACKERS", "AITHER", "cli_alias"], "value": ""}])[1] == 200
-    assert server._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["cli_alias"] == ""
+    assert webui_config_store._load_config_from_file(config_path)["TRACKERS"]["AITHER"]["cli_alias"] == ""
 
 
 @pytest.mark.parametrize("updates", [[], None, {}, [None], [{}] * 1001])
@@ -403,6 +409,6 @@ def test_invalid_batch_shape_does_not_write(batch_config, updates):
 def test_batch_requires_authenticated_same_origin_session(batch_config, monkeypatch, guard, status):
     config_path, _, _, _ = batch_config
     before = config_path.read_bytes()
-    monkeypatch.setattr(server, guard, lambda: False)
+    monkeypatch.setattr(webui_security, guard, lambda: False)
     assert post_updates([{"path": ["DEFAULT", "screens"], "value": 8}])[1] == status
     assert config_path.read_bytes() == before

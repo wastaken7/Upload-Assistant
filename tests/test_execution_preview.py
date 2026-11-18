@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pytest
 
+import web_ui.preview as webui_preview
+import web_ui.security as webui_security
 from web_ui import server
-from web_ui.server import _extract_execution_preview
+from web_ui.preview import _extract_execution_preview
 
 
 @pytest.mark.parametrize("category", ["MOVIE", "TV"])
@@ -234,7 +236,7 @@ def test_book_preview_exposes_safe_audible_asin_link(audible_url, expected_url):
 def test_execution_preview_uses_local_cover_for_active_session(tmp_path, monkeypatch):
     cover = tmp_path / "POSTER.png"
     cover.write_bytes(b"png")
-    monkeypatch.setattr("web_ui.server._find_execution_preview_cover_file", lambda session_id: cover if session_id == "session-1" else None)
+    monkeypatch.setattr("web_ui.preview._find_execution_preview_cover_file", lambda session_id: cover if session_id == "session-1" else None)
 
     preview = _extract_execution_preview({"uuid": "release-1", "category": "XXX"}, str(tmp_path), "session-1")
 
@@ -243,11 +245,11 @@ def test_execution_preview_uses_local_cover_for_active_session(tmp_path, monkeyp
 
 
 def test_cover_regeneration_rejects_a_preview_that_has_moved(monkeypatch):
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     monkeypatch.setattr(
-        server,
+        webui_preview,
         "_resolve_execution_preview_meta",
         lambda _session_id: ("C:/media/second", Path("meta.json"), {"uuid": "second", "category": "XXX"}),
     )
@@ -268,16 +270,16 @@ def test_cover_regeneration_uses_execution_path_name_when_uuid_is_missing(monkey
         captured["random_frame"] = random_frame
         return "POSTER.png"
 
-    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     monkeypatch.setattr(
-        server,
+        webui_preview,
         "_resolve_execution_preview_meta",
         lambda _session_id: ("C:/media/release-folder", Path("meta.json"), {"base_dir": "C:/state", "category": "XXX", "filelist": []}),
     )
     monkeypatch.setattr("src.takescreens.xxx_fallback_cover", fake_fallback_cover)
-    monkeypatch.setattr(server, "_execution_preview_cover_cache_key", lambda _session_id, fallback: fallback)
+    monkeypatch.setattr(webui_preview, "_execution_preview_cover_cache_key", lambda _session_id, fallback: fallback)
 
     response = server.app.test_client().post(
         "/api/execution_preview_cover/regenerate",

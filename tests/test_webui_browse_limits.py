@@ -7,6 +7,10 @@ from types import SimpleNamespace
 import limits.storage.memory as memory_storage
 import pytest
 
+import web_ui.auth as auth_mod
+import web_ui.context as webui_context
+import web_ui.extensions as webui_extensions
+import web_ui.security as webui_security
 import web_ui.server as server
 
 BROWSE_ROUTES = [
@@ -22,23 +26,23 @@ def browser(tmp_path, monkeypatch):
     """Provide an authenticated browser with isolated media and IP-control files."""
     auth_root = tmp_path / "auth"
     auth_root.mkdir()
-    monkeypatch.setattr(server, "cfg_dir", auth_root)
-    monkeypatch.setattr(server.auth_mod, "get_config_dir", lambda: auth_root)
+    monkeypatch.setattr(webui_context, "cfg_dir", auth_root)
+    monkeypatch.setattr(auth_mod, "get_config_dir", lambda: auth_root)
     media_root = tmp_path / "media"
     movie = media_root / "Movie"
     movie.mkdir(parents=True)
     (movie / "movie.mkv").touch()
     monkeypatch.setenv("UA_BROWSE_ROOTS", str(media_root))
-    server.limiter.reset()
-    server.auth_mod.create_user("fictional-user", "Fictional-Passphrase-2026!")
+    webui_extensions.limiter.reset()
+    auth_mod.create_user("fictional-user", "Fictional-Passphrase-2026!")
     client = server.app.test_client()
     with client.session_transaction() as session:
-        session["enc"] = server.auth_mod.encrypt_text(
-            server._derive_aes_key(),
-            json.dumps({"authenticated": True, "account": server._account_fingerprint(), "csrf_token": HEADERS["X-CSRF-Token"]}),
+        session["enc"] = auth_mod.encrypt_text(
+            webui_security._derive_aes_key(),
+            json.dumps({"authenticated": True, "account": webui_security._account_fingerprint(), "csrf_token": HEADERS["X-CSRF-Token"]}),
         )
     yield client
-    server.limiter.reset()
+    webui_extensions.limiter.reset()
 
 
 @pytest.fixture
@@ -115,7 +119,7 @@ def test_page_load_routes_allow_more_than_default_limit(browser):
 def test_invalid_basic_credentials_are_counted_before_html_redirect(browser, monkeypatch):
     """Block repeated password guesses on exempt root listing before verification."""
     record = {"username": "browse-user", "password_hash": "test-only-hash"}
-    monkeypatch.setattr(server.auth_mod, "load_user", lambda: record)
+    monkeypatch.setattr(auth_mod, "load_user", lambda: record)
     verified_passwords = []
 
     def reject_password(password_hash, password):
@@ -123,7 +127,7 @@ def test_invalid_basic_credentials_are_counted_before_html_redirect(browser, mon
         verified_passwords.append((password_hash, password))
         return False
 
-    monkeypatch.setattr(server.auth_mod, "verify_password", reject_password)
+    monkeypatch.setattr(auth_mod, "verify_password", reject_password)
     anonymous = server.app.test_client()
     for _ in range(5):
         response = anonymous.get("/api/browse_roots", auth=("browse-user", "incorrect"), headers={"Accept": "text/html"})
@@ -140,5 +144,5 @@ def test_anonymous_html_redirects_do_not_count_as_password_guesses(browser):
     for _ in range(10):
         response = anonymous.get("/api/browse_roots", headers={"Accept": "text/html"})
         assert response.status_code == 302
-    assert server._get_ip_failures() == {}
-    assert server._get_ip_blacklist() == []
+    assert webui_security._get_ip_failures() == {}
+    assert webui_security._get_ip_blacklist() == []

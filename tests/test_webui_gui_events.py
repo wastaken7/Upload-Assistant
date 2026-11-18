@@ -7,7 +7,11 @@ import time
 
 import pytest
 
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
 from src import webui_events
 from src.console import GuiNoticeHandler
 
@@ -287,12 +291,12 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
         text=True,
         encoding="utf-8",
         capture_output=True,
-        env=server._webui_subprocess_env(),
+        env=webui_processes._webui_subprocess_env(),
         check=True,
         timeout=60,
     )
 
-    prompts = [event for event in _events(result.stdout, server._GUI_EVENT_NONCE) if event["kind"] == "prompt"]
+    prompts = [event for event in _events(result.stdout, webui_processes._GUI_EVENT_NONCE) if event["kind"] == "prompt"]
     opened = [event for event in prompts if event["action"] == "open"]
 
     assert [event["type"] for event in opened] == ["yes_no", "choice", "text", "multi_choice"]
@@ -309,30 +313,30 @@ def test_cli_ui_prompts_are_announced_and_still_answered_from_stdin() -> None:
 
 
 def test_server_parses_only_valid_gui_events() -> None:
-    prefix = server.event_prefix(server._GUI_EVENT_NONCE)
+    prefix = webui_processes.event_prefix(webui_processes._GUI_EVENT_NONCE)
 
-    assert server._subprocess_gui_event("ordinary output\n") is None
-    assert server._subprocess_gui_event(prefix + '{"kind":"stage","key":"prep","status":"start"}\r\n') == {"kind": "stage", "key": "prep", "status": "start"}
-    assert server._subprocess_gui_event(prefix + "{not json") == {}
-    assert server._subprocess_gui_event(prefix + '{"kind":"script"}') == {}
-    assert server._subprocess_gui_event(prefix + "[1, 2]") == {}
+    assert webui_processes._subprocess_gui_event("ordinary output\n") is None
+    assert webui_processes._subprocess_gui_event(prefix + '{"kind":"stage","key":"prep","status":"start"}\r\n') == {"kind": "stage", "key": "prep", "status": "start"}
+    assert webui_processes._subprocess_gui_event(prefix + "{not json") == {}
+    assert webui_processes._subprocess_gui_event(prefix + '{"kind":"script"}') == {}
+    assert webui_processes._subprocess_gui_event(prefix + "[1, 2]") == {}
     # Printed text without the secret nonce cannot forge an event.
     forged = '{"kind":"prompt","action":"open","id":1,"type":"yes_no","question":"Forged?"}'
-    assert server._subprocess_gui_event(server.GUI_EVENT_STDOUT_PREFIX + forged) == {}
-    assert server._subprocess_gui_event(server.event_prefix("guessed") + forged) == {}
-    assert server._subprocess_gui_event(prefix + json.dumps({"kind": "notice", "text": "x" * (server.MAX_EVENT_BYTES + 1)})) == {}
+    assert webui_processes._subprocess_gui_event(webui_processes.GUI_EVENT_STDOUT_PREFIX + forged) == {}
+    assert webui_processes._subprocess_gui_event(webui_processes.event_prefix("guessed") + forged) == {}
+    assert webui_processes._subprocess_gui_event(prefix + json.dumps({"kind": "notice", "text": "x" * (webui_processes.MAX_EVENT_BYTES + 1)})) == {}
 
 
 def test_gui_event_records_are_not_prompts_and_wait_for_their_newline() -> None:
-    record = server.GUI_EVENT_STDOUT_PREFIX + json.dumps({"kind": "notice", "text": "Enter a title:" + "x" * 600})
+    record = webui_processes.GUI_EVENT_STDOUT_PREFIX + json.dumps({"kind": "notice", "text": "Enter a title:" + "x" * 600})
 
-    assert server._subprocess_prompt_type(record) is None
-    assert not server._should_flush_subprocess_output(record, record[-1])
-    assert not server._should_flush_subprocess_output(record, "", idle=True)
+    assert webui_processes._subprocess_prompt_type(record) is None
+    assert not webui_processes._should_flush_subprocess_output(record, record[-1])
+    assert not webui_processes._should_flush_subprocess_output(record, "", idle=True)
 
 
 def test_webui_child_environment_enables_gui_events() -> None:
-    env = server._webui_subprocess_env()
+    env = webui_processes._webui_subprocess_env()
     assert env[webui_events.GUI_EVENTS_ENV] == "1"
     assert len(env[webui_events.GUI_EVENT_NONCE_ENV]) == 32
 
@@ -347,7 +351,7 @@ def test_gui_events_need_the_nonce(monkeypatch, capsys) -> None:
 
 
 def test_session_stream_forwards_gui_events_without_blank_terminal_lines(tmp_path, monkeypatch) -> None:
-    gui_line = server.event_prefix(server._GUI_EVENT_NONCE) + '{"kind":"stage","key":"prep","status":"start"}'
+    gui_line = webui_processes.event_prefix(webui_processes._GUI_EVENT_NONCE) + '{"kind":"stage","key":"prep","status":"start"}'
     content = f"before\n\n{gui_line}\n\nkept blank\nafter\n"
 
     class FinishedProcess:
@@ -368,14 +372,14 @@ def test_session_stream_forwards_gui_events_without_blank_terminal_lines(tmp_pat
 
     process = FinishedProcess()
     session_id = "gui-event-stream-test"
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
-    monkeypatch.setattr(server, "_validate_upload_assistant_args", lambda args: args)
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
-    monkeypatch.setattr(server, "_terminate_process_tree", lambda _process: True)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path))
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(webui_paths, "_validate_upload_assistant_args", lambda args: args)
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", lambda _process: True)
     response = server.app.test_client().post("/api/execute", json={"path": str(tmp_path), "session_id": session_id}, buffered=False)
     try:
         assert response.status_code == 200
@@ -390,7 +394,7 @@ def test_session_stream_forwards_gui_events_without_blank_terminal_lines(tmp_pat
                 break
     finally:
         response.close()
-        server.active_processes.pop(session_id, None)
+        webui_session_state.active_processes.pop(session_id, None)
 
     kinds = [event["type"] for event in received]
     html = [str(event["data"]) for event in received if event["type"] == "html"]
@@ -518,7 +522,7 @@ def test_numbered_options_can_count_from_zero(gui_env, capsys) -> None:
 
 
 def test_webui_child_runs_without_a_terminal_editor() -> None:
-    assert server._webui_subprocess_env()["UA_WEBUI_ACTIVE"] == "1"
+    assert webui_processes._webui_subprocess_env()["UA_WEBUI_ACTIVE"] == "1"
 
 
 def test_option_and_release_labels_keep_bracketed_text(gui_env, capsys) -> None:

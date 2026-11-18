@@ -6,7 +6,7 @@ import pytest
 from src.args import read_paths_from_stdin
 from src.meta import Meta
 from src.queuemanage import QueueManager
-from web_ui.server import _validate_upload_assistant_args
+from web_ui.paths import _validate_upload_assistant_args
 
 
 class InteractiveInput(io.StringIO):

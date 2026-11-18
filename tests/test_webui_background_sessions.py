@@ -9,7 +9,14 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
+import web_ui.config_store as webui_config_store
+import web_ui.context as webui_context
+import web_ui.paths as webui_paths
+import web_ui.processes as webui_processes
+import web_ui.security as webui_security
 import web_ui.server as server
+import web_ui.session_state as webui_session_state
+import web_ui.sessions as webui_sessions
 
 
 class FeedStream:
@@ -74,22 +81,22 @@ def _read_until(events: Iterator[dict[str, object]], predicate: Callable[[dict[s
 
 
 def _logged_html(session_id: str) -> str:
-    state = server.active_processes[session_id]
-    with server._session_condition(state):
-        return "".join(payload for _seq, payload in server._session_events(state))
+    state = webui_session_state.active_processes[session_id]
+    with webui_sessions._session_condition(state):
+        return "".join(payload for _seq, payload in webui_sessions._session_events(state))
 
 
 @pytest.fixture
 def start_session(tmp_path, monkeypatch):
     """Start an execution backed by a FakeProcess with the given session settings."""
-    monkeypatch.setattr(server, "active_processes", {})
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Journey 2024"))
-    monkeypatch.setattr(server, "_assert_safe_resolved_path", lambda _: None)
-    monkeypatch.setattr(server, "_close_webui_process_io", lambda _: None)
+    monkeypatch.setattr(webui_session_state, "active_processes", {})
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Journey 2024"))
+    monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", lambda _: None)
+    monkeypatch.setattr(webui_processes, "_close_webui_process_io", lambda _: None)
     terminated: list[FakeProcess] = []
 
     def terminate(process: FakeProcess) -> bool:
@@ -97,14 +104,14 @@ def start_session(tmp_path, monkeypatch):
         process.exit(-15)
         return True
 
-    monkeypatch.setattr(server, "_terminate_process_tree", terminate)
+    monkeypatch.setattr(webui_processes, "_terminate_process_tree", terminate)
     processes: list[FakeProcess] = []
 
     def start(session_id: str, *, keep_running: bool = True, prompt_timeout: float = 0.0):
         process = FakeProcess()
         processes.append(process)
-        monkeypatch.setattr(server, "_webui_session_settings", lambda: (keep_running, prompt_timeout))
-        monkeypatch.setattr(server, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
+        monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (keep_running, prompt_timeout))
+        monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", lambda *_args: (process, "subprocess"))
         response = server.app.test_client().post(
             "/api/execute",
             json={"path": "Fictional Journey 2024", "session_id": session_id, "label": "Fictional Journey 2024"},
@@ -166,16 +173,16 @@ def test_closed_tab_keeps_upload_running_and_reattach_replays_missed_output(star
     assert list(resumed_events) == [{"type": "finished", "exit_code": 0}]
     resumed.close()
 
-    _wait_for(lambda: server.active_processes["keep-running"].get("finished") is True)
+    _wait_for(lambda: webui_session_state.active_processes["keep-running"].get("finished") is True)
     finished = client.get("/api/sessions").get_json()["sessions"]
     assert [(item["running"], item["exit_code"]) for item in finished] == [(False, 0)]
 
     # A finished session no longer claims its content or capacity.
-    with server.active_processes_lock:
-        assert server._execution_conflict_locked("another-tab", frozenset(server.active_processes["keep-running"]["content_paths"])) is None
+    with webui_session_state.active_processes_lock:
+        assert webui_session_state._execution_conflict_locked("another-tab", frozenset(webui_session_state.active_processes["keep-running"]["content_paths"])) is None
 
     assert client.post("/api/session_dismiss", json={"session_id": "keep-running"}).get_json() == {"success": True}
-    assert "keep-running" not in server.active_processes
+    assert "keep-running" not in webui_session_state.active_processes
 
 
 def test_closed_tab_kills_upload_when_keep_running_is_disabled(start_session) -> None:
@@ -185,7 +192,7 @@ def test_closed_tab_kills_upload_when_keep_running_is_disabled(start_session) ->
     response.close()
 
     assert process in terminated
-    assert "legacy" not in server.active_processes
+    assert "legacy" not in webui_session_state.active_processes
 
 
 def test_unanswered_prompt_is_killed_only_while_no_browser_is_attached(start_session) -> None:
@@ -211,48 +218,48 @@ def test_running_sessions_cannot_be_dismissed(start_session) -> None:
 
     answer = server.app.test_client().post("/api/session_dismiss", json={"session_id": "still-running"})
     assert answer.status_code == 409
-    assert "still-running" in server.active_processes
+    assert "still-running" in webui_session_state.active_processes
     process.exit(0)
 
 
 def test_unknown_session_stream_is_not_found(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
     response = server.app.test_client().get("/api/session_stream?session_id=missing&after=0")
     assert response.status_code == 404
 
 
 def test_only_recent_finished_sessions_are_kept(monkeypatch) -> None:
     def finished_state(finished_at: float) -> dict[str, object]:
-        state = server._make_process_state("Fictional.mkv", "")
-        server._init_session_events(state, label="Fictional", keep_running=True, prompt_timeout=0)
-        server._finish_session(state, 0)
+        state = webui_session_state._make_process_state("Fictional.mkv", "")
+        webui_sessions._init_session_events(state, label="Fictional", keep_running=True, prompt_timeout=0)
+        webui_sessions._finish_session(state, 0)
         state["finished_at"] = finished_at
         return state
 
     now = time.time()
-    keep = server.MAX_RETAINED_FINISHED_SESSIONS
+    keep = webui_session_state.MAX_RETAINED_FINISHED_SESSIONS
     sessions = {f"done-{index}": finished_state(now - index) for index in range(keep + 1)}
-    sessions["expired"] = finished_state(now - server.FINISHED_SESSION_TTL_SECONDS - 1)
+    sessions["expired"] = finished_state(now - webui_sessions.FINISHED_SESSION_TTL_SECONDS - 1)
     sessions["running"] = {"content_paths": frozenset()}
-    monkeypatch.setattr(server, "active_processes", sessions)
+    monkeypatch.setattr(webui_session_state, "active_processes", sessions)
 
-    with server.active_processes_lock:
-        server._prune_finished_sessions_locked()
+    with webui_session_state.active_processes_lock:
+        webui_sessions._prune_finished_sessions_locked()
 
     # Expired and oldest finished sessions go; running ones are never pruned.
-    assert sorted(server.active_processes) == sorted([*(f"done-{index}" for index in range(keep)), "running"])
+    assert sorted(webui_session_state.active_processes) == sorted([*(f"done-{index}" for index in range(keep)), "running"])
 
 
 def test_session_log_is_capped_and_reattach_reports_trimmed_output(monkeypatch) -> None:
-    monkeypatch.setattr(server, "SESSION_EVENT_LOG_MAX_BYTES", 400)
-    state = server._make_process_state("Fictional.mkv", "")
-    server._init_session_events(state, label="Fictional", keep_running=True, prompt_timeout=0)
+    monkeypatch.setattr(webui_sessions, "SESSION_EVENT_LOG_MAX_BYTES", 400)
+    state = webui_session_state._make_process_state("Fictional.mkv", "")
+    webui_sessions._init_session_events(state, label="Fictional", keep_running=True, prompt_timeout=0)
     for index in range(20):
-        server._publish_session_event(state, {"type": "html", "data": f"Fictional line {index}"})
-    server._finish_session(state, 0)
+        webui_sessions._publish_session_event(state, {"type": "html", "data": f"Fictional line {index}"})
+    webui_sessions._finish_session(state, 0)
 
     assert state["events_bytes"] <= 400
-    replay = [json.loads(chunk.removeprefix("data: ")) for chunk in server._stream_session_events("capped", state, 0)]
+    replay = [json.loads(chunk.removeprefix("data: ")) for chunk in webui_sessions._stream_session_events("capped", state, 0)]
     assert replay[0] == {"type": "truncated"}
     assert replay[-3]["data"] == "Fictional line 19"
     assert replay[-2] == {"type": "replay_done"}
@@ -266,21 +273,21 @@ def test_session_log_is_capped_and_reattach_reports_trimmed_output(monkeypatch) 
         ({"category": "MOVIE", "title": "Fictional Journey", "year": 0}, "Fictional Journey"),
         ({"category": "TV", "title": "Fictional Voyage", "season": "S01", "episode": "E02", "tv_pack": 0}, "Fictional Voyage S01E02"),
         ({"category": "TV", "title": "Fictional Voyage", "season": "S01", "episode": "E02", "tv_pack": 1}, "Fictional Voyage S01"),
-        ({"category": "MUSIC", "title": "Fictional Album", "artist": "Fictional Band"}, f"Fictional Band{server.SESSION_LABEL_SEPARATOR}Fictional Album"),
-        ({"category": "BOOK", "title": "Fictional Novel", "author": "Fictional Writer"}, f"Fictional Writer{server.SESSION_LABEL_SEPARATOR}Fictional Novel"),
+        ({"category": "MUSIC", "title": "Fictional Album", "artist": "Fictional Band"}, f"Fictional Band{webui_sessions.SESSION_LABEL_SEPARATOR}Fictional Album"),
+        ({"category": "BOOK", "title": "Fictional Novel", "author": "Fictional Writer"}, f"Fictional Writer{webui_sessions.SESSION_LABEL_SEPARATOR}Fictional Novel"),
         ({"category": "GAME", "title": "Fictional Quest"}, "Fictional Quest"),
         ({"category": "MOVIE", "year": 2024}, ""),
     ],
 )
 def test_session_display_label(meta_data, expected) -> None:
-    assert server._session_display_label(meta_data) == expected
+    assert webui_sessions._session_display_label(meta_data) == expected
 
 
 def test_queue_tab_label_follows_the_current_item(start_session, tmp_path, monkeypatch) -> None:
     state_dir = tmp_path / "state"
     targets = [tmp_path / "Fictional.Journey.2024.mkv", tmp_path / "Fictional.Voyage.2023.mkv"]
-    monkeypatch.setattr(server, "STATE_DIR", state_dir)
-    monkeypatch.setattr(server, "_execution_item_paths", lambda _path: [os.path.normcase(os.path.realpath(target)) for target in targets])
+    monkeypatch.setattr(webui_context, "STATE_DIR", state_dir)
+    monkeypatch.setattr(webui_session_state, "_execution_item_paths", lambda _path: [os.path.normcase(os.path.realpath(target)) for target in targets])
     process, response, _terminated = start_session("labels")
     events = _events(response)
 
@@ -288,7 +295,7 @@ def test_queue_tab_label_follows_the_current_item(start_session, tmp_path, monke
         event = {"op": "preview_target", "path": str(target)}
         if meta_uuid:
             event["meta_uuid"] = meta_uuid
-        return server.PROGRESS_STDOUT_PREFIX + json.dumps(event) + "\n\n"
+        return webui_processes.PROGRESS_STDOUT_PREFIX + json.dumps(event) + "\n\n"
 
     def write_meta(meta_uuid: str, **meta: object) -> None:
         meta_dir = state_dir / "tmp" / meta_uuid
@@ -318,7 +325,7 @@ def test_queue_tab_label_follows_the_current_item(start_session, tmp_path, monke
 
 
 def _occupy_all_slots(tmp_path) -> dict[str, dict[str, object]]:
-    return {f"busy-{index}": {"content_paths": frozenset({str(tmp_path / f"Fictional Busy {index}")})} for index in range(server.MAX_CONCURRENT_SESSIONS)}
+    return {f"busy-{index}": {"content_paths": frozenset({str(tmp_path / f"Fictional Busy {index}")})} for index in range(webui_session_state.MAX_CONCURRENT_SESSIONS)}
 
 
 def _post_execute(session_id: str, *, schedule: bool) -> list[dict[str, object]]:
@@ -333,7 +340,7 @@ def _post_execute(session_id: str, *, schedule: bool) -> list[dict[str, object]]
 def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session, tmp_path, monkeypatch) -> None:
     _warm_up(start_session)
     busy = _occupy_all_slots(tmp_path)
-    monkeypatch.setattr(server, "active_processes", dict(busy))
+    monkeypatch.setattr(webui_session_state, "active_processes", dict(busy))
     process = FakeProcess()
     spawned: list[FakeProcess] = []
 
@@ -341,11 +348,11 @@ def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session,
         spawned.append(process)
         return process, "subprocess"
 
-    monkeypatch.setattr(server, "_spawn_webui_upload_process", spawn)
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+    monkeypatch.setattr(webui_processes, "_spawn_webui_upload_process", spawn)
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (True, 0.0))
 
     assert _post_execute("scheduled", schedule=True) == [{"type": "scheduled"}]
-    state = server.active_processes["scheduled"]
+    state = webui_session_state.active_processes["scheduled"]
     assert state["scheduled"] is True
     assert spawned == []
 
@@ -355,12 +362,12 @@ def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session,
     assert [(item["session_id"], item["scheduled"], item["running"]) for item in listed["sessions"]] == [("scheduled", True, True)]
 
     # Scheduled content is claimed: a second upload of it is a duplicate.
-    with server.active_processes_lock:
-        assert server._execution_conflict_locked("other", state["content_paths"])[0] == "duplicate"
+    with webui_session_state.active_processes_lock:
+        assert webui_session_state._execution_conflict_locked("other", state["content_paths"])[0] == "duplicate"
 
-    with server.active_processes_lock:
-        server.active_processes.pop("busy-0")
-    server._start_scheduled_sessions()
+    with webui_session_state.active_processes_lock:
+        webui_session_state.active_processes.pop("busy-0")
+    webui_sessions._start_scheduled_sessions()
     assert spawned == [process]
     assert state["scheduled"] is False
     assert '"started"' in _logged_html("scheduled")
@@ -369,75 +376,75 @@ def test_full_slots_schedule_the_upload_and_a_free_slot_starts_it(start_session,
 
 def test_upload_is_refused_instead_of_scheduled_when_not_requested_or_keep_running_is_off(start_session, tmp_path, monkeypatch) -> None:
     _warm_up(start_session)
-    monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
+    monkeypatch.setattr(webui_session_state, "active_processes", _occupy_all_slots(tmp_path))
 
     assert _post_execute("plain", schedule=False)[0]["code"] == "capacity"
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (False, 0.0))
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (False, 0.0))
     assert _post_execute("legacy", schedule=True)[0]["code"] == "capacity"
-    assert "plain" not in server.active_processes
-    assert "legacy" not in server.active_processes
+    assert "plain" not in webui_session_state.active_processes
+    assert "legacy" not in webui_session_state.active_processes
 
 
 def test_killing_a_scheduled_upload_cancels_it(start_session, tmp_path, monkeypatch) -> None:
     _warm_up(start_session)
-    monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+    monkeypatch.setattr(webui_session_state, "active_processes", _occupy_all_slots(tmp_path))
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (True, 0.0))
     assert _post_execute("cancel-me", schedule=True) == [{"type": "scheduled"}]
 
     response = server.app.test_client().post("/api/kill", json={"session_id": "cancel-me"})
     assert response.get_json() == {"success": True, "message": "Execution startup cancelled"}
-    assert "cancel-me" not in server.active_processes
+    assert "cancel-me" not in webui_session_state.active_processes
 
 
 def test_scheduling_queue_has_its_own_limit(start_session, tmp_path, monkeypatch) -> None:
     _warm_up(start_session)
     sessions = _occupy_all_slots(tmp_path)
-    for index in range(server.MAX_SCHEDULED_SESSIONS):
+    for index in range(webui_session_state.MAX_SCHEDULED_SESSIONS):
         sessions[f"waiting-{index}"] = {"content_paths": frozenset({str(tmp_path / f"Fictional Wait {index}")}), "scheduled": True}
-    monkeypatch.setattr(server, "active_processes", sessions)
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+    monkeypatch.setattr(webui_session_state, "active_processes", sessions)
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (True, 0.0))
 
     error = _post_execute("one-too-many", schedule=True)[0]
-    assert (error["code"], error["data"]) == ("capacity", f"Maximum of {server.MAX_SCHEDULED_SESSIONS} scheduled uploads reached; wait for one to start")
+    assert (error["code"], error["data"]) == ("capacity", f"Maximum of {webui_session_state.MAX_SCHEDULED_SESSIONS} scheduled uploads reached; wait for one to start")
 
 
 def test_replacing_a_scheduled_session_releases_it(start_session, tmp_path, monkeypatch) -> None:
     _warm_up(start_session)
-    monkeypatch.setattr(server, "active_processes", _occupy_all_slots(tmp_path))
-    monkeypatch.setattr(server, "_webui_session_settings", lambda: (True, 0.0))
+    monkeypatch.setattr(webui_session_state, "active_processes", _occupy_all_slots(tmp_path))
+    monkeypatch.setattr(webui_sessions, "_webui_session_settings", lambda: (True, 0.0))
     assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]
-    replaced = server.active_processes["reused-id"]
+    replaced = webui_session_state.active_processes["reused-id"]
     released: list[str] = []
-    monkeypatch.setattr(server, "_remove_session_queue_file", released.append)
-    monkeypatch.setattr(server, "_execution_item_paths", lambda _path: [str(tmp_path / "Fictional Other 2024")])
-    monkeypatch.setattr(server, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Other 2024"))
+    monkeypatch.setattr(webui_sessions, "_remove_session_queue_file", released.append)
+    monkeypatch.setattr(webui_session_state, "_execution_item_paths", lambda _path: [str(tmp_path / "Fictional Other 2024")])
+    monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(tmp_path / "Fictional Other 2024"))
     replaced["execution_path"] = str(tmp_path / "webui_queue_old.txt")
 
     assert _post_execute("reused-id", schedule=True) == [{"type": "scheduled"}]
-    assert server.active_processes["reused-id"] is not replaced
+    assert webui_session_state.active_processes["reused-id"] is not replaced
     assert replaced["finished"] is True
     assert released == [str(tmp_path / "webui_queue_old.txt")]
 
 
 def test_dismiss_requires_a_session_id(monkeypatch) -> None:
-    monkeypatch.setattr(server, "_get_bearer_from_header", lambda: None)
-    monkeypatch.setattr(server, "_is_authenticated", lambda: True)
-    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
-    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(webui_security, "_get_bearer_from_header", lambda: None)
+    monkeypatch.setattr(webui_security, "_is_authenticated", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(webui_security, "_verify_same_origin", lambda: True)
     response = server.app.test_client().post("/api/session_dismiss", json={})
     assert response.status_code == 400
 
 
 def test_session_settings_are_reparsed_only_when_a_config_changes(monkeypatch) -> None:
     calls: list[object] = []
-    real_load = server._load_config_from_file
+    real_load = webui_config_store._load_config_from_file
 
     def counting_load(path):
         calls.append(path)
         return real_load(path)
 
-    monkeypatch.setattr(server, "_session_settings_cache", None)
-    monkeypatch.setattr(server, "_load_config_from_file", counting_load)
-    first = server._webui_session_settings()
-    assert server._webui_session_settings() == first
+    monkeypatch.setattr(webui_sessions, "_session_settings_cache", None)
+    monkeypatch.setattr(webui_config_store, "_load_config_from_file", counting_load)
+    first = webui_sessions._webui_session_settings()
+    assert webui_sessions._webui_session_settings() == first
     assert len(calls) == 2  # user and example config, parsed once

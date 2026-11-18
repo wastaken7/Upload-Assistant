@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import web_ui.server as server
+import web_ui.paths as webui_paths
 from tests.test_webui_browse_limits import HEADERS, browser  # noqa: F401
 
 
@@ -15,18 +15,18 @@ def search(browser, **params):
 
 
 def test_scope_walks_only_selected_folder(browser, monkeypatch):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     child = root / "selected"
     (child / "nested").mkdir(parents=True)
     (child / "nested" / "movie.mkv").touch()
     visited = []
-    walk = server.os.walk
+    walk = os.walk
 
     def record(path, **kwargs):
         visited.append(Path(path))
         yield from walk(path, **kwargs)
 
-    monkeypatch.setattr(server.os, "walk", record)
+    monkeypatch.setattr(os, "walk", record)
     response = search(browser, path=str(child))
     assert response.status_code == 200
     assert [item["path"] for item in response.json["items"]] == [str(child / "nested" / "movie.mkv")]
@@ -54,18 +54,18 @@ def test_folders_displace_earlier_files_across_roots(browser, monkeypatch, tmp_p
 
 @pytest.mark.parametrize("scope", ["", "missing", "outside", "file", "duplicate"])
 def test_invalid_scope_does_not_walk(browser, monkeypatch, tmp_path, scope):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     values = {"": "", "missing": str(root / "missing"), "outside": str(tmp_path), "file": str(root / "Movie" / "movie.mkv"), "duplicate": [str(root), str(root)]}
 
     def no_walk(*args, **kwargs):
         pytest.fail("Invalid scope must not start a filesystem walk")
 
-    monkeypatch.setattr(server.os, "walk", no_walk)
+    monkeypatch.setattr(os, "walk", no_walk)
     assert search(browser, path=values[scope]).status_code == 400
 
 
 def test_links_are_not_searched_or_accepted_as_scope(browser, tmp_path):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "movie secret.mkv").touch()
@@ -80,7 +80,7 @@ def test_links_are_not_searched_or_accepted_as_scope(browser, tmp_path):
 
 @pytest.mark.skipif(os.name != "nt", reason="Real Windows junction creation")
 def test_windows_junction_is_pruned_and_rejected_as_scope(browser, tmp_path):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "movie secret.mkv").touch()
@@ -95,20 +95,20 @@ def test_windows_junction_is_pruned_and_rejected_as_scope(browser, tmp_path):
 
 
 def test_unreadable_selection_is_an_error(browser, monkeypatch):
-    root = Path(server._get_browse_roots()[0])
-    original = server.os.scandir
+    root = Path(webui_paths._get_browse_roots()[0])
+    original = os.scandir
 
     def denied(path):
         if Path(path) == root:
             raise PermissionError("Test denial")
         return original(path)
 
-    monkeypatch.setattr(server.os, "scandir", denied)
+    monkeypatch.setattr(os, "scandir", denied)
     assert search(browser, path=str(root)).status_code == 400
 
 
 def test_desc_filter_hidden_entries_and_overlapping_roots(browser, monkeypatch):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     movie = root / "Movie"
     (movie / "movie.txt").touch()
     (movie / ".movie.txt").touch()
@@ -120,7 +120,7 @@ def test_desc_filter_hidden_entries_and_overlapping_roots(browser, monkeypatch):
 
 
 def test_nested_folders_displace_files(browser):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     child = root / "selected"
     nested = child / "nested"
     nested.mkdir(parents=True)
@@ -134,7 +134,7 @@ def test_nested_folders_displace_files(browser):
 
 
 def test_internal_links_are_listed_and_searchable_as_scope(browser):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     target = root / "Movie"
     link = root / "movie alias"
     file_link = root / "movie link.mkv"
@@ -154,7 +154,7 @@ def test_internal_links_are_listed_and_searchable_as_scope(browser):
 
 @pytest.mark.skipif(os.name != "nt", reason="Real Windows junction creation")
 def test_internal_junction_is_listed_not_descended_and_searchable_as_scope(browser):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     target = root / "Movie"
     junction = root / "movie junction"
     subprocess.run(["cmd.exe", "/c", "mklink", "/J", str(junction), str(target)], check=True, capture_output=True)
@@ -174,7 +174,7 @@ def test_internal_junction_is_listed_not_descended_and_searchable_as_scope(brows
 def test_linked_scope_can_target_another_configured_root(browser, monkeypatch, tmp_path, kind, child_scope):
     if kind == "junction" and os.name != "nt":
         pytest.skip("Real Windows junction creation")
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     other = tmp_path / "other"
     target = other / "target"
     (target / "nested").mkdir(parents=True)
@@ -189,7 +189,7 @@ def test_linked_scope_can_target_another_configured_root(browser, monkeypatch, t
         except OSError:
             pytest.skip("Creating symlinks requires OS permission")
     monkeypatch.setenv("UA_BROWSE_ROOTS", f"{root},{other}")
-    walk = server.os.walk
+    walk = os.walk
     visited = []
 
     def record(path, **kwargs):
@@ -197,7 +197,7 @@ def test_linked_scope_can_target_another_configured_root(browser, monkeypatch, t
             visited.append(Path(entry[0]))
             yield entry
 
-    monkeypatch.setattr(server.os, "walk", record)
+    monkeypatch.setattr(os, "walk", record)
     try:
         assert str(link) in [item["path"] for item in search(browser).json["items"]]
         visited.clear()
@@ -213,37 +213,37 @@ def test_linked_scope_can_target_another_configured_root(browser, monkeypatch, t
 
 
 def test_scope_link_outside_configured_roots_is_not_accepted(browser, monkeypatch, tmp_path):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     link = tmp_path / "outside alias"
     try:
         link.symlink_to(root, target_is_directory=True)
     except OSError:
         pytest.skip("Creating symlinks requires OS permission")
-    monkeypatch.setattr(server.os, "walk", lambda *a, **k: pytest.fail("Outside scope must not walk"))
+    monkeypatch.setattr(os, "walk", lambda *a, **k: pytest.fail("Outside scope must not walk"))
     assert search(browser, path=str(link)).status_code == 400
 
 
 def test_relative_scope_is_rejected(browser, monkeypatch):
-    monkeypatch.setattr(server.os, "walk", lambda *a, **k: pytest.fail("Relative scope must not walk"))
+    monkeypatch.setattr(os, "walk", lambda *a, **k: pytest.fail("Relative scope must not walk"))
     assert search(browser, path="Movie").status_code == 400
 
 
 @pytest.mark.parametrize("budget", [0, 1, 5, 500])
 def test_full_results_stop_after_folder_scan_budget(browser, monkeypatch, budget):
-    root = Path(server._get_browse_roots()[0])
+    root = Path(webui_paths._get_browse_roots()[0])
     for index in range(120):
         (root / f"movie {index}.mkv").touch()
     for index in range(budget + 20):
         (root / f"empty {index:04d}").mkdir()
     visited = []
-    scandir = server.os.scandir
+    scandir = os.scandir
 
     def record(path):
         visited.append(Path(path))
         return scandir(path)
 
-    monkeypatch.setattr(server.os, "scandir", record)
-    monkeypatch.setattr(server, "_BROWSE_SEARCH_FOLDER_SCAN_DIRS", budget)
+    monkeypatch.setattr(os, "scandir", record)
+    monkeypatch.setattr(webui_paths, "_BROWSE_SEARCH_FOLDER_SCAN_DIRS", budget)
     response = search(browser)
     items = response.json["items"]
     assert len(items) == 100
