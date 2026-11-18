@@ -355,6 +355,23 @@
       headers,
       credentials: "same-origin",
     });
+    if (response.headers.get("X-UA-Reauth-Required") === "1") {
+      // Settings changes need a recent password confirmation. Pages that
+      // register a prompt ask for it once and repeat the request.
+      if (!retryOnAuthFail || typeof window.UAReauthPrompt !== "function") {
+        return response;
+      }
+      let info = {};
+      try {
+        info = await response.clone().json();
+      } catch (_error) {
+        info = {};
+      }
+      const confirmed = await window.UAReauthPrompt({
+        totpRequired: Boolean(info.totp_required),
+      });
+      return confirmed ? uaApiFetch(url, options, false) : response;
+    }
     if (
       retryOnAuthFail &&
       (response.status === 401 || response.status === 403)

@@ -256,7 +256,8 @@ def tracker_api_key_status():
     if not tracker_class or not getattr(tracker_class, "api_key_expiry_supported", False):
         return jsonify({"success": False, "error": "API key expiry checks are not supported for this tracker"}), 400
     config = config_store_mod._load_config_from_file(context_mod.STATE_DIR / "data" / "config.py") or {}
-    if "api_key" in data:
+    # The browser only holds a placeholder for a saved key, so use the saved one.
+    if "api_key" in data and data["api_key"] != config_store_mod.REDACTED_PLACEHOLDER:
         api_key = data["api_key"]
     else:
         trackers_config = config.get("TRACKERS")

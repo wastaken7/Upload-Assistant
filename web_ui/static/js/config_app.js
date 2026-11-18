@@ -934,7 +934,7 @@ const loadCsrfToken =
   (typeof window !== "undefined" && window.loadCsrfToken) || (async () => {});
 
 const sensitiveKeyPattern =
-  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url|userhash)/i;
+  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url|userhash|secret|token|client_id|login_answer|rtorrent_url|^cookies$)/i;
 const isSensitiveKey = (key) => sensitiveKeyPattern.test(key || "");
 const isTorrentClientUserPass = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && /(user|pass)/i.test(key || "");
@@ -4654,6 +4654,141 @@ function ReleaseGroupOverrides({
         </div>
       )}
     </section>
+  );
+}
+
+function SettingsReauthModal({ totpRequired, onCancel, onConfirmed }) {
+  const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useModalFocus(onCancel);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (submitting || !password || (totpRequired && !totpCode.trim())) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await apiFetch(`${API_BASE}/settings_reauth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, totp_code: totpCode.trim() }),
+      });
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (_error) {
+        data = {};
+      }
+      if (response.ok && data.success) {
+        onConfirmed();
+        return;
+      }
+      setPassword("");
+      setTotpCode("");
+      setError(
+        response.status === 429
+          ? "Too many attempts. Try again later."
+          : data.error || "Password or 2FA code did not match.",
+      );
+    } catch (_error) {
+      setError("Unable to confirm the password. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <form
+        ref={dialogRef}
+        className="ua-config-modal w-full max-w-md overflow-hidden rounded-xl border shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-reauth-title"
+        tabIndex="-1"
+        onSubmit={submit}
+      >
+        <div className="ua-config-section-heading border-b px-4 py-3">
+          <h2 id="settings-reauth-title" className="text-base font-semibold">
+            Confirm your password
+          </h2>
+          <p className="ua-config-service-description mt-1 text-xs">
+            Settings can change which programs Upload Assistant runs, so
+            changes need a recent password confirmation. You won&apos;t be
+            asked again for 15 minutes.
+          </p>
+        </div>
+        <div className="space-y-3 p-4">
+          <div className="space-y-1">
+            <label
+              htmlFor="settings-reauth-password"
+              className="text-sm font-semibold"
+            >
+              Password
+            </label>
+            <input
+              id="settings-reauth-password"
+              type="password"
+              value={password}
+              className="ua-config-input w-full rounded-lg border px-3 py-2"
+              autoComplete="current-password"
+              data-ua-modal-initial-focus
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+          {totpRequired && (
+            <div className="space-y-1">
+              <label
+                htmlFor="settings-reauth-totp"
+                className="text-sm font-semibold"
+              >
+                2FA code
+              </label>
+              <input
+                id="settings-reauth-totp"
+                type="text"
+                inputMode="numeric"
+                value={totpCode}
+                className="ua-config-input w-full rounded-lg border px-3 py-2"
+                autoComplete="one-time-code"
+                onChange={(event) => setTotpCode(event.target.value)}
+              />
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-red-500" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t px-4 py-3">
+          <button
+            type="button"
+            className="ua-config-service-action rounded-lg border px-4 py-2 text-sm font-semibold"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={
+              submitting || !password || (totpRequired && !totpCode.trim())
+            }
+          >
+            {submitting ? "Confirming…" : "Confirm"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -10274,6 +10409,25 @@ function ConfigApp() {
   );
   const folderPickerResolveRef = useRef(null);
   const [folderPicker, setFolderPicker] = useState(null);
+  // Requests that need a password confirmation share one prompt (see
+  // uaApiFetch in shared_utils.js).
+  const settingsReauthRef = useRef(null);
+  const [settingsReauth, setSettingsReauth] = useState(null);
+  useEffect(() => {
+    window.UAReauthPrompt = ({ totpRequired } = {}) => {
+      if (settingsReauthRef.current) return settingsReauthRef.current.promise;
+      let resolve;
+      const promise = new Promise((done) => {
+        resolve = done;
+      });
+      settingsReauthRef.current = { promise, resolve };
+      setSettingsReauth({ totpRequired: Boolean(totpRequired) });
+      return promise;
+    };
+    return () => {
+      delete window.UAReauthPrompt;
+    };
+  }, []);
   const [renameClientSource, setRenameClientSource] = useState("");
   const [clientTestStates, setClientTestStates] = useState(new Map());
   const [prowlarrTestState, setProwlarrTestState] = useState(null);
@@ -11306,7 +11460,20 @@ function ConfigApp() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: clientName, config: clientConfig }),
+          body: JSON.stringify({
+            name: clientName,
+            // Saved credentials arrive as <REDACTED>; the server fills them
+            // in from this saved client (its pre-rename name, if renamed).
+            saved_name:
+              sections
+                .find((section) => section.section === "TORRENT_CLIENTS")
+                ?.items?.find(
+                  (item) =>
+                    String(item.key).toLowerCase() ===
+                    String(clientName).toLowerCase(),
+                )?.renamedFrom || clientName,
+            config: clientConfig,
+          }),
         },
       );
       const data = await response.json();
@@ -12408,6 +12575,13 @@ function ConfigApp() {
     if (resolve) resolve(selectedPath || null);
   };
 
+  const finishSettingsReauth = (confirmed) => {
+    const pending = settingsReauthRef.current;
+    settingsReauthRef.current = null;
+    setSettingsReauth(null);
+    if (pending) pending.resolve(confirmed);
+  };
+
   const handleLogout = async () => {
     try {
       const resp = await apiFetch("/logout", { method: "POST" });
@@ -12429,6 +12603,13 @@ function ConfigApp() {
         (isDarkMode ? "ua-mode-dark" : "ua-mode-light")
       }
     >
+      {settingsReauth && (
+        <SettingsReauthModal
+          totpRequired={settingsReauth.totpRequired}
+          onCancel={() => finishSettingsReauth(false)}
+          onConfirmed={() => finishSettingsReauth(true)}
+        />
+      )}
       {folderPicker && (
         <FolderPickerModal
           fieldLabel={folderPicker.fieldLabel}

@@ -20,7 +20,7 @@ from typing import Any, cast
 import web_ui.auth as auth_mod
 from web_ui import context as context_mod
 from web_ui.context import _cfg_read, _cfg_write, console
-from web_ui.flask_compat import current_app, g, pyotp, request, session
+from web_ui.flask_compat import current_app, g, jsonify, pyotp, request, session
 from web_ui.request_utils import _as_dict, _as_str_list, _json_load_dict, _request_form_text, _request_header, _request_json_dict
 
 # Load stable session secret (env/file/SECRET_KEY fallback). Use bytes directly.
@@ -272,18 +272,62 @@ def _is_authenticated() -> bool:
 
 
 def _mark_session_authenticated(username: str) -> None:
-    """Replace the browser session with a fresh authenticated one."""
+    """Replace the browser session with a fresh authenticated one.
+
+    The password was just entered, so it also counts as a settings
+    confirmation. Remember-me cookies restore sign-in without this.
+    """
+    fingerprint = _account_fingerprint()
     _commit_session_dict(
         {
             "authenticated": True,
             "username": username,
-            "account": _account_fingerprint(),
+            "account": fingerprint,
             "csrf_token": secrets.token_urlsafe(32),
+            "settings_reauth": {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": fingerprint},
         }
     )
     # Issue a new session id so an id known before sign-in cannot be reused.
     with contextlib.suppress(Exception):
         current_app.session_interface.regenerate(session)
+
+
+# Settings changes can run programs (tool paths, post-upload hooks), so a
+# signed-in browser must confirm the account password before changing them.
+SETTINGS_REAUTH_SECONDS = 15 * 60
+SETTINGS_REAUTH_HEADER = "X-UA-Reauth-Required"
+
+
+def _mark_settings_reauthenticated() -> None:
+    """Allow settings changes from this browser session for a short time."""
+    _session_set("settings_reauth", {"until": time.time() + SETTINGS_REAUTH_SECONDS, "account": _account_fingerprint()})
+
+
+def _settings_reauth_valid() -> bool:
+    """Return True when this session confirmed the password recently."""
+    state = _session_get("settings_reauth")
+    if not isinstance(state, Mapping):
+        return False
+    state_map = cast(Mapping[str, Any], state)
+    until = state_map.get("until")
+    return isinstance(until, (int, float)) and until > time.time() and _account_fingerprint_matches(state_map.get("account"))
+
+
+def _settings_reauth_required_response() -> Any | None:
+    """Return a 403 response asking for password confirmation, or None if confirmed."""
+    if _settings_reauth_valid():
+        return None
+    response = jsonify(
+        {
+            "success": False,
+            "error": "Confirm your WebUI password to change settings.",
+            "reauth_required": True,
+            "totp_required": _totp_enabled(),
+        }
+    )
+    response.status_code = 403
+    response.headers[SETTINGS_REAUTH_HEADER] = "1"
+    return response
 
 
 _first_run_setup_code_value: str | None = None
@@ -823,13 +867,33 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+_SENSITIVE_KEY_PARTS = (
+    "password",
+    "pass",
+    "secret",
+    "token",
+    "key",
+    "totp",
+    "api",
+    "credential",
+    "auth",
+    "userhash",
+    "client_id",
+    "announce",
+    "cookie",
+    "login_answer",
+    "proxy_url",
+    "rtorrent_url",
+)
+
+
 def _redact_sensitive(value: Any) -> Any:
     """Return a copy of the value with sensitive dictionary fields redacted.
 
-    Keys containing any of these substrings will be redacted (case-insensitive):
-    password, pass, secret, token, key, totp, api, credential, auth, userhash
+    Keys containing any substring from ``_SENSITIVE_KEY_PARTS`` are redacted
+    (case-insensitive).
     """
-    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth", "userhash")
+    sensitive_parts = _SENSITIVE_KEY_PARTS
 
     if isinstance(value, Mapping):
         out: dict[str, Any] = {}
@@ -856,8 +920,7 @@ def _is_sensitive_key(key: Any) -> bool:
     if not isinstance(key, str):
         return False
     lowered = key.lower()
-    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth", "userhash")
-    return any(part in lowered for part in sensitive_parts)
+    return any(part in lowered for part in _SENSITIVE_KEY_PARTS)
 
 
 def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: Any, success: bool, error: str | None = None) -> None:

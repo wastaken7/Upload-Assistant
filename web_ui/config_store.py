@@ -418,6 +418,86 @@ def _validate_release_group_overrides(value: object) -> None:
                 raise ValueError(f"Overrides for {name} must contain text fields or null values.")
 
 
+REDACTED_PLACEHOLDER = "<REDACTED>"
+# Keep in sync with sensitiveKeyPattern in web_ui/static/js/config_app.js.
+_SENSITIVE_CONFIG_KEY_PATTERN = re.compile(
+    r"(api|username|password|announce_url|rss_key|passkey|qui_proxy_url|userhash|secret|token|client_id|login_answer|rtorrent_url|^cookies$)",
+    re.IGNORECASE,
+)
+
+
+def _is_sensitive_config_path(path: list[str]) -> bool:
+    """Return True when the config field at ``path`` holds a credential."""
+    if not path:
+        return False
+    key = path[-1]
+    if _SENSITIVE_CONFIG_KEY_PATTERN.search(key):
+        return True
+    return "TORRENT_CLIENTS" in path and re.search(r"(user|pass)", key, re.IGNORECASE) is not None
+
+
+def _redact_config_value(path: list[str], value: Any, example_value: Any) -> Any:
+    """Hide a saved credential before it is sent to the browser.
+
+    Values equal to the public example (placeholders) stay visible so the UI can
+    still tell an unconfigured field from a configured one.
+    """
+    if not isinstance(value, str) or not value.strip() or value == example_value:
+        return value
+    return REDACTED_PLACEHOLDER if _is_sensitive_config_path(path) else value
+
+
+# Draft fields that decide where a torrent-client test sends saved credentials.
+TORRENT_CLIENT_DESTINATION_KEYS = (
+    "torrent_client",
+    "qbit_url",
+    "qbit_port",
+    "deluge_url",
+    "deluge_port",
+    "transmission_protocol",
+    "transmission_host",
+    "transmission_port",
+    "transmission_path",
+    "VERIFY_WEBUI_CERTIFICATE",
+)
+
+
+def _contains_redacted(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return any(_contains_redacted(item) for item in cast(Mapping[str, Any], value).values())
+    return value == REDACTED_PLACEHOLDER
+
+
+def _same_destination_value(draft: Any, saved: Any) -> bool:
+    """Compare a draft destination field with its saved value, ignoring formatting."""
+    if isinstance(draft, bool) or isinstance(saved, bool):
+        return bool(draft) == bool(True if saved is None else saved)
+    return _normalize_destination(draft) == _normalize_destination(saved)
+
+
+def _normalize_destination(value: Any) -> str:
+    return "" if value is None else str(value).strip().rstrip("/").casefold()
+
+
+def _destination_matches(draft: Mapping[str, Any], saved: Any, keys: tuple[str, ...]) -> bool:
+    """Return True when the draft would contact the same place as the saved config."""
+    saved_dict = _as_dict(saved)
+    if saved_dict is None:
+        return False
+    return all(_same_destination_value(draft[key], saved_dict.get(key)) for key in keys if key in draft and draft[key] != REDACTED_PLACEHOLDER)
+
+
+def _restore_redacted_values(draft: Any, saved: Any) -> Any:
+    """Replace ``<REDACTED>`` placeholders in a draft with the saved values."""
+    if isinstance(draft, Mapping):
+        saved_dict = _as_dict(saved) or {}
+        draft_dict = cast(Mapping[str, Any], draft)
+        return {key: _restore_redacted_values(value, saved_dict.get(key)) for key, value in draft_dict.items()}
+    if draft == REDACTED_PLACEHOLDER:
+        return saved if isinstance(saved, str) else ""
+    return draft
+
+
 def _build_config_items(
     example_section: dict[str, Any],
     user_section: dict[str, Any],
@@ -515,7 +595,7 @@ def _build_config_items(
                 source = "example"
             item = {
                 "key": key,
-                "value": _json_safe(value),
+                "value": _json_safe(_redact_config_value(key_path, value, example_value)),
                 "example_value": _json_safe(example_value),
                 "source": source,
                 "help": help_text,
@@ -837,6 +917,9 @@ def _apply_config_update(source: str, example_config: dict[str, Any], data: dict
 
     if not path:
         raise ValueError("Invalid path")
+    if raw_value == REDACTED_PLACEHOLDER and _is_sensitive_config_path(path):
+        # The browser only ever sees the placeholder; never persist it.
+        raise ValueError(f"Refusing to save the redacted placeholder for {'/'.join(path)}; re-enter the value")
 
     example_value = _get_nested_value(example_config, path)
 

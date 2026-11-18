@@ -141,10 +141,21 @@ def config_test_prowlarr():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
     if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    # These tests send saved credentials to the draft's address.
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
 
     data = _request_json_dict()
     base_url = str(data.get("url") or "").strip()
     api_key = str(data.get("api_key") or "").strip()
+    if api_key == config_store_mod.REDACTED_PLACEHOLDER:
+        # The browser only holds the placeholder for a saved key. Send it only to
+        # the saved Prowlarr address, so an edited URL cannot collect the key.
+        saved_config = config_store_mod._load_config_from_file(context_mod.STATE_DIR / "data" / "config.py") or {}
+        saved_default = _as_dict(saved_config.get("DEFAULT")) or {}
+        if not config_store_mod._same_destination_value(base_url, saved_default.get("prowlarr_url")):
+            return jsonify({"success": False, "error": "The Prowlarr URL changed. Re-enter the API key to test the new address."}), 400
+        api_key = str(saved_default.get("prowlarr_api_key") or "").strip()
     if not base_url or not api_key:
         return jsonify({"success": False, "error": "Prowlarr URL and API key are required"}), 400
 
@@ -188,6 +199,8 @@ def _config_write_route(view: Callable[..., Any]) -> Callable[..., Any]:
             return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
         if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
             return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+        if (reauth := security_mod._settings_reauth_required_response()) is not None:
+            return reauth
         try:
             with config_write_lock(context_mod.STATE_DIR / "data" / "config.py"):
                 return view(*args, **kwargs)
@@ -309,9 +322,11 @@ def config_update():
         return jsonify({"success": False, "error": "An error occurred while updating the configuration"}), 500
 
     _audit_config_updates(records, True)
+    # Echo saved values back without credentials, like /api/config_options.
+    values = [_json_safe(config_store_mod._redact_config_value(record["path"], record["value"], None)) for record in records]
     if is_batch:
-        return jsonify({"success": True, "values": [_json_safe(record["value"]) for record in records]})
-    return jsonify({"success": True, "value": _json_safe(records[0]["value"])})
+        return jsonify({"success": True, "values": values})
+    return jsonify({"success": True, "value": values[0]})
 
 
 @bp.route("/api/config_remove_subsection", methods=["POST"])
@@ -514,12 +529,35 @@ def config_test_torrent_client():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
     if not security_mod._verify_csrf_header() or not security_mod._verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    # These tests send saved credentials to the draft's address.
+    if (reauth := security_mod._settings_reauth_required_response()) is not None:
+        return reauth
 
     data = _request_json_dict()
     client_name = str(data.get("name", "")).strip()
     client_config = _as_dict(data.get("config"))
     if not client_name or client_config is None:
         return jsonify({"success": False, "error": "Invalid torrent client configuration"}), 400
+    # Saved credentials reach the browser as placeholders; test with the saved values.
+    # saved_name covers a client renamed in the editor but not yet saved.
+    saved_name = str(data.get("saved_name") or client_name).strip()
+    saved_config = config_store_mod._load_config_from_file(context_mod.STATE_DIR / "data" / "config.py") or {}
+    saved_clients = _as_dict(saved_config.get("TORRENT_CLIENTS")) or {}
+    saved_client = next(
+        (value for name, value in saved_clients.items() if str(name).casefold() == saved_name.casefold()),
+        None,
+    )
+    if config_store_mod._contains_redacted(client_config):
+        # Saved credentials may only go to the saved address, so an edited
+        # address cannot collect them.
+        if not config_store_mod._destination_matches(client_config, saved_client, config_store_mod.TORRENT_CLIENT_DESTINATION_KEYS):
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "The client address changed. Re-enter its password or API key to test the new address.",
+                }
+            ), 400
+        client_config = config_store_mod._restore_redacted_values(client_config, saved_client)
 
     client_type = str(client_config.get("torrent_client", "")).strip().lower()
     if client_type not in {"qbit", "rtorrent", "deluge", "transmission", "watch"}:
