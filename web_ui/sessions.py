@@ -30,6 +30,7 @@ from web_ui.session_state import (
     MAX_CONCURRENT_SESSIONS,
     MAX_RETAINED_FINISHED_SESSIONS,
     _discard_session_state,
+    _execution_path_held_elsewhere_locked,
     _session_is_running,
     _session_state_is_current,
     _set_process_awaiting_input_if_current,
@@ -201,7 +202,7 @@ def _start_scheduled_sessions() -> None:
         except Exception as e:
             console.print(f"Could not start scheduled session {session_id}: {e}", markup=False)
             _publish_session_event(process_state, {"type": "error", "data": "Execution error"})
-            _remove_session_queue_file(str(process_state.get("execution_path") or ""))
+            _release_session_queue_file(str(process_state.get("execution_path") or ""), process_state)
             _finish_session(process_state, None)
 
 
@@ -364,13 +365,38 @@ def _remove_session_queue_file(validated_path: str) -> None:
         key = os.path.normcase(os.path.realpath(validated_path))
         with _generated_queues_lock:
             generated = paths_mod._generated_queues.pop(key, None)
-        if generated is not None:
-            lines = Path(key).read_text(encoding="utf-8").splitlines() if Path(key).is_file() else []
-            _remove_generated_queue_file(key)
-            _remove_generated_queue_logs(generated, lines)
-            console.print(f"Cleaned up queue file: {Path(validated_path).name}", markup=False)
+        _cleanup_released_queue(key, generated, validated_path)
     except Exception as cleanup_err:
         console.print(f"Failed to cleanup queue file: {cleanup_err}", markup=False)
+
+
+def _release_session_queue_file(validated_path: str, own_state: Mapping[str, object] | None) -> None:
+    """Release a queue unless a session other than own_state still uses it.
+
+    The holder check and the release share the registration lock, so a request
+    that registers the same queue either keeps it alive or sees it expired.
+    """
+    if not validated_path:
+        return
+    try:
+        key = os.path.normcase(os.path.realpath(validated_path))
+        with active_processes_lock:
+            if _execution_path_held_elsewhere_locked(key, own_state):
+                return
+            with _generated_queues_lock:
+                generated = paths_mod._generated_queues.pop(key, None)
+        _cleanup_released_queue(key, generated, validated_path)
+    except Exception as cleanup_err:
+        console.print(f"Failed to cleanup queue file: {cleanup_err}", markup=False)
+
+
+def _cleanup_released_queue(key: str, generated: str | None, validated_path: str) -> None:
+    if generated is None:
+        return
+    lines = Path(key).read_text(encoding="utf-8").splitlines() if Path(key).is_file() else []
+    _remove_generated_queue_file(key)
+    _remove_generated_queue_logs(generated, lines)
+    console.print(f"Cleaned up queue file: {Path(validated_path).name}", markup=False)
 
 
 def _pump_session(session_id: str, process_state: dict[str, object], process: _WebUIProcess, process_mode: str) -> None:
@@ -456,21 +482,27 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
         prompt_timed_out = False
         orphaned = False
 
-        exited_with_open_pipe_at: float | None = None
+        exited_at: float | None = None
+        # Output still to process once the drain deadline passed; None before it.
+        backlog_left: int | None = None
         while True:
             # Process exit does not mean its pipes are drained: keep reading
             # until both readers reach EOF. A descendant that inherited the
-            # pipe can hold it open, so only wait a bounded grace period.
-            if process.poll() is not None:
+            # pipe can hold it open (silent or still writing), so after a
+            # grace period only the output already queued at the cutoff is
+            # processed.
+            exited = process.poll() is not None
+            if exited:
                 readers_done = not stdout_thread.is_alive() and (stderr_thread is None or not stderr_thread.is_alive())
-                if output_queue.empty():
-                    if readers_done:
-                        break
-                    if exited_with_open_pipe_at is None:
-                        exited_with_open_pipe_at = time.monotonic()
-                    elif time.monotonic() - exited_with_open_pipe_at >= READER_DRAIN_GRACE_SECONDS:
-                        break
-            if not prompt_timed_out and _unanswered_prompt_expired(process_state):
+                if readers_done and output_queue.empty():
+                    break
+                if exited_at is None:
+                    exited_at = time.monotonic()
+                elif backlog_left is None and time.monotonic() - exited_at >= READER_DRAIN_GRACE_SECONDS:
+                    backlog_left = output_queue.qsize()
+                if backlog_left is not None and backlog_left <= 0:
+                    break
+            if not exited and not prompt_timed_out and _unanswered_prompt_expired(process_state):
                 prompt_timed_out = True
                 minutes = float(cast(float, process_state["prompt_timeout"])) / 60
                 message = f"Upload killed: a prompt went unanswered for {minutes:g} minutes with no browser connected"
@@ -480,6 +512,11 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
                     processes_mod._terminate_process_tree(process)
 
             has_output, output = _read_output(output_queue)
+            if has_output and backlog_left is not None:
+                backlog_left -= 1
+            elif not has_output and backlog_left is not None:
+                # The queued backlog is gone; flush pending buffers and stop.
+                backlog_left = 0
             previous_prompt_type = str(process_state.get("input_type") or "text") if process_state.get("awaiting_input") else None
             if has_output and output is not None:
                 output_type, char = output
@@ -577,9 +614,8 @@ def _pump_session(session_id: str, process_state: dict[str, object], process: _W
             if process.poll() is None:
                 processes_mod._terminate_process_tree(process)
         processes_mod._close_webui_process_io(process)
-        execution_path = str(process_state.get("execution_path") or "")
-        if execution_path:
-            _remove_session_queue_file(execution_path)
+        # A replacement session in the same tab can already run this queue again.
+        _release_session_queue_file(str(process_state.get("execution_path") or ""), process_state)
         if exit_code is not None:
             _publish_session_event(process_state, {"type": "exit", "code": exit_code})
         _finish_session(process_state, exit_code)

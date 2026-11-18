@@ -61,6 +61,7 @@ def test_webui_description_api_saves_an_execution_scoped_override(tmp_path, monk
         initial = client.get("/api/execution_description?session_id=session")
         assert initial.status_code == 200
         assert initial.get_json()["content"] == "tracker text"
+        assert initial.get_json()["media_id"] == "release"
 
         response = client.put(
             "/api/execution_description",

@@ -1,6 +1,7 @@
 # ruff: noqa: S101
 """Races between queue advances, scheduling, kills and late subprocess output."""
 
+import hashlib
 import io
 import json
 import os
@@ -113,10 +114,13 @@ def test_kill_keeps_a_replacement_session_registered_under_the_same_id(isolated_
 def test_refused_execute_keeps_the_queue_of_the_session_it_conflicts_with(isolated_sessions, tmp_path, monkeypatch):
     item = tmp_path / "Fictional Item"
     item.mkdir()
-    queue_file = tmp_path / "webui_queue_fictional.txt"
+    # A real generated queue: inside STATE_DIR/tmp and registered by its digest,
+    # so the cleanup would delete it if it wrongly released the queue.
+    (tmp_path / "tmp").mkdir()
+    queue_file = tmp_path / "tmp" / "webui_queue_fictional.txt"
     queue_file.write_text(f'"{item}"\n', encoding="utf-8")
     key = os.path.normcase(os.path.realpath(queue_file))
-    monkeypatch.setitem(webui_paths._generated_queues, key, "0123456789abcdef")
+    monkeypatch.setitem(webui_paths._generated_queues, key, hashlib.sha256(queue_file.read_bytes()).hexdigest())
     monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
     monkeypatch.setattr(webui_paths, "_validate_execution_path", lambda *_args, **_kwargs: str(queue_file))
     monkeypatch.setattr(webui_paths, "_assert_safe_resolved_path", lambda _: None)
@@ -128,7 +132,7 @@ def test_refused_execute_keeps_the_queue_of_the_session_it_conflicts_with(isolat
     response = server.app.test_client().post("/api/execute", json={"path": str(queue_file), "session_id": "intruder"}, buffered=False)
     events = [json.loads(chunk.decode().removeprefix("data: ")) for chunk in response.response]
 
-    assert events[0]["type"] == "error"
+    assert (events[0]["type"], events[0]["code"]) == ("error", "duplicate")
     assert queue_file.is_file()
     assert key in webui_paths._generated_queues
     assert "intruder" not in isolated_sessions
@@ -155,6 +159,44 @@ def test_preview_metadata_is_not_cached_for_a_target_that_moved_during_the_read(
     assert state["meta_uuid"] == "uuid-b"
 
 
+def test_preview_reports_nothing_when_the_target_keeps_moving(isolated_sessions, monkeypatch):
+    state = _registered_state("tab", "/media/Fictional Item 0")
+    reads: list[str] = []
+
+    def read(execution_path: str, _known_uuid: str):
+        reads.append(execution_path)
+        webui_session_state.set_execution_preview_target("tab", str(state["run_token"]), f"/media/Fictional Item {len(reads)}", None)
+        return Path("meta.json"), {"name": execution_path}, ""
+
+    monkeypatch.setattr(webui_preview, "_read_preview_meta_for_target", read)
+
+    assert webui_preview._resolve_execution_preview_meta("tab") == ("", None, None)
+
+
+def test_alias_metadata_does_not_replace_the_published_uuid(tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    alias_dir = tmp_path / "tmp" / "Fictional Item"
+    alias_dir.mkdir(parents=True)
+    (alias_dir / "meta.json").write_text(json.dumps({"uuid": "older-uuid"}), encoding="utf-8")
+
+    _meta_file, meta, uuid_to_cache = webui_preview._read_preview_meta_for_target("/media/Fictional Item", "published-uuid")
+
+    assert meta is not None and meta["uuid"] == "older-uuid"
+    assert uuid_to_cache == "published-uuid"
+
+
+def _pump_with_timeout(state: dict[str, object], process: "ExitedProcess", timeout: float = 5.0) -> None:
+    """Run the pump in a worker so a regression fails the test instead of hanging it."""
+    worker = threading.Thread(target=webui_sessions._pump_session, args=("tab", state, process, "subprocess"), daemon=True)
+    worker.start()
+    try:
+        worker.join(timeout)
+        assert not worker.is_alive(), "pump did not return"
+    finally:
+        process.stdout.end()
+        worker.join(1)
+
+
 def test_pump_reads_output_written_after_the_process_exited(isolated_sessions):
     state = _registered_state("tab", "/media/Fictional Item")
     process = ExitedProcess()
@@ -165,7 +207,7 @@ def test_pump_reads_output_written_after_the_process_exited(isolated_sessions):
         process.stdout.end()
 
     threading.Thread(target=write_late, daemon=True).start()
-    webui_sessions._pump_session("tab", state, process, "subprocess")
+    _pump_with_timeout(state, process)
 
     assert "final summary line" in _logged_html(state)
     assert state["finished"] is True
@@ -177,10 +219,64 @@ def test_pump_stops_waiting_when_a_descendant_holds_the_pipe_open(isolated_sessi
     process = ExitedProcess()
     process.stdout.feed("before exit\n")
 
-    started = time.monotonic()
-    webui_sessions._pump_session("tab", state, process, "subprocess")
+    _pump_with_timeout(state, process)
 
-    assert time.monotonic() - started < 5
     assert "before exit" in _logged_html(state)
     assert state["finished"] is True
-    process.stdout.end()
+
+
+def test_pump_stops_when_a_descendant_keeps_writing_after_exit(isolated_sessions, monkeypatch):
+    monkeypatch.setattr(webui_sessions, "READER_DRAIN_GRACE_SECONDS", 0.2)
+    state = _registered_state("tab", "/media/Fictional Item")
+    process = ExitedProcess()
+    process.stdout.feed("before exit\n")
+    stop = threading.Event()
+
+    def keep_writing() -> None:
+        while not stop.is_set():
+            process.stdout.feed("noise\n")
+            time.sleep(0.005)
+
+    threading.Thread(target=keep_writing, daemon=True).start()
+    try:
+        _pump_with_timeout(state, process)
+    finally:
+        stop.set()
+
+    assert "before exit" in _logged_html(state)
+    assert state["finished"] is True
+
+
+def test_pump_does_not_report_a_prompt_timeout_after_the_process_exited(isolated_sessions, monkeypatch):
+    monkeypatch.setattr(webui_sessions, "READER_DRAIN_GRACE_SECONDS", 0.2)
+    state = _registered_state("tab", "/media/Fictional Item")
+    state.update(prompt_timeout=0.01, awaiting_input=True, awaiting_since=0.0, detached_at=0.0, last_input_at=0.0)
+    process = ExitedProcess()
+
+    _pump_with_timeout(state, process)
+
+    assert "went unanswered" not in _logged_html(state)
+    assert state["finished"] is True
+
+
+def test_queue_release_keeps_a_queue_a_replacement_registered(isolated_sessions, tmp_path, monkeypatch):
+    monkeypatch.setattr(webui_context, "STATE_DIR", tmp_path)
+    (tmp_path / "tmp").mkdir()
+    queue_file = tmp_path / "tmp" / "webui_queue_fictional.txt"
+    queue_file.write_text('"/media/Fictional Item"\n', encoding="utf-8")
+    key = os.path.normcase(os.path.realpath(queue_file))
+    monkeypatch.setitem(webui_paths._generated_queues, key, hashlib.sha256(queue_file.read_bytes()).hexdigest())
+    retiring = _registered_state("tab", str(queue_file))
+    retiring["execution_path"] = str(queue_file)
+    # The same tab already runs the queue again when the old pump cleans up.
+    replacement = _registered_state("tab", str(queue_file))
+    replacement["execution_path"] = str(queue_file)
+
+    webui_sessions._release_session_queue_file(str(queue_file), retiring)
+    assert key in webui_paths._generated_queues
+    assert queue_file.is_file()
+
+    webui_session_state._discard_session_state("tab", replacement)
+    webui_sessions._release_session_queue_file(str(queue_file), retiring)
+    assert key not in webui_paths._generated_queues
+    assert not queue_file.exists()

@@ -212,6 +212,9 @@ def execution_description():
     return jsonify(
         {
             "success": True,
+            # The item this draft belongs to; the editor drops a draft for an
+            # item other than the one it shows.
+            "media_id": _stringify_preview_value(meta_data.get("uuid")),
             "content": content,
             "version": version,
             "sources": source_items(meta_data),

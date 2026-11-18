@@ -195,16 +195,17 @@ def _session_state_is_current(session_id: str, process_state: Mapping[str, objec
         return bool(run_token and current_state.get("run_token") == run_token)
 
 
-def _execution_path_held_elsewhere(path: str, own_state: Mapping[str, object] | None) -> bool:
-    """Return whether a running or scheduled session other than own_state uses this execution path."""
-    key = os.path.normcase(os.path.realpath(path))
-    with active_processes_lock:
-        for info in active_processes.values():
-            other_path = str(info.get("execution_path") or "")
-            if info is own_state or not other_path or not _session_is_running(info):
-                continue
-            if os.path.normcase(os.path.realpath(other_path)) == key:
-                return True
+def _execution_path_held_elsewhere_locked(key: str, own_state: Mapping[str, object] | None) -> bool:
+    """Return whether a running or scheduled session other than own_state uses this normalized path.
+
+    The caller holds active_processes_lock.
+    """
+    for info in active_processes.values():
+        other_path = str(info.get("execution_path") or "")
+        if info is own_state or not other_path or not _session_is_running(info):
+            continue
+        if os.path.normcase(os.path.realpath(other_path)) == key:
+            return True
     return False
 
 

@@ -4543,9 +4543,12 @@ function AudionutsUAGUI() {
           const polledVersion = Number.isInteger(descriptionData?.version)
             ? descriptionData.version
             : null;
+          // The queue can advance between the preview and description
+          // requests; keep the draft bound to the item the editor shows.
           if (
             !cancelled &&
             descriptionData?.success &&
+            descriptionData.media_id === descriptionMediaRef.current &&
             polledVersion !== null &&
             polledVersion >= descriptionVersionRef.current
           ) {

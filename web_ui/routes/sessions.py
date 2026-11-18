@@ -36,7 +36,6 @@ from web_ui.session_state import (
     _debug_process_snapshot,
     _discard_session_state,
     _execution_conflict_locked,
-    _execution_path_held_elsewhere,
     _make_process_state,
     _session_is_running,
     _set_process_awaiting_input,
@@ -450,8 +449,10 @@ def execute_command():
                     # tab watches /api/sessions instead of holding a stream open.
                     handed_off = True
                     console.print(f"Scheduled upload session {session_id}", markup=False)
-                    yield _sse({"type": "scheduled"})
+                    # Wake the scheduler first: the client may close the response
+                    # at the yield, and this generator would never resume.
                     _start_scheduled_sessions()
+                    yield _sse({"type": "scheduled"})
                     return
 
                 _launch_session(session_id, process_state)
@@ -464,15 +465,17 @@ def execute_command():
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
                 console.print(traceback.format_exc(), markup=False)
                 if not handed_off:
-                    yield _sse({"type": "error", "data": "Execution error"})
+                    # Release the reservation before yielding: the client may
+                    # close the response there.
                     with contextlib.suppress(Exception):
                         if process_state is not None:
                             _discard_session_state(session_id, process_state)
+                    yield _sse({"type": "error", "data": "Execution error"})
             finally:
                 # A refused request must not release a queue that another
                 # session (for example the one it conflicted with) still uses.
-                if not handed_off and validated_path and not _execution_path_held_elsewhere(validated_path, process_state):
-                    sessions_mod._remove_session_queue_file(validated_path)
+                if not handed_off and validated_path:
+                    sessions_mod._release_session_queue_file(validated_path, process_state)
 
         return Response(generate(), mimetype="text/event-stream")
 
@@ -574,7 +577,7 @@ def kill_process():
             # upload is cancelled the same way and its queue file is released.
             _discard_session_state(session_id, process_info)
             if process_info.get("scheduled"):
-                sessions_mod._remove_session_queue_file(str(process_info.get("execution_path") or ""))
+                sessions_mod._release_session_queue_file(str(process_info.get("execution_path") or ""), process_info)
             return jsonify({"success": True, "message": "Execution startup cancelled"})
 
         terminated = False
