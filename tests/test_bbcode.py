@@ -95,7 +95,7 @@ def test_tracker_specific_formats_only_clamps_gazelle_descriptions() -> None:
     builder = object.__new__(DescriptionBuilder)
 
     assert builder.tracker_specific_formats("ANTHELION", "[size=16]Text[/size]") == "[size=10]Text[/size]"
-    assert builder.tracker_specific_formats("HDTORRENTS", "[size=16]Text[/size]") == "[size=16]Text[/size]"
+    assert builder.tracker_specific_formats("HDBITS", "[size=16]Text[/size]") == "[size=16]Text[/size]"
 
 
 def test_tracker_specific_formats_converts_colors_for_gazelle_trackers() -> None:
@@ -119,11 +119,181 @@ def test_tracker_specific_formats_converts_headings_for_selected_trackers() -> N
     assert builder.tracker_specific_formats("HDBITS", description) == description
 
 
+def test_tracker_specific_formats_converts_unsupported_tags_for_brasiltracker() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    cases = {
+        "[url=https://img.example/a][img=350]https://img.example/a.png[/img][/url]": "[url=https://img.example/a][img]https://img.example/a.png[/img][/url]",
+        "[code]Video:    1080p[/code]": "[pre]Video:    1080p[/pre]",
+        "[strike]old[/strike] x[sup]2[/sup] H[sub]2[/sub]O": "[s]old[/s] x2 H2O",
+        "[color=#0A0]green[/color]": "[color=#00aa00]green[/color]",
+        "[font=Courier New]mono[/font] [note]note[/note] [indent]in[/indent][hr]": "mono note in",
+        "[align=center]a[/align][align=justify]b[/align][align=left]c[/align]": "[center]a[/center]b[left]c[/left]",
+        '[url="https://example.test"]link[/url]': "[url=https://example.test]link[/url]",
+        "[collapse=Menu]x[/collapse][expand]y[/expand]": "[spoiler=Menu]x[/spoiler][spoiler]y[/spoiler]",
+        "[list=1][*]a[/list][ul][li]b[/li][/ul]": "[*]a[*]b",
+        "[tr][th]Head[/th][/tr]": "[tr][td][b]Head[/b][/td][/tr]",
+        "[youtube]https://www.youtube.com/watch?v=abcdefghijk[/youtube]": "[youtube]abcdefghijk[/youtube]",
+        "[video]https://youtu.be/abcdefghijk[/video] [video]https://video.example/clip.mp4[/video]": "[youtube]abcdefghijk[/youtube] [url]https://video.example/clip.mp4[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("BRASILTRACKER", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_bjshare() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    cases = {
+        "[url=https://img.example/a][img=350]https://img.example/a.png[/img][/url]": "[url=https://img.example/a][img]https://img.example/a.png[/img][/url]",
+        "[code]Video:    1080p[/code] [mediainfo]General[/mediainfo]": "[pre]Video:    1080p[/pre] [pre]General[/pre]",
+        "[strike]old[/strike] x[sup]2[/sup] [color=#0A0]green[/color]": "[s]old[/s] x2 [color=#00aa00]green[/color]",
+        "[right]a[/right][left]b[/left][align=justify]c[/align]": "[align=right]a[/align]bc",
+        "[spoiler=Menu]x[/spoiler][collapse]y[/collapse]": "[hide=Menu]x[/hide][hide]y[/hide]",
+        "[list=1][*]a[/list][ul][li]b[/li][/ul]": "[*]a[*]b",
+        "[tr][th]Head[/th][/tr]": "[tr][td][b]Head[/b][/td][/tr]",
+        "[youtube]abcdefghijk[/youtube]": "[youtube]https://www.youtube.com/watch?v=abcdefghijk[/youtube]",
+        "[video]https://youtu.be/abcdefghijk[/video] [video]https://video.example/clip.mp4[/video]": "[video]https://youtu.be/abcdefghijk[/video] [url]https://video.example/clip.mp4[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("BJSHARE", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_greatposterwall() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    comparison = "[comparison=Source, Encode]\nhttps://img.example/1.png\nhttps://img.example/2.png\n[/comparison]"
+    cases = {
+        "[url=https://img.example/a][img=350]https://img.example/a.png[/img][/url]": "[img]https://img.example/a.png[/img]",
+        "[strike]old[/strike] x[sup]2[/sup] [color=#0A0]g[/color] [note]n[/note] [hr]": "[s]old[/s] x2 [color=#00aa00]g[/color] n [hr]",
+        "[center]a[/center][right]b[/right][left]c[/left][align=justify]d[/align]": "[align=center]a[/align][align=right]b[/align]cd",
+        "[collapse=Menu]x[/collapse][hide]y[/hide]": "[spoiler=Menu]x[/spoiler][hide]y[/hide]",
+        "[list=1][*]a[/list][tr][th]Head[/th][/tr]": "[*]a[tr][td][b]Head[/b][/td][/tr]",
+        "[youtube]abcdefghijk[/youtube] [video]https://youtu.be/abcdefghijk[/video]": "[url]https://www.youtube.com/watch?v=abcdefghijk[/url] [url]https://youtu.be/abcdefghijk[/url]",
+        comparison: comparison,
+        "[mediainfo]General[/mediainfo]": "[mediainfo]General[/mediainfo]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("GREATPOSTERWALL", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_unit3d() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    cases = {
+        "[strike]old[/strike] [mediainfo]General[/mediainfo]": "[s]old[/s] [code]General[/code]",
+        '[url="https://example.test"]link[/url]': "[url=https://example.test]link[/url]",
+        "[align=center]a[/align][align=right]b[/align][align=justify]c[/align][indent]d[/indent]": "[center]a[/center][right]b[/right]cd",
+        "[hide=Menu]x[/hide][collapse]y[/collapse][expand=More]z[/expand]": "[spoiler=Menu]x[/spoiler][spoiler]y[/spoiler][spoiler=More]z[/spoiler]",
+        "[ul][li]a[/li][/ul][ol][li]b[/li][/ol]": "[list][*]a[/list][list=1][*]b[/list]",
+        "[youtube]https://www.youtube.com/watch?v=abcdefghijk[/youtube] [video]https://video.example/clip.mp4[/video]": "[youtube]abcdefghijk[/youtube] [url]https://video.example/clip.mp4[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("CAPYBARABR", description) == expected
+
+
+def test_tracker_specific_formats_converts_comparisons_for_brasiltracker() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    description = "[comparison=Source, Encode]\nhttps://img.example/1.png\nhttps://img.example/2.png\n[/comparison]"
+
+    expected = "[center]Source | Encode\n[url=https://img.example/1.png][img]https://img.example/1.png[/img][/url][url=https://img.example/2.png][img]https://img.example/2.png[/img][/url][/center]"
+    assert builder.tracker_specific_formats("BRASILTRACKER", description) == expected
+
+
 def test_tracker_specific_formats_converts_colors_for_hdspace() -> None:
     builder = object.__new__(DescriptionBuilder)
     description = "[color=#87ceeb]Text[/color]"
 
     assert builder.tracker_specific_formats("HDSPACE", description) == "[color=skyblue]Text[/color]"
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_hdspace() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    builder.tracker = "HDSPACE"
+    cases = {
+        "[code]Video:    1080p[/code] [mediainfo]General[/mediainfo]": "[pre]Video:    1080p[/pre] [pre]General[/pre]",
+        "[s]a[/s] [strike]b[/strike] [color=#0a0]c[/color] [font=Mono]d[/font] [size=20]e[/size]": "a b c d [size=7]e[/size]",
+        "[h4]Title[/h4] [hr]": "[u][b]Title[/b][/u] ",
+        "[align=center]a[/align][right]b[/right][align=justify]c[/align]": "[center]a[/center]bc",
+        "[spoiler=BDInfo]x[/spoiler][hide=Menu]y[/hide][collapse]z[/collapse]": "xyz",
+        "[ul][li]a[/li][/ul] [list=1][*]b[/list]": "[list][*]a[/list] [list=1][*]b[/list]",
+        "[table][tr][th]A[/th][th]B[/th][/tr][/table]": "A | B\n",
+        "[youtube]abcdefghijk[/youtube]": "[url]https://www.youtube.com/watch?v=abcdefghijk[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("HDSPACE", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_hdtorrents() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    builder.tracker = "HDTORRENTS"
+    cases = {
+        "Emoji \U0001f3ac ✅ end": "Emoji  ✅ end",
+        "[code]Video:    1080p[/code] [mediainfo]General[/mediainfo]": "[pre]Video:    1080p[/pre] [pre]General[/pre]",
+        "[s]a[/s] [strike]b[/strike] [color=#0a0]c[/color] [size=20]d[/size] [hr]": "a b [color=#00aa00]c[/color] [size=7]d[/size] ",
+        "[align=center]a[/align][align=right]b[/align][align=justify]c[/align]": "[center]a[/center][right]b[/right]c",
+        "[spoiler=BDInfo]x[/spoiler][collapse]y[/collapse]": "[b]BDInfo[/b]\n[hide]x[/hide][hide]y[/hide]",
+        "[list][*]a[/list] [ul][li]b[/li][/ul]": "[*]a [*]b",
+        "[table][tr][th]A[/th][th]B[/th][/tr][/table]": "A | B\n",
+        "[youtube]abcdefghijk[/youtube]": "[url]https://www.youtube.com/watch?v=abcdefghijk[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("HDTORRENTS", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_mteam() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    builder.tracker = "MTEAM"
+    cases = {
+        "[strike]a[/strike] [h1]T[/h1] [hr]": "[s]a[/s] [size=6][b]T[/b][/size] ",
+        "[pre]x[/pre] [mediainfo]General[/mediainfo]": "[code]x[/code] [code]General[/code]",
+        '[url="https://example.test"]l[/url] [img width=100]https://img.example/a.png[/img]': "[url=https://example.test]l[/url] [img]https://img.example/a.png[/img]",
+        "[align=center]a[/align][align=justify]b[/align][indent]c[/indent]": "[center]a[/center]bc",
+        "[spoiler=BDInfo]x[/spoiler][hide]y[/hide]": "[b]BDInfo[/b]\nxy",
+        "[list]\n[*]a\n[*] b\n[/list]": "\n• a\n• b\n",
+        "[youtube]abcdefghijk[/youtube]": "[url]https://www.youtube.com/watch?v=abcdefghijk[/url]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("MTEAM", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_speedapp() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    builder.tracker = "SPEEDAPP"
+    cases = {
+        "[url=https://img.example/a][img=350]https://img.example/a.png[/img][/url]": "[url=https://img.example/a][img width=350]https://img.example/a.png[/img][/url]",
+        "[strike]a[/strike] [indent]b[/indent] [mediainfo]General[/mediainfo]": "[s]a[/s] b [code]General[/code]",
+        "[code]x[/code] [note]n[/note] [list][*]a[/list]": "[code]x[/code] [note]n[/note] [list][*]a[/list]",
+        "[spoiler=BDInfo]x[/spoiler][spoiler=Fictional Title]y[/spoiler]": "[spoiler=BDInfo]x[/spoiler][b]Fictional Title[/b]\n[spoiler]y[/spoiler]",
+        "[hide]a[/hide][collapse]b[/collapse]": "[spoiler]a[/spoiler][spoiler]b[/spoiler]",
+        "[table][tr][th]A[/th][th]B[/th][/tr][/table]": "A | B\n",
+        "[youtube]https://www.youtube.com/watch?v=abcdefghijk[/youtube]": "[youtube]abcdefghijk[/youtube]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("SPEEDAPP", description) == expected
+
+
+def test_tracker_specific_formats_converts_unsupported_tags_for_torrentleech() -> None:
+    builder = object.__new__(DescriptionBuilder)
+    builder.tracker = "TORRENTLEECH"
+    comparison = "[comparison=Source, Encode]\nhttps://img.example/1.png\nhttps://img.example/2.png\n[/comparison]"
+    cases = {
+        "before [hr] after": "before --- after",
+        "[center]a[/center][align=center]b[/align][right]c[/right]": "<center>a</center><center>b</center>c",
+        comparison: "<center>Source | Encode\n[url=https://img.example/1.png][img]https://img.example/1.png[/img][/url][url=https://img.example/2.png][img]https://img.example/2.png[/img][/url]</center>",
+        "[img width=100]https://img.example/a.png[/img]": "[img]https://img.example/a.png[/img]",
+        "[quote=Fictional User]q[/quote] [strike]s[/strike]": "[quote]q[/quote] [s]s[/s]",
+        "[mediainfo]General[/mediainfo] [hide=Menu]x[/hide] [spoiler=BDInfo]y[/spoiler]": "General x y",
+        "[list]\n[*]a\n[*]b\n[/list]": "\n• a\n• b\n",
+        "[tr][th]Head[/th][/tr]": "[tr][td][b]Head[/b][/td][/tr]",
+        "[video]https://youtu.be/abcdefghijk[/video]": "[youtube]abcdefghijk[/youtube]",
+    }
+
+    for description, expected in cases.items():
+        assert builder.tracker_specific_formats("TORRENTLEECH", description) == expected
 
 
 def test_tracker_specific_formats_removes_image_resize_for_nexusphp_trackers() -> None:
