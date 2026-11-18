@@ -41,7 +41,7 @@ def test_registration_and_config() -> None:
     assert "announce_url" not in example_config["TRACKERS"]["VULTU"]
 
 
-@pytest.mark.parametrize(("category", "kept"), [("MOVIE", True), ("TV", True), ("GAME", True), ("MUSIC", False), ("BOOK", False)])
+@pytest.mark.parametrize(("category", "kept"), [("MOVIE", True), ("TV", True), ("GAME", True), ("MUSIC", True), ("BOOK", False)])
 def test_supported_categories(category: str, kept: bool) -> None:
     meta = Meta(category=category, trackers=["VULTU"])
     TrackerSetup(CONFIG).filter_unsupported_trackers(meta)
@@ -169,6 +169,172 @@ def test_upload_data_limits_screenshots_and_flags_anime(tmp_path: Path) -> None:
     assert data["anonymous"] == "true"
     assert data["mediainfo"].startswith("General")
     assert asyncio.run(Vultu(CONFIG).get_data(Meta(category="GAME", base_dir=str(tmp_path), uuid="abc", anime=True), "igdb:1"))["anime"] == "false"
+
+
+def test_upload_data_sends_bbcode_notes_and_tonemapped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    async def fake_generator(_self: Any, _meta: Meta, **kwargs: Any) -> str:
+        calls.append(kwargs)
+        return "  [b]Encode notes[/b]  "
+
+    monkeypatch.setattr(vultu_module.DescriptionBuilder, "general_description_generator", fake_generator)
+    images = [{"raw_url": f"https://img.example/{index}.png"} for index in range(3)]
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid="abc", name="Fictional Film 2001", image_list=images, tonemapped=True)
+
+    data = asyncio.run(Vultu(CONFIG).get_data(meta, "tmdb:movie:1"))
+
+    assert data["notes"] == "[b]Encode notes[/b]"
+    assert data["notes_format"] == "bbcode"
+    assert data["tonemapped"] == "true"
+    # MediaInfo, NFO and screenshots have their own fields, and the site drops images from the notes.
+    assert calls == [{"audio_spectrogram": False, "logo": False, "mediainfo": False, "menu_screenshots": False, "nfo": False, "screenshots": False, "tonemapped_header": False}]
+    assert "notes" not in asyncio.run(Vultu(CONFIG).get_data(meta, "tmdb:movie:1", preview=True))
+
+
+@pytest.mark.parametrize("generated", ["   ", "x" * (Vultu.max_bbcode_notes_length + 1)])
+def test_upload_data_omits_empty_or_oversized_notes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, generated: str) -> None:
+    async def fake_generator(_self: Any, _meta: Meta, **_kwargs: Any) -> str:
+        return generated
+
+    monkeypatch.setattr(vultu_module.DescriptionBuilder, "general_description_generator", fake_generator)
+    data = asyncio.run(Vultu(CONFIG).get_data(Meta(category="GAME", base_dir=str(tmp_path), uuid="abc"), "igdb:1"))
+
+    assert "notes" not in data
+    assert "notes_format" not in data
+    assert "tonemapped" not in data
+
+
+def test_banned_groups_use_the_api_list() -> None:
+    assert Vultu.banned_url == "https://vultu.org/api/v1/banned-groups"
+    assert Vultu.banned_groups_response_key == "groups"
+
+
+MBID_GROUP = "11111111-2222-3333-4444-555555555555"
+MBID_RELEASE = "66666666-7777-8888-9999-AAAAAAAAAAAA"
+
+
+@pytest.mark.parametrize(
+    ("external_ids", "values", "expected"),
+    [
+        ({"musicbrainz_release_group": MBID_GROUP, "musicbrainz_release": MBID_RELEASE, "discogs_master": "12"}, {}, f"musicbrainz:release-group:{MBID_GROUP}"),
+        ({"musicbrainz_release": MBID_RELEASE, "discogs_master": "12"}, {}, f"musicbrainz:release:{MBID_RELEASE.lower()}"),
+        ({"discogs_master": "12", "discogs_release": "34"}, {}, "discogs:master:12"),
+        ({}, {"music_discogs_release_id": "34"}, "discogs:release:34"),
+        ({"discogs_master": "12"}, {"music_discogs_enabled": False}, ""),
+        ({"musicbrainz_release_group": "not-an-mbid"}, {}, ""),
+    ],
+)
+def test_music_work_prefers_the_musicbrainz_album(external_ids: dict[str, str], values: dict[str, Any], expected: str) -> None:
+    meta = Meta(category="MUSIC", music_release={"external_ids": external_ids}, **values)
+    assert asyncio.run(Vultu(CONFIG).get_work(meta)) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "tag", "tracks", "expected"),
+    [
+        # Lossless names already carry the bit depth and sample rate.
+        (
+            "Fictional Artist - Fictional Album 2001 CD FLAC 16-bit 44.1 kHz-FAKEGRP",
+            "-FAKEGRP",
+            [{"encoder_settings": ""}],
+            "Fictional Artist - Fictional Album 2001 CD FLAC 16-bit 44.1 kHz-FAKEGRP",
+        ),
+        (
+            "Fictional Artist - Fictional Album 2001 WEB MP3-FAKEGRP",
+            "-FAKEGRP",
+            [{"encoder_settings": "-V 0 --vbr-new"}] * 2,
+            "Fictional Artist - Fictional Album 2001 WEB MP3 V0-FAKEGRP",
+        ),
+        (
+            "Fictional Artist - Fictional Album 2001 WEB MP3-FAKEGRP",
+            "-FAKEGRP",
+            [{"bitrate_mode": "CBR", "bitrate": 320000}, {"bitrate_mode": "CBR", "bitrate": 320000}],
+            "Fictional Artist - Fictional Album 2001 WEB MP3 320-FAKEGRP",
+        ),
+        ("Fictional Artist - Fictional Album 2001 WEB AAC", "", [{"bitrate_mode": "CBR", "bitrate": 256000}], "Fictional Artist - Fictional Album 2001 WEB AAC 256"),
+        # Mixed VBR without a LAME preset has no single encoding to name.
+        (
+            "Fictional Artist - Fictional Album 2001 WEB MP3-FAKEGRP",
+            "-FAKEGRP",
+            [{"bitrate_mode": "VBR", "bitrate": 250000}],
+            "Fictional Artist - Fictional Album 2001 WEB MP3-FAKEGRP",
+        ),
+    ],
+)
+def test_music_name_adds_the_lossy_encoding(name: str, tag: str, tracks: list[dict[str, Any]], expected: str) -> None:
+    meta = Meta(category="MUSIC", name=name, tag=tag, music_release={"tracks": tracks})
+    assert asyncio.run(Vultu(CONFIG).get_name(meta)) == expected
+
+
+def test_music_sends_spectrograms_without_mediainfo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_generator(_self: Any, _meta: Meta, **kwargs: Any) -> str:
+        assert kwargs["audio_spectrogram"] is False
+        return ""
+
+    monkeypatch.setattr(vultu_module.DescriptionBuilder, "general_description_generator", fake_generator)
+    (tmp_path / "tmp" / "abc").mkdir(parents=True)
+    (tmp_path / "tmp" / "abc" / "MEDIAINFO_CLEANPATH.txt").write_text("General\n", encoding="utf-8")
+    meta = Meta(
+        category="MUSIC",
+        base_dir=str(tmp_path),
+        uuid="abc",
+        name="Fictional Artist - Fictional Album 2001 CD FLAC 16-bit 44.1 kHz",
+        image_list=[{"raw_url": "https://img.example/screen.png"}],
+        spectrograms_images=[{"raw_url": f"https://img.example/spec{index}.png"} for index in range(2)],
+        tonemapped=True,
+    )
+
+    data = asyncio.run(Vultu(CONFIG).get_data(meta, f"musicbrainz:release-group:{MBID_GROUP}"))
+
+    assert data["screenshots"] == ["https://img.example/spec0.png", "https://img.example/spec1.png"]
+    assert "tonemapped" not in data
+    assert "mediainfo" not in data
+
+
+def test_music_without_album_fails_checks() -> None:
+    meta = Meta(category="MUSIC", name="Fictional Artist - Fictional Album 2001 WEB FLAC")
+    assert asyncio.run(Vultu(CONFIG).get_additional_checks(meta)) is False
+    meta.music_release = {"external_ids": {"musicbrainz_release_group": MBID_GROUP}}
+    assert asyncio.run(Vultu(CONFIG).get_additional_checks(meta)) is True
+
+
+def test_requests_list_open_requests_of_the_same_season(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests_page = {
+        "requests": [
+            {"id": 57, "title": "Fictional Show S02 1080p", "bounty": 4500, "season": 2, "url": "https://vultu.org/pedidos/57"},
+            {"id": 58, "title": "Fictional Show S03", "bounty": 100, "season": 3, "url": "https://vultu.org/pedidos/58"},
+            {"id": 59, "title": "Fictional Show any season", "bounty": 0, "season": None, "url": None},
+        ],
+        "next": None,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/api/v1/requests"
+        assert request.url.params["status"] == "open"
+        assert request.url.params["work"] == "tmdb:tv:12"
+        return httpx.Response(200, json=requests_page)
+
+    requests = _mock_client(monkeypatch, handler)
+    results = asyncio.run(Vultu(CONFIG).get_requests(Meta(category="TV", tmdb=12, season="S02", search_requests=True)))
+
+    assert len(requests) == 1
+    assert results == [
+        {"Name": "Fictional Show S02 1080p", "Reward": "4500", "Link": "https://vultu.org/pedidos/57"},
+        {"Name": "Fictional Show any season", "Reward": "", "Link": "https://vultu.org/pedidos/59"},
+    ]
+
+
+def test_requests_are_not_searched_unless_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests = _mock_client(monkeypatch, lambda _request: httpx.Response(500))
+    assert asyncio.run(Vultu(CONFIG).get_requests(Meta(category="MOVIE", tmdb=1))) == []
+    assert requests == []
+
+
+def test_requests_report_errors_without_raising(monkeypatch: pytest.MonkeyPatch) -> None:
+    _mock_client(monkeypatch, lambda _request: httpx.Response(429, json={"status": 429, "detail": "Muitos pedidos.", "code": "api.rate_limited"}))
+    assert asyncio.run(Vultu(CONFIG).get_requests(Meta(category="MOVIE", tmdb=1, search_requests=True))) == []
 
 
 def test_bdmv_sends_bdinfo_as_mediainfo(tmp_path: Path) -> None:

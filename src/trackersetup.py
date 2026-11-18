@@ -495,7 +495,7 @@ class TrackerSetup:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("AITHER", "CAPYBARABR", "DARKPEERS", "INFINITYHD", "LST", "LUMINARR", "SPEEDAPP", "ULCX", "ZENITH"):
+        if tracker.upper() in ("AITHER", "CAPYBARABR", "DARKPEERS", "INFINITYHD", "LST", "LUMINARR", "SPEEDAPP", "ULCX", "VULTU", "ZENITH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
@@ -895,7 +895,7 @@ class TrackerSetup:
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
+            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS", "VULTU"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 for request in requests or []:
