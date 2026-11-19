@@ -362,6 +362,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/midnightscene.png" width="16" height="16" />             | MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV, GAME, MUSIC       |
 | <img src="web_ui/static/img/trackers/mteam.png" width="16" height="16" />                     | M-Team                 | MTEAM                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/nebulance.png" width="16" height="16" />                 | Nebulance              | NEBULANCE              | TV                           |
+| <img src="web_ui/static/img/trackers/nightbloom.png" width="16" height="16" />                | Nightbloom             | NIGHTBLOOM             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/nordicquality.png" width="16" height="16" />             | NordicQuality          | NORDICQUALITY          | MOVIE, TV, MUSIC, BOOK, GAME |
 | <img src="web_ui/static/img/trackers/oldtoonsworld.png" width="16" height="16" />             | OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/onlyencodes.png" width="16" height="16" />               | OnlyEncodes+           | ONLYENCODES            | MOVIE, TV                    |
