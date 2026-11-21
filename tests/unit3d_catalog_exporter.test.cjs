@@ -171,6 +171,7 @@ test("uses canonical tracker filenames for known domains without prompting", () 
     ["reelflix.xyz", "reelflix.json"],
     ["WWW.CAPYBARABR.COM.", "capybarabr.json"],
     ["www.torrenthr.org", "torrenthr.json"],
+    ["shadow.vip3ra.org", "shadow.json"],
   ]) {
     const result = run([], { hostname, tracker: null });
     assert.deepEqual(result.downloads, [filename]);
