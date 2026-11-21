@@ -46,6 +46,7 @@
     "rocket-hd.cc": "rockethd",
     "samaritano.cc": "samaritano",
     "seedpool.org": "seedpool",
+    "shadow.vip3ra.org": "shadow",
     "shareisland.org": "shareisland",
     "skipthecommercials.xyz": "skipthecommercials",
     "theldu.to": "lastdigitalunderground",
