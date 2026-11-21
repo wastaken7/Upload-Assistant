@@ -3106,11 +3106,21 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "SHADOW": {
-            # Shadow settings > API Key
+            "cli_alias": "SHD",
+            # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "api_key": "",
             "anon": True,
             "use_for_search": False,
-            # The settings below can override DEFAULT for Shadow.
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
+            # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
             "thumbnail_size": "",
