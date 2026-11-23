@@ -388,6 +388,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/rockethd.png" width="16" height="16" />                  | RocketHD               | ROCKETHD               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/samaritano.png" width="16" height="16" />                | Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/seedpool.png" width="16" height="16" />                  | seedpool               | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/shadow.png" width="16" height="16" />                    | Shadow                 | SHADOW                 | MOVIE, TV, BOOK, GAME, MUSIC, XXX |
 | <img src="web_ui/static/img/trackers/shareisland.png" width="16" height="16" />               | ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/simurg.png" width="16" height="16" />                    | Simurg                 | SIMURG                 | BOOK                         |
 | <img src="web_ui/static/img/trackers/skipthecommercials.png" alt="" width="16" height="16" /> | SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE (Documentary only), TV |

@@ -188,3 +188,11 @@ def region_choices(tracker: str = "") -> list[tuple[str, str]]:
     """``(id, code)`` pairs of a tracker's regions, sorted by code."""
     _, reverse = _load_region_maps(tracker.strip().lower() or "default")
     return sorted(((str(id_value), code) for id_value, code in reverse.items()), key=lambda item: item[1])
+
+
+@cache
+def classification_choices(tracker: str, section: str) -> tuple[tuple[str, str], ...]:
+    """Tracker-specific category, type or resolution options in catalog order."""
+    path = _CATALOG_DIR / f"{tracker.lower()}.json"
+    catalog = json.loads(path.read_text(encoding="utf-8"))
+    return tuple(catalog[section].items())
