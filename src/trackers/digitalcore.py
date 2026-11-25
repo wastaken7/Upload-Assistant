@@ -5,8 +5,9 @@ from typing import Any, cast
 
 import aiofiles
 import httpx
+import langcodes
 
-from src import payload_preview
+from src import language_names, payload_preview
 from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -231,6 +232,42 @@ class DigitalCore:
                     return str(raw_url)
         return ""
 
+    @staticmethod
+    def _language_tag(raw: object) -> str:
+        """Turn a language name or code into DigitalCore's tag: its lowercase English name."""
+        text = str(raw or "").strip()
+        if not text:
+            return ""
+        # a code first ("en" is also the name of a language), then a name ("English")
+        for lookup in (langcodes.get, language_names.find):
+            try:
+                lang = lookup(text)
+            except LookupError, ValueError:
+                continue
+            if lang.language in (None, "und", "zxx", "mul", "mis"):
+                return ""
+            name = language_names.language_name(lang, "en")
+            # an unknown code comes back as a placeholder such as "Unknown language [xx]"
+            if "[" not in name:
+                return name.lower()
+        return ""
+
+    def get_language(self, meta: Meta) -> str:
+        """The release's language tag; left empty, the site tags the upload as English."""
+        if meta.category == "BOOK":
+            return self._language_tag(meta.book_language)
+        if meta.category not in ("MOVIE", "TV"):
+            return ""
+        tags = [tag for raw in meta.audio_languages or [] if (tag := self._language_tag(raw))]
+        # a dubbed or MULTI release is tagged with its first language other than the
+        # original one, as the site does for GERMAN.DL or MULTI release names
+        original = self._language_tag(meta.original_language)
+        if original:
+            for tag in tags:
+                if tag != original:
+                    return tag
+        return tags[0] if tags else ""
+
     async def fetch_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
         """Build the upload form; a ``preview`` leaves out the description and MediaInfo."""
         anon = "1" if meta.anon or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"
@@ -242,7 +279,7 @@ class DigitalCore:
             "frileech": "1",
             "gameUrl": meta.steam_url or meta.igdb_url,
             "imdbId": meta.imdb_tt,
-            "language": meta.book_language,
+            "language": self.get_language(meta),
             "mediainfo": None if preview else await self.mediainfo(meta),
             "nfo": None if preview else await self.generate_description(meta),
             "p2p": "0",
