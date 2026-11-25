@@ -79,20 +79,27 @@ def test_supported_categories(category: str, kept: bool) -> None:
 @pytest.mark.parametrize(
     ("values", "expected"),
     [
-        ({"category": "MOVIE", "resolution": "1080p", "type": "WEBDL"}, 11),
-        ({"category": "MOVIE", "resolution": "1080p", "type": "REMUX", "source": "BluRay"}, 11),
-        ({"category": "MOVIE", "resolution": "2160p", "type": "ENCODE"}, 31),
-        ({"category": "MOVIE", "resolution": "1080p", "type": "DISC", "is_disc": "BDMV"}, 5),
-        ({"category": "MOVIE", "resolution": "480p", "type": "DISC", "is_disc": "DVD", "sd": 1}, 9),
-        ({"category": "MOVIE", "resolution": "480p", "type": "DVDRIP", "sd": 1}, 9),
-        ({"category": "MOVIE", "resolution": "480p", "type": "WEBRIP", "sd": 1}, 24),
+        ({"category": "MOVIE", "resolution": "1080p", "type": "WEBDL"}, 21),
+        ({"category": "MOVIE", "resolution": "480p", "type": "WEBDL", "sd": 1}, 21),
+        ({"category": "MOVIE", "resolution": "2160p", "type": "WEBDL"}, 13),
+        ({"category": "MOVIE", "resolution": "1080p", "type": "WEBDL", "anime": True}, 1),
+        ({"category": "MOVIE", "resolution": "1080p", "type": "WEBRIP"}, 4),
+        ({"category": "MOVIE", "resolution": "1080p", "type": "REMUX", "source": "BluRay"}, 4),
+        ({"category": "MOVIE", "resolution": "2160p", "type": "ENCODE"}, 13),
+        ({"category": "MOVIE", "resolution": "1080p", "type": "DISC", "is_disc": "BDMV"}, 2),
+        ({"category": "MOVIE", "resolution": "480p", "type": "DISC", "is_disc": "DVD", "sd": 1}, 3),
+        ({"category": "MOVIE", "resolution": "480p", "type": "DVDRIP", "sd": 1}, 3),
+        ({"category": "MOVIE", "resolution": "480p", "type": "WEBRIP", "sd": 1}, 8),
         ({"category": "MOVIE", "resolution": "1080p", "anime": True}, 1),
-        ({"category": "TV", "resolution": "1080p"}, 13),
-        ({"category": "TV", "resolution": "576p", "sd": 1}, 20),
-        ({"category": "TV", "is_sports": True}, 42),
-        ({"category": "XXX"}, 27),
-        ({"category": "MUSIC"}, 28),
-        ({"category": "GAME"}, 30),
+        ({"category": "TV", "resolution": "1080p"}, 5),
+        ({"category": "TV", "resolution": "576p", "sd": 1}, 7),
+        ({"category": "TV", "resolution": "1080p", "tv_pack": True}, 24),
+        ({"category": "TV", "resolution": "576p", "sd": 1, "tv_pack": True}, 24),
+        ({"category": "TV", "is_sports": True}, 16),
+        ({"category": "TV", "is_sports": True, "tv_pack": True}, 16),
+        ({"category": "XXX"}, 10),
+        ({"category": "MUSIC"}, 11),
+        ({"category": "GAME"}, 12),
     ],
 )
 def test_category_id(values: dict[str, Any], expected: int) -> None:
@@ -163,7 +170,7 @@ def test_data_sends_ids_matching_the_category(tmp_path: Path) -> None:
     data = asyncio.run(FileIPlay(CONFIG).get_data(meta, attach_screenshots=False, preview=True))
 
     assert data == {
-        "category_id": "13",
+        "category_id": "5",
         "name": "Fictional.Show.S02E03.1080p.WEB-DL",
         "anon": "1",
         "tmdbid": "101",
@@ -189,7 +196,7 @@ def test_data_without_tmdb_category_sends_poster_and_no_ids(tmp_path: Path) -> N
 
     data = asyncio.run(FileIPlay(CONFIG).get_data(meta, attach_screenshots=False, preview=True))
 
-    assert data["category_id"] == "30"
+    assert data["category_id"] == "12"
     assert data["poster"] == "https://img.example/cover.jpg"
     assert data["steamid"] == "4242"
     assert "tmdbid" not in data
@@ -330,7 +337,7 @@ def test_upload_posts_documented_fields_and_downloads_published_torrent(tmp_path
             assert request.headers["Authorization"] == "Bearer test-token"
             body = request.content
             for expected in (
-                b'name="category_id"\r\n\r\n11',
+                b'name="category_id"\r\n\r\n21',
                 b'name="name"\r\n\r\nFictional.Film.2001.1080p.WEB-DL.H.264-FAKEGRP',
                 b'name="anon"\r\n\r\n0',
                 b'name="tmdbid"\r\n\r\n1',
