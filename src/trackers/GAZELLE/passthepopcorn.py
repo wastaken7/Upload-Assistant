@@ -23,7 +23,7 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.exceptions import UploadError
-from src.manual_input import Question, ask, choices_from
+from src.manual_input import Question, ask, choices_from, has_answer, is_interactive
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.meta_file import write_meta_file
@@ -155,7 +155,9 @@ class PassThePopcorn:
         ("Ukrainian", "ukr", "uk"): 34,
         ("Vietnamese", "vie", "vi"): 25,
     }
-    supported_categories = ("MOVIE",)
+    # TV (Miniseries, Anthology Series, ...) is allowed only with staff approval.
+    supported_categories = ("MOVIE", "TV")
+    staff_approval_key = "passthepopcorn.staff_approval"
     torrent_policy = PASSTHEPOPCORN_POLICY
     tracker_urls = ("passthepopcorn.me",)
 
@@ -207,7 +209,44 @@ class PassThePopcorn:
             logger.info(f"{self.tracker}: [red]Failed to extract passkey from PassThePopcorn announce URL. Skipping upload.[/red]")
             return False
 
+        if meta.category == "TV":
+            logger.info(
+                f"{self.tracker}: [yellow]TV uploads (Miniseries, Anthology Series, ...) require staff approval. A link to the approval is asked before upload.[/yellow]"
+            )
+            if not is_interactive(meta) and not has_answer(meta, self.staff_approval_key):
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: pass --answer {self.staff_approval_key}=<link> to upload TV content. Skipping upload.[/yellow]")
+                return False
+
         return True
+
+    @staticmethod
+    def _validate_approval_link(link: str) -> str | None:
+        parsed = urlparse(link)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or re.search(r"[\s\[\]]", link):
+            return "Enter a full http(s) link to where the staff approval was given"
+        return None
+
+    async def get_staff_approval_link(self, meta: Meta) -> str:
+        """Ask where staff approved this TV upload; uploading is refused without it."""
+        link = await ask(
+            meta,
+            Question(
+                key=self.staff_approval_key,
+                kind="text",
+                prompt="TV uploads need staff approval. Enter the link where approval was given",
+                title="Staff approval",
+                hint="PassThePopcorn allows TV content (Miniseries, Anthology Series, ...) only with staff approval. The link is added to the top of the description.",
+                placeholder="https://passthepopcorn.me/",
+                summary={"Tracker": self.tracker, "Release": meta.name or meta.title, "Staff approval": ""},
+                focus="Staff approval",
+                tracker=self.tracker,
+                validate=self._validate_approval_link,
+            ),
+        )
+        if not link:
+            meta.skipping = self.tracker
+            raise UploadError(f"{self.tracker}: TV uploads require a link to the staff approval.")
+        return str(link)
 
     async def get_ptp_id_imdb(
         self,
@@ -636,12 +675,13 @@ class PassThePopcorn:
     async def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
         ptp_type = None
         if imdb_info["type"] is not None:
-            imdb_type = imdb_info.get("type", "movie").lower()
-            if imdb_type in ("movie", "tv movie", "tvmovie"):
+            # IMDb title types come as ids such as "tvMovie" or "tvMiniSeries".
+            imdb_type = str(imdb_info.get("type", "movie")).lower().replace(" ", "")
+            if imdb_type in ("movie", "tvmovie"):
                 ptp_type = "Feature Film" if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else "Short Film"
             if imdb_type == "short":
                 ptp_type = "Short Film"
-            elif imdb_type == "tv mini series":
+            elif imdb_type == "tvminiseries":
                 ptp_type = "Miniseries"
             elif imdb_type == "comedy":
                 ptp_type = "Stand-up Comedy"
@@ -976,12 +1016,12 @@ class PassThePopcorn:
             return screenshot_limit
         return screenshot_limit + len(get_tracker_image_collection(meta, self.tracker, "menu_images"))
 
-    async def edit_desc(self, meta: Meta) -> None:
+    async def edit_desc(self, meta: Meta, staff_approval_link: str = "") -> None:
         # Pack images are shared with the trackers uploading at the same time.
         async with release_image_lock(meta):
-            await self._write_description(meta)
+            await self._write_description(meta, staff_approval_link)
 
-    async def _write_description(self, meta: Meta) -> None:
+    async def _write_description(self, meta: Meta, staff_approval_link: str = "") -> None:
         from src.description_review import get_base_description
 
         base = get_base_description(meta)
@@ -1064,6 +1104,8 @@ class PassThePopcorn:
                 logger.warning(f"{self.tracker}: [yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
 
         desc = io.StringIO()
+        if staff_approval_link:
+            desc.write(f"[quote]Uploaded with staff approval: [url]{staff_approval_link}[/url][/quote]\n\n")
         discs = cast(list[dict[str, Any]], meta.discs)
         filelist = cast(list[str], meta.filelist)
 
@@ -1587,7 +1629,8 @@ class PassThePopcorn:
         resolution, other_resolution = self.get_resolution(meta)
         desc = ""
         if not preview:
-            await self.edit_desc(meta)
+            staff_approval_link = await self.get_staff_approval_link(meta) if meta.category == "TV" else ""
+            await self.edit_desc(meta, staff_approval_link)
             file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
             try:
                 Path(file_path).stat()  # Ensures the file is accessible
