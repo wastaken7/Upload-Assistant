@@ -46,23 +46,25 @@ class FileIPlay:
     supported_categories = ("MOVIE", "TV", "GAME", "MUSIC", "XXX")
     tracker_urls = ("fileiplay.org",)
 
-    # Category IDs from the upload form (GET /api/v1/categories lists the same).
+    # Category IDs from GET /api/v1/categories.
     category_ids: ClassVar[dict[str, int]] = {
         "Movies: Anime": 1,
-        "Movies: BluRay": 5,
-        "Movies: DVD": 9,
-        "Movies: HD": 11,
-        "HDTV Episodes": 13,
-        "TV Episodes": 20,
-        "Movies: XVID": 24,
-        "Movies: XXX": 27,
-        "Music": 28,
-        "Games: PC-ISO": 30,
-        "Movies: 4K": 31,
-        "Sport": 42,
+        "Movies: BluRay": 2,
+        "Movies: DVD": 3,
+        "Movies: HD": 4,
+        "HDTV Episodes": 5,
+        "TV Episodes": 7,
+        "Movies: XVID": 8,
+        "Movies: XXX": 10,
+        "Music": 11,
+        "Games: PC-ISO": 12,
+        "Movies: 4K": 13,
+        "Sport": 16,
+        "Movies/WEB-DL": 21,
+        "TV-Packs": 24,
     }
-    movie_category_ids = frozenset({1, 5, 9, 11, 24, 31})
-    tv_category_ids = frozenset({13, 20})
+    movie_category_ids = frozenset({1, 2, 3, 4, 8, 13, 21})
+    tv_category_ids = frozenset({5, 7, 24})
 
     # Limits from the API documentation.
     max_name_length = 255
@@ -130,6 +132,8 @@ class FileIPlay:
         if category == "GAME":
             return self.category_ids["Games: PC-ISO"]
         if category == "TV":
+            if meta.tv_pack:
+                return self.category_ids["TV-Packs"]
             # The site lists SD episodes under "TV" and 720p and above under "HD TV".
             return self.category_ids["TV Episodes"] if meta.sd else self.category_ids["HDTV Episodes"]
 
@@ -137,6 +141,8 @@ class FileIPlay:
             return self.category_ids["Movies: Anime"]
         if meta.resolution in ("2160p", "4320p"):
             return self.category_ids["Movies: 4K"]
+        if str(meta.type).upper() == "WEBDL":
+            return self.category_ids["Movies/WEB-DL"]
         if meta.is_disc in ("BDMV", "HDDVD"):
             return self.category_ids["Movies: BluRay"]
         dvd_remux = str(meta.type).upper() == "REMUX" and str(meta.source or "") in ("PAL DVD", "NTSC DVD", "DVD")
