@@ -367,7 +367,7 @@ uv tool install --force git+https://github.com/wastaken7/Upload-Assistant.git
 | <img src="web_ui/static/img/trackers/oldtoonsworld.png" width="16" height="16" />             | OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/onlyencodes.png" width="16" height="16" />               | OnlyEncodes+           | ONLYENCODES            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/orpheus.png" width="16" height="16" />                   | Orpheus                | ORPHEUS                | MUSIC                        |
-| <img src="web_ui/static/img/trackers/passthepopcorn.png" width="16" height="16" />            | PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                        |
+| <img src="web_ui/static/img/trackers/passthepopcorn.png" width="16" height="16" />            | PassThePopcorn         | PASSTHEPOPCORN         | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/peergarden.png" width="16" height="16" />                | PeerGarden             | PEERGARDEN             | MOVIE, TV, GAME, BOOK, MUSIC |
 | <img src="web_ui/static/img/trackers/polishtorrent.png" alt="" width="16" height="16" />      | Polish Torrent         | POLISHTORRENT          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/portugas.png" width="16" height="16" />                  | Portugas               | PORTUGAS               | MOVIE, TV                    |

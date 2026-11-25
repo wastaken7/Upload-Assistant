@@ -67,6 +67,7 @@ QUESTION_KEYS: dict[str, KeyInfo] = {
     "passthepopcorn.cover": KeyInfo("Cover image link for a new group (.jpg, .jpeg, .png or .webp)"),
     "passthepopcorn.hc_sub_language": KeyInfo("Language code of non-English hardcoded subtitles"),
     "passthepopcorn.mark_trumpable": KeyInfo("Whether to mark the release trumpable (yes/no)"),
+    "passthepopcorn.staff_approval": KeyInfo("Link to the staff approval for a TV upload (Miniseries, Anthology Series, ...)"),
     "passthepopcorn.tags": KeyInfo("Tags for a new group, comma-separated"),
     "passthepopcorn.trailer": KeyInfo("YouTube trailer link for a new group"),
     "passthepopcorn.trumpable": KeyInfo("Trumpable reasons, comma-separated", ("hc_full", "hc_forced", "no_english_subs", "softsubs_mislabeled", "hc_non_english")),

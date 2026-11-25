@@ -121,3 +121,71 @@ def test_successful_upload_records_torrent_link(tmp_path, monkeypatch):
     assert status["torrent_id"] == "345"  # noqa: S101
     assert status["torrent_link"] == link  # noqa: S101
     assert ready_to_seed.await_args.args[-1] == link  # noqa: S101
+
+
+def _configured_tracker() -> PassThePopcorn:
+    tracker = object.__new__(PassThePopcorn)
+    tracker.api_user = "user"
+    tracker.username = "name"
+    tracker.password = "secret"
+    tracker.announce_url = "https://please.passthepopcorn.me/example/announce"
+    return tracker
+
+
+def test_tv_upload_is_skipped_unattended_without_staff_approval() -> None:
+    meta = Meta(category="TV", unattended=True)
+
+    assert asyncio.run(_configured_tracker().get_additional_checks(meta)) is False  # noqa: S101
+
+
+def test_tv_upload_continues_unattended_with_staff_approval_answer() -> None:
+    meta = Meta(category="TV", unattended=True, answers={PassThePopcorn.staff_approval_key: "https://passthepopcorn.me/staffpm.php?id=1"})
+
+    assert asyncio.run(_configured_tracker().get_additional_checks(meta)) is True  # noqa: S101
+
+
+def test_movie_upload_does_not_need_staff_approval() -> None:
+    meta = Meta(category="MOVIE", unattended=True)
+
+    assert asyncio.run(_configured_tracker().get_additional_checks(meta)) is True  # noqa: S101
+
+
+def test_staff_approval_link_must_be_a_web_link() -> None:
+    validate = PassThePopcorn._validate_approval_link
+
+    assert validate("https://passthepopcorn.me/staffpm.php?action=viewconv&id=1") is None  # noqa: S101
+    assert validate("approved on irc") is not None  # noqa: S101
+    assert validate("https://example.org/a]b") is not None  # noqa: S101
+
+
+def test_missing_staff_approval_refuses_tv_upload() -> None:
+    from src.exceptions import UploadError
+
+    tracker = _configured_tracker()
+    meta = Meta(category="TV", unattended=True, name="Example.Show.S01")
+
+    with pytest.raises(UploadError):
+        asyncio.run(tracker.get_staff_approval_link(meta))
+    assert meta.skipping == tracker.tracker  # noqa: S101
+
+
+def test_staff_approval_link_heads_the_description(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("src.description_review.get_base_description", lambda _meta: "")
+    tracker = object.__new__(PassThePopcorn)
+    tracker.config = {"DEFAULT": {"multiScreens": 2}}
+    meta = Meta(base_dir=str(tmp_path), uuid="release", skip_imghost_upload=True)
+    (tmp_path / "tmp" / "release").mkdir(parents=True)
+    link = "https://passthepopcorn.me/staffpm.php?id=1"
+
+    asyncio.run(tracker.edit_desc(meta, link))
+
+    description = (tmp_path / "tmp" / "release" / "[PASSTHEPOPCORN]DESCRIPTION.txt").read_text(encoding="utf-8")
+    assert description.startswith(f"[quote]Uploaded with staff approval: [url]{link}[/url][/quote]")  # noqa: S101
+
+
+def test_imdb_miniseries_title_type_maps_to_miniseries() -> None:
+    tracker = object.__new__(PassThePopcorn)
+    meta = Meta(category="TV")
+
+    assert asyncio.run(tracker.get_type({"type": "tvMiniSeries", "runtime": "50"}, meta)) == "Miniseries"  # noqa: S101
+    assert asyncio.run(tracker.get_type({"type": "tvMovie", "runtime": "90"}, meta)) == "Feature Film"  # noqa: S101

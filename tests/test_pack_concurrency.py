@@ -271,7 +271,7 @@ def test_ptp_description_holds_the_release_image_lock(tmp_path, monkeypatch):
     ptp = PassThePopcorn({"DEFAULT": {}, "TRACKERS": {"PASSTHEPOPCORN": {}}})
     held = []
 
-    async def write_description(_meta):
+    async def write_description(_meta, _staff_approval_link=""):
         held.append(release_image_lock(meta).locked())
 
     monkeypatch.setattr(ptp, "_write_description", write_description)
