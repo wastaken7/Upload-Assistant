@@ -15,6 +15,14 @@ from src.meta import Meta
 from src.trackers.common import Common
 
 
+def bearer_authorization(token: object) -> str:
+    """The Authorization value for an API token, accepting one saved with or without "Bearer "."""
+    value = str(token or "").strip()
+    if not value or value.lower().startswith("bearer "):
+        return value
+    return f"Bearer {value}"
+
+
 class RetroFlix:
     """
     RTF Private Torrent Tracker
@@ -39,14 +47,21 @@ class RetroFlix:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
 
+    def _headers(self) -> dict[str, str]:
+        """Headers for API calls, with the token sent the way the API documents it (Bearer)."""
+        return {"accept": "application/json", "Authorization": bearer_authorization(self.config["TRACKERS"][self.tracker].get("api_key", ""))}
+
     async def get_data(self, meta: Meta, preview: bool = False) -> dict[str, Any]:
-        """Build the upload form; a ``preview`` leaves out the MediaInfo/BDInfo and screenshots."""
+        """Build the upload form; a ``preview`` leaves out the description, MediaInfo/BDInfo and screenshots."""
         mi_dump = bd_dump = None
+        description = ""
         if not preview:
-            await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+            # The site shows the screenshots field in its own section, so they stay out of the description.
+            description = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
                 meta,
                 mediainfo=False,
                 nfo=False,
+                screenshots=False,
                 signature=self.forum_link,
             )
             if meta.bdinfo:
@@ -62,14 +77,14 @@ class RetroFlix:
         imdb_url = str(imdb_url_value) if imdb_url_value else ""
         json_data: dict[str, Any] = {
             "name": await self.get_name(meta),
-            # description does not work for some reason
+            # Short description, typically a genre list; the site fills it from IMDb.
             "description": "",
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
             "mediaInfo": re.sub(r"(\d+)\s+(\d+)", r"\1,\2", mi_dump or "") if bd_dump is None else f"{bd_dump}",
             "nfo": "",
             "url": f"{imdb_url}/" if imdb_url else "",
-            # auto pulled from IMDB
-            "descr": "",
+            # Long description (BBCode), shown under "Description"; the IMDb plot is shown separately.
+            "descr": description,
             "poster": meta.artwork_url,
             "type": "401" if meta.category == "MOVIE" else "402",
             "screenshots": screenshots,
@@ -84,12 +99,15 @@ class RetroFlix:
             "description": payload_preview.readonly("Description"),
             "nfo": payload_preview.readonly("NFO"),
             "url": payload_preview.text("IMDb URL"),
-            "descr": payload_preview.readonly("Plot"),
             "poster": payload_preview.text("Poster URL", max_length=1000),
             "type": payload_preview.choice("Category", {"MOVIE": "401", "TV": "402"}, by_label=True),
             "isAnonymous": payload_preview.flag("Anonymous", on=True, off=False),
         }
-        deferred = {"mediaInfo": "Read from the MediaInfo/BDInfo report at upload time", "screenshots": "Uploaded after this question"}
+        deferred = {
+            "descr": payload_preview.DESCRIPTION_NOTE,
+            "mediaInfo": "Read from the MediaInfo/BDInfo report at upload time",
+            "screenshots": "Uploaded after this question",
+        }
         return payload_preview.describe(self.tracker, await self.get_data(meta, preview=True), specs, deferred=deferred)
 
     async def upload(self, meta: Meta) -> bool:
@@ -112,11 +130,7 @@ class RetroFlix:
             base64_message = base64_encoded_data.decode("utf-8")
             json_data["file"] = base64_message
 
-        headers: dict[str, Any] = {
-            "accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
-        }
+        headers = {**self._headers(), "Content-Type": "application/json"}
 
         if meta.debug is False:
             try:
@@ -304,11 +318,8 @@ class RetroFlix:
             Returns empty list if search fails.
         """
         dupes: list[dict[str, Any]] = []
-        headers: dict[str, Any] = {
-            "accept": "application/json",
-            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
-        }
-        params = {"includingDead": "1"}
+        headers = self._headers()
+        params = {"includingDead": "included"}
 
         imdb_id_value = meta.imdb_id or 0
         if imdb_id_value != 0:
@@ -347,116 +358,63 @@ class RetroFlix:
 
         return dupes
 
-    async def api_test(self, meta: Meta) -> bool | None:
-        """Test if the stored API key is valid.
+    async def api_test(self, meta: Meta) -> bool:  # noqa: ARG002 - called with meta by upload.py
+        """Check the API token, logging in again when there is none or the site rejects it.
 
-        RETROFLIX API keys expire weekly, so this method validates the current key
-        and generates a new one if needed.
-
-        Args:
-            meta: Metadata dictionary containing base directory path.
-
-        Returns:
-            True if API key is valid, None if key generation was attempted.
+        RetroFlix tokens expire, so a rejected token is replaced by logging in with the
+        configured username and password. The new token is kept in memory for this run only.
         """
-        headers: dict[str, Any] = {
-            "accept": "application/json",
-            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.base_url}/api/test", headers=headers)
-
-                if response.status_code != 200:
-                    logger.info(f"{self.tracker}: [bold red]Your API key is incorrect SO generating a new one")
-                    await self.generate_new_api(meta)
-                    return None
+        if str(self.config["TRACKERS"][self.tracker].get("api_key", "")).strip():
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(f"{self.base_url}/api/test", headers=self._headers())
+            except httpx.RequestError as e:
+                logger.info(f"{self.tracker}: [bold red]Could not reach the API: {e!s}")
+                return False
+            if response.status_code == 200:
                 return True
-        except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [bold red]Error testing API: {e!s}")
-            await self.generate_new_api(meta)
-            return None
-        except Exception as e:
-            logger.error(f"{self.tracker}: [bold red]Unexpected error testing API: {e!s}")
-            await self.generate_new_api(meta)
-            return None
+            if response.status_code not in (401, 403):
+                logger.info(f"{self.tracker}: [bold red]Unexpected response while testing the API token: HTTP {response.status_code}")
+                return False
+            logger.info(f"{self.tracker}: [yellow]The API token was rejected, logging in for a new one")
+        return await self.generate_new_api()
 
-    async def generate_new_api(self, meta: Meta) -> bool | None:
-        """Generate a new API key for RETROFLIX tracker.
-
-        Authenticates using username/password and retrieves a new API token,
-        then updates both the in-memory config and the config file on disk.
-
-        Args:
-            meta: Metadata dictionary containing base directory path for config file location.
-
-        Returns:
-            True if new API key was successfully generated and saved, None otherwise.
-        """
-        headers = {
-            "accept": "application/json",
-        }
-
-        json_data = {
-            "username": self.config["TRACKERS"][self.tracker]["username"],
-            "password": self.config["TRACKERS"][self.tracker]["password"],
-        }
-
-        base_dir = meta.base_dir if meta.base_dir is not None else "."
-        config_path = f"{base_dir}/data/config.py"
+    async def generate_new_api(self) -> bool:
+        """Log in with the configured username and password and keep the new token in memory."""
+        tracker_config = self.config["TRACKERS"][self.tracker]
+        username = str(tracker_config.get("username", "")).strip()
+        password = str(tracker_config.get("password", ""))
+        if not username or not password:
+            logger.info(f"{self.tracker}: [bold red]No valid API token and no username/password to get one; add them to the config.")
+            return False
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(f"{self.base_url}/api/login", headers=headers, json=json_data)
-
-            if response.status_code == 201:
-                token = response.json().get("token")
-                if token:
-                    try:
-                        # Update the in-memory config dictionary
-                        self.config["TRACKERS"][self.tracker]["api_key"] = token
-
-                        # Now we update the config file on disk using utf-8 encoding
-                        async with aiofiles.open(config_path, encoding="utf-8") as file:
-                            config_data = await file.read()
-
-                        # Find the RETROFLIX tracker and replace the api_key value (supports single/double quotes and multiline blocks)
-                        pattern = r"(['\"]RETROFLIX['\"]\s*:\s*{.*?['\"]api_key['\"]\s*:\s*)(['\"])[^'\"]*(['\"])"
-                        new_config_data, replacements = re.subn(
-                            pattern,
-                            rf"\1\2{token}\3",
-                            config_data,
-                            count=1,
-                            flags=re.DOTALL,
-                        )
-                        if replacements == 0:
-                            logger.info(f"{self.tracker}: [bold red]Failed to update RETROFLIX api_key in config file.")
-                            return None
-
-                        # Write the updated config back to the file
-                        async with aiofiles.open(config_path, "w", encoding="utf-8") as file:
-                            await file.write(new_config_data)
-
-                        logger.info(f"{self.tracker}: [bold green]API Key successfully saved to {config_path}")
-                        return True
-                    except Exception as e:
-                        logger.info(f"{self.tracker}: [bold red]Failed to update config file: {e!s}")
-                        return None
-                else:
-                    logger.info(f"{self.tracker}: [bold red]API response does not contain a token.")
-                    return None
-            else:
-                logger.info(f"{self.tracker}: [bold red]Error getting new API key: {response.status_code}, please check username and password in the config.")
-                return None
-
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(f"{self.base_url}/api/login", headers={"accept": "application/json"}, json={"username": username, "password": password})
         except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [bold red]An error occurred while requesting the API: {e!s}")
-            return None
+            logger.info(f"{self.tracker}: [bold red]An error occurred while logging in: {e!s}")
+            return False
 
-        except Exception as e:
-            logger.info(f"{self.tracker}: [bold red]An unexpected error occurred: {e!s}")
-            return None
+        if response.status_code != 201:
+            try:
+                message = str(response.json().get("message", ""))
+            except ValueError:
+                message = ""
+            logger.info(f"{self.tracker}: [bold red]Login failed (HTTP {response.status_code}){': ' + message if message else ''}")
+            return False
+
+        try:
+            token = str(response.json().get("token") or "")
+        except ValueError:
+            token = ""
+        if not token:
+            logger.info(f"{self.tracker}: [bold red]The login response did not contain a token.")
+            return False
+
+        # Shared with the rest of this run (cross-seeding reads it too); the config file is left untouched.
+        tracker_config["api_key"] = token
+        logger.info(f"{self.tracker}: [green]Logged in and got a new API token for this run.")
+        return True
 
     async def get_name(self, meta: Meta) -> str:
         return meta.name
