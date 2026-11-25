@@ -2692,7 +2692,6 @@ async def get_service(
         "Criterion": "CRIT",
         "CRKI": "CRKI",
         "CRKL": "CRKL",
-        "Crunchy Roll": "CR",
         "Crunchyroll": "CR",
         "CRZN": "CRZN",
         "CSpan": "CSPN",
