@@ -128,6 +128,7 @@ from src.trackerhandle import process_trackers
 from src.trackers.common import Common
 from src.trackers.GAZELLE.alpharatio import AlphaRatio
 from src.trackers.GAZELLE.passthepopcorn import PassThePopcorn
+from src.trackers.retroflix import bearer_authorization
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager, run_tracker_checks
 from src.tvdb import close_tvdb
@@ -3706,7 +3707,7 @@ async def process_cross_seeds(meta: Meta) -> None:
             api_key = str(tracker_cfg.get("api_key", "")).strip() if _is_str_dict(tracker_cfg) else ""
             headers = {
                 "accept": "application/json",
-                "Authorization": api_key,
+                "Authorization": bearer_authorization(api_key),
             }
 
         if tracker == "ALPHARATIO" and download_url:

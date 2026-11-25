@@ -2932,9 +2932,10 @@ config: dict[str, Any] = {
             "cli_alias": "RTF",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
+            # Used to log in for a new API token when the saved one is missing or expired
             "username": "",
             "password": "",
-            # get_it_by_running_/api/ login command from https://retroflix.club/api/doc
+            # Optional: a token from the /api/login command at https://retroflix.club/api/doc
             "api_key": "",
             "announce_url": "",
             "anon": True,
