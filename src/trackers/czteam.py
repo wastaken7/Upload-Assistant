@@ -111,9 +111,8 @@ class CZTeam:
             return 28 if romanian else 20  # Movies/DVD-RO, Movies/DVD-R
         if meta.sd:
             return 19  # Movies/XviD
-        if meta.type == "HDTV" and romanian:
-            return 33  # Movies/HDTV-RO
-        return 38 if romanian else 29  # Movies-RO, Movies/HD
+        # The site files every HD movie with Romanian audio or subtitles under HDTV-RO, whatever the source.
+        return 33 if romanian else 29  # Movies/HDTV-RO, Movies/HD
 
     def get_resolution(self, meta: Meta) -> str:
         return meta.resolution if meta.resolution in self.resolutions else ""

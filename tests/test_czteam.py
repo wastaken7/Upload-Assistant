@@ -61,7 +61,8 @@ def test_supported_categories(category: str, kept: bool) -> None:
     ("values", "romanian", "expected"),
     [
         ({"category": "MOVIE", "resolution": "1080p"}, False, 29),
-        ({"category": "MOVIE", "resolution": "1080p"}, True, 38),
+        ({"category": "MOVIE", "resolution": "1080p"}, True, 33),
+        ({"category": "MOVIE", "resolution": "2160p", "type": "WEBDL"}, True, 33),
         ({"category": "MOVIE", "sd": 1}, False, 19),
         ({"category": "MOVIE", "is_disc": "BDMV"}, False, 36),
         ({"category": "MOVIE", "is_disc": "DVD"}, True, 28),
