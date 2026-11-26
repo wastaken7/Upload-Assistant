@@ -156,17 +156,19 @@ def test_name_matches_capybarabr() -> None:
     assert "2026" not in expected
 
 
-def test_upload_data_limits_screenshots_and_flags_anime(tmp_path: Path) -> None:
+@pytest.mark.parametrize(("personalrelease", "expected"), [(True, "true"), (False, "false")])
+def test_upload_data_limits_screenshots_and_flags_anime(tmp_path: Path, personalrelease: bool, expected: str) -> None:
     (tmp_path / "tmp" / "abc").mkdir(parents=True)
     (tmp_path / "tmp" / "abc" / "MEDIAINFO_CLEANPATH.txt").write_text("General\nFormat : Matroska\n", encoding="utf-8")
     images = [{"raw_url": f"https://img.example/{index}.png"} for index in range(8)] + [{"raw_url": "http://img.example/insecure.png"}]
-    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid="abc", name="Fictional Film 2001", anime=True, anon=True, image_list=images)
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid="abc", name="Fictional Film 2001", anime=True, anon=True, personalrelease=personalrelease, image_list=images)
 
     data = asyncio.run(Vultu(CONFIG).get_data(meta, "tmdb:movie:1"))
 
     assert data["screenshots"] == [f"https://img.example/{index}.png" for index in range(6)]
     assert data["anime"] == "true"
     assert data["anonymous"] == "true"
+    assert data["personal_release"] == expected
     assert data["mediainfo"].startswith("General")
     assert asyncio.run(Vultu(CONFIG).get_data(Meta(category="GAME", base_dir=str(tmp_path), uuid="abc", anime=True), "igdb:1"))["anime"] == "false"
 
