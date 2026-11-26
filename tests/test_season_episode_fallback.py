@@ -3,6 +3,8 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from src import prep_helpers
 from src.getseasonep import SeasonEpisodeManager
 from src.meta import Meta
@@ -41,6 +43,44 @@ def test_standard_single_episode_parsing_is_preserved() -> None:
     assert result.season_int == 3
     assert result.episode == "E04"
     assert result.episode_int == 4
+    assert result.tv_pack is False
+
+
+@pytest.mark.parametrize(
+    ("video", "filelist", "episode", "episode_int", "tv_pack"),
+    [
+        ("Example.Show.S00E01.Special.Episode.1080p.AMZN.WEB-DL.DDP2.0.H.264.mkv", ["episode.mkv"], "E01", 1, False),
+        ("Example.Show.2022.S00E01.1080p.WEB-DL-GROUP.mkv", ["episode.mkv"], "E01", 1, False),
+        ("Example.Show.S00.1080p.WEB-DL-GROUP", ["episode1.mkv", "episode2.mkv"], "", 0, True),
+    ],
+)
+def test_standard_season_zero_is_preserved(video: str, filelist: list[str], episode: str, episode_int: int, tv_pack: bool) -> None:
+    manager = SeasonEpisodeManager({"DEFAULT": {"tmdb_api": "test-key"}})
+    meta = Meta(category="TV", anime=False, filelist=filelist)
+
+    with patch("src.getseasonep.logger.info") as log_info:
+        result = asyncio.run(manager.get_season_episode(video, meta))
+
+    assert result.season == "S00"
+    assert result.season_int == 0
+    assert result.episode == episode
+    assert result.episode_int == episode_int
+    assert result.tv_pack is tv_pack
+    assert not any("error guessing the season number" in str(call) for call in log_info.call_args_list)
+
+
+@pytest.mark.parametrize("season_data", [{}, {"season": None}, {"season": ""}, {"season": "invalid"}])
+def test_missing_or_invalid_season_defaults_to_one(season_data: dict[str, object]) -> None:
+    manager = SeasonEpisodeManager({"DEFAULT": {"tmdb_api": "test-key"}})
+    meta = Meta(category="TV", anime=False, filelist=["episode.mkv"])
+
+    with patch("src.getseasonep.guessit_fn", return_value={"episode": 1, **season_data}):
+        result = asyncio.run(manager.get_season_episode("Example.Show.E01.mkv", meta))
+
+    assert result.season == "S01"
+    assert result.season_int == 1
+    assert result.episode == "E01"
+    assert result.episode_int == 1
     assert result.tv_pack is False
 
 
