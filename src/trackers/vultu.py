@@ -341,6 +341,7 @@ class Vultu:
             "name": await self.get_name(meta),
             "anime": "true" if meta.anime and work.startswith("tmdb:") else "false",
             "anonymous": "true" if anon else "false",
+            "personal_release": "true" if meta.personalrelease else "false",
         }
         if preview:
             return data
