@@ -2819,6 +2819,8 @@ async def get_service(
         "HBO Max": "HMAX",
         "HBO": "HBO",
         "HBOMAX": "HMAX",
+        "HEI Network": "HEIN",
+        "HEIN": "HEIN",
         "HGM": "HGM",
         "HGTV": "HGTV",
         "HIDI": "HIDI",
