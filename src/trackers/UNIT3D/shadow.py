@@ -10,7 +10,7 @@ from src.xxx_match import is_pack_name
 
 
 _ROMANIAN_LANGUAGE = r"(?:ro|ron|rum|romanian|română|romana)(?:[-_]ro)?"
-_ROMANIAN_SUBTITLE_LABEL = re.compile(rf"{_ROMANIAN_LANGUAGE}(?:$|[\s(])", re.IGNORECASE)
+_ROMANIAN_LANGUAGE_LABEL = re.compile(rf"{_ROMANIAN_LANGUAGE}(?:$|[\s(])", re.IGNORECASE)
 _ROMANIAN_SUBTITLE_FILENAME = re.compile(rf"(?:^|[._ -]){_ROMANIAN_LANGUAGE}(?:[._ -](?:forced|sdh|cc))*$", re.IGNORECASE)
 
 
@@ -27,7 +27,7 @@ class Shadow(UNIT3D):
 
     category_choices: ClassVar[dict[str, tuple[str, ...]]] = {
         "MOVIE": ("2", "12", "13", "14", "15", "16", "22", "28", "29"),
-        "TV": ("11", "17", "22"),
+        "TV": ("11", "17"),
         "BOOK": ("23",),
         "GAME": ("19", "20"),
         "MUSIC": ("26", "27", "31"),
@@ -80,22 +80,31 @@ class Shadow(UNIT3D):
         resolution = meta.resolution.lower()
         if resolution in {"2160p", "4320p"}:
             return "4K"
-        if meta.sd or resolution in {"576p", "576i", "540p", "480p", "480i"}:
+        if meta.sd or resolution in {"576p", "576i", "540p", "540i", "480p", "480i"}:
             return "SD"
         return "HD"
 
-    async def _has_romanian_subtitles(self, meta: Meta) -> bool:
-        subtitles = meta.subtitle_languages
-        labels = [subtitles] if isinstance(subtitles, str) else list(subtitles or [])
-        if meta.hardcoded_subs_language:
-            labels.append(meta.hardcoded_subs_language)
+    async def _is_romanian_release(self, meta: Meta) -> bool:
+        if "RO" in meta.origin_country:
+            return True
+
+        labels = [meta.original_language, meta.hardcoded_subs_language]
+        for languages in (meta.audio_languages, meta.subtitle_languages):
+            labels.extend([languages] if isinstance(languages, str) else languages or [])
+
         if meta.is_disc == "BDMV":
             labels.extend(meta.bdinfo.get("subtitles") or [])
+            labels.extend(track.get("language") for track in meta.bdinfo.get("audio") or [] if isinstance(track, dict) and not track.get("is_commentary"))
         elif meta.is_disc != "DVD":
-            # Keep embedded tracks visible even if a hardcoded-subtitle correction replaced the prepared language list.
+            # Prepared languages can omit embedded tracks, e.g. after a hardcoded-subtitle correction.
             tracks = (meta.mediainfo.get("media") or {}).get("track") or []
-            labels.extend(track.get("Language") for track in tracks if isinstance(track, dict) and track.get("@type") == "Text")
-        if any(_ROMANIAN_SUBTITLE_LABEL.match(part.strip()) for label in labels if isinstance(label, str) for part in re.split(r"[,;]", label)):
+            for track in tracks:
+                if not isinstance(track, dict):
+                    continue
+                track_type = track.get("@type")
+                if track_type == "Text" or (track_type == "Audio" and "commentary" not in str(track.get("Title", "")).casefold()):
+                    labels.append(track.get("Language"))
+        if any(_ROMANIAN_LANGUAGE_LABEL.match(part.strip()) for label in labels if isinstance(label, str) for part in re.split(r"[,;]", label)):
             return True
 
         return (
@@ -109,16 +118,15 @@ class Shadow(UNIT3D):
             return {label: value for value, label in choices} if mapping_only else dict(choices)
 
         category = category or meta.category
-        if category in {"MOVIE", "TV"}:
+        if category == "MOVIE":
             combined_genres = re.split(r"[,|/]", meta.combined_genres) if isinstance(meta.combined_genres, str) else meta.combined_genres
             genres = (*meta.genres, *combined_genres, *meta.keywords)
             if any(genre.strip().casefold() in {"documentary", "documentar"} for genre in genres):
                 return {"category_id": "22"}
-            romanian_subtitles = await self._has_romanian_subtitles(meta)
-            if category == "MOVIE":
-                standard_id, romanian_id = {"SD": ("12", "15"), "HD": ("13", "2"), "4K": ("14", "16")}[self._video_quality(meta)]
-                return {"category_id": romanian_id if romanian_subtitles else standard_id}
-            return {"category_id": "11" if romanian_subtitles else "17"}
+            standard_id, romanian_id = {"SD": ("12", "15"), "HD": ("13", "2"), "4K": ("14", "16")}[self._video_quality(meta)]
+            return {"category_id": romanian_id if await self._is_romanian_release(meta) else standard_id}
+        if category == "TV":
+            return {"category_id": "11" if await self._is_romanian_release(meta) else "17"}
         if category == "BOOK":
             return {"category_id": "23"}
         if category == "GAME":
@@ -181,3 +189,4 @@ class Shadow(UNIT3D):
         type_choices = unit3d_catalogs.classification_choices(self.tracker, "types")
         specs["type_id"] = payload_preview.choice("Type", [(value, label) for value, label in type_choices if int(value) in types])
         return specs
+

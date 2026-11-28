@@ -1,4 +1,6 @@
 import asyncio
+import json
+from collections.abc import Callable
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
@@ -11,11 +13,29 @@ from src.meta import Meta
 from src.payload_preview import accept_edits
 from src.trackers.UNIT3D.shadow import Shadow
 from src.trackersetup import api_trackers, tracker_class_map
+from src.video import VideoManager
 
 
 @pytest.fixture
 def shadow() -> Shadow:
     return Shadow({"DEFAULT": {}, "TRACKERS": {"SHADOW": {"api_key": "test-key"}}})
+
+
+def mock_shadow_upload(shadow: Shadow, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, handler: Callable[[httpx.Request], httpx.Response]) -> None:
+    torrent = tmp_path / "base.torrent"
+    torrent.write_bytes(b"test torrent")
+    monkeypatch.setattr(shadow.common, "get_base_torrent_path", AsyncMock(return_value=torrent))
+    monkeypatch.setattr(shadow.common, "download_tracker_torrent", AsyncMock())
+    monkeypatch.setattr(shadow, "get_description", AsyncMock(return_value={"description": "Test release"}))
+    monkeypatch.setattr(shadow, "get_mediainfo", AsyncMock(return_value={"mediainfo": "Test MediaInfo"}))
+    monkeypatch.setattr(shadow, "observe_api_key_expiry", lambda *_: None)
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **_: client)
+
+
+def upload_fields(request: httpx.Request) -> dict[str, bytes]:
+    form = BytesParser(policy=policy.default).parsebytes(f"Content-Type: {request.headers['content-type']}\r\n\r\n".encode() + request.content)
+    return {part.get_param("name", header="content-disposition"): part.get_payload(decode=True) for part in form.iter_parts()}
 
 
 @pytest.mark.parametrize(
@@ -24,14 +44,17 @@ def shadow() -> Shadow:
         (Meta(category="MOVIE", type="WEBDL", resolution="2160p"), "14", "4", "2"),
         (Meta(category="MOVIE", type="WEBDL", resolution="2160p", subtitle_languages=["ro-RO"]), "16", "4", "2"),
         (Meta(category="MOVIE", type="ENCODE", resolution="1080p", subtitle_languages="English, Romanian (Forced)"), "2", "3", "3"),
-        (Meta(category="MOVIE", type="ENCODE", resolution="1080p", audio_languages=["Romanian"], subtitle_languages=["English"]), "13", "3", "3"),
+        (Meta(category="MOVIE", type="ENCODE", resolution="1080p", audio_languages=["Romanian"], subtitle_languages=["English"]), "2", "3", "3"),
+        (Meta(category="MOVIE", type="WEBDL", resolution="2160p", origin_country=["RO"]), "16", "4", "2"),
         (Meta(category="MOVIE", type="DVDRIP", resolution="576p"), "12", "50", "6"),
         (Meta(category="MOVIE", type="DVDRIP", resolution="576p", subtitle_languages=["rum"]), "15", "50", "6"),
         (Meta(category="TV", type="HDTV", resolution="720p", tv_pack=True), "17", "6", "5"),
         (Meta(category="TV", type="HDTV", resolution="720p", tv_pack=True, subtitle_languages=["ron"]), "11", "6", "5"),
+        (Meta(category="TV", type="HDTV", resolution="720p", original_language="ro"), "11", "6", "5"),
         (Meta(category="TV", type="WEBDL", resolution="1080p", hardcoded_subs=True, hardcoded_subs_language="română"), "11", "4", "3"),
-        (Meta(category="TV", type="WEBDL", resolution="1080p", genres=["Documentary"], subtitle_languages=["Romanian"]), "22", "4", "3"),
+        (Meta(category="MOVIE", type="WEBDL", resolution="1080p", genres=["Documentary"], subtitle_languages=["Romanian"]), "22", "4", "3"),
         (Meta(category="MOVIE", type="DISC", resolution="1080p", is_disc="BDMV", bdinfo={"subtitles": ["Romanian"]}), "2", "1", "3"),
+        (Meta(category="MOVIE", type="DISC", resolution="1080p", is_disc="BDMV", bdinfo={"audio": [{"language": "Romanian"}]}), "2", "1", "3"),
         (Meta(category="BOOK", container=".epub"), "23", "30", None),
         (Meta(category="BOOK", audiobook=True), "23", "33", None),
         (Meta(category="GAME", platform="PC"), "19", "15", None),
@@ -66,6 +89,49 @@ def test_shadow_uses_embedded_subtitles_with_a_different_burned_in_language(shad
     assert asyncio.run(shadow.get_category_id(meta)) == {"category_id": "2"}
 
 
+@pytest.mark.parametrize(("title", "expected_id"), [("Romanian dub", "11"), ("Director commentary", "17")])
+def test_shadow_uses_embedded_romanian_audio(shadow: Shadow, title: str, expected_id: str) -> None:
+    meta = Meta(category="TV", mediainfo={"media": {"track": [{"@type": "Audio", "Language": "ro", "Title": title}]}})
+    assert asyncio.run(shadow.get_category_id(meta)) == {"category_id": expected_id}
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "scan", "resolution", "resolution_id"),
+    [
+        (854, 480, "Progressive", "480p", "8"),
+        (720, 480, "Interlaced", "480i", "9"),
+        (1024, 576, "Progressive", "576p", "6"),
+        (720, 576, "Interlaced", "576i", "7"),
+    ],
+)
+def test_shadow_detects_sd_dvdrip_for_upload(
+    shadow: Shadow, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, width: int, height: int, scan: str, resolution: str, resolution_id: str
+) -> None:
+    release_dir = tmp_path / "tmp" / "release"
+    release_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        json.dumps({"media": {"track": [{"@type": "General"}, {"@type": "Video", "Width": width, "Height": height, "ScanType": scan}]}}),
+        encoding="utf-8",
+    )
+    meta = Meta(category="MOVIE", name="Fictional Movie", audio_languages=["ron"], debug=False, tracker_status={"SHADOW": {}})
+    video = VideoManager()
+    meta.type = asyncio.run(video.get_type("Fictional.Movie.DVDRip.mkv", False, "", meta))
+    meta.resolution, _ = asyncio.run(video.get_resolution({}, release_dir.name, str(tmp_path), meta))
+    assert meta.resolution == resolution
+    meta.sd = asyncio.run(video.is_sd(meta.resolution))
+
+    def upload(request: httpx.Request) -> httpx.Response:
+        fields = upload_fields(request)
+        assert fields["category_id"] == b"15"
+        assert fields["resolution_id"] == resolution_id.encode()
+        assert fields["type_id"] == b"50"
+        assert fields["sd"] == b"1"
+        return httpx.Response(200, json={"success": True, "data": f"{shadow.base_url}/torrent/download/7.example"})
+
+    mock_shadow_upload(shadow, tmp_path, monkeypatch, upload)
+    assert asyncio.run(shadow.upload(meta))
+
+
 @pytest.mark.parametrize(("torrent_layout", "expected_id"), [("BASE_SUBS", "2"), ("BASE", "13")])
 def test_shadow_only_counts_external_subtitles_when_included(shadow: Shadow, monkeypatch: pytest.MonkeyPatch, torrent_layout: str, expected_id: str) -> None:
     meta = Meta(category="MOVIE", resolution="1080p", subtitle_files=["Fictional.Movie.ro.forced.srt"])
@@ -80,39 +146,65 @@ def test_shadow_automatic_category_and_preview_override_reach_upload(shadow: Sha
     category = preview.find("category_id")
     assert category is not None
     assert ("2", "Filme HD-RO") in category.choices
+    assert ("22", "Documentar") in category.choices
     assert ("28", "Filme Pack-RO") in category.choices
     assert ("17", "Serial TV") not in category.choices
     assert category.value == "2"
     if override:
         accept_edits(meta, {"SHADOW": preview}, {"SHADOW": {"category_id": "13"}})
 
-    torrent = tmp_path / "base.torrent"
-    torrent.write_bytes(b"test torrent")
-    monkeypatch.setattr(shadow.common, "get_base_torrent_path", AsyncMock(return_value=torrent))
-    monkeypatch.setattr(shadow.common, "download_tracker_torrent", AsyncMock())
-    monkeypatch.setattr(shadow, "get_description", AsyncMock(return_value={"description": "Test release"}))
-    monkeypatch.setattr(shadow, "get_mediainfo", AsyncMock(return_value={"mediainfo": "Test MediaInfo"}))
-    monkeypatch.setattr(shadow, "observe_api_key_expiry", lambda *_: None)
-
     def upload(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == shadow.upload_url
         assert request.headers["authorization"] == "Bearer test-key"
-        form = BytesParser(policy=policy.default).parsebytes(f"Content-Type: {request.headers['content-type']}\r\n\r\n".encode() + request.content)
-        fields = {part.get_param("name", header="content-disposition"): part.get_payload(decode=True) for part in form.iter_parts()}
+        fields = upload_fields(request)
         assert fields["category_id"] == (b"13" if override else b"2")
         assert fields["type_id"] == b"4"
         assert fields["resolution_id"] == b"3"
         return httpx.Response(200, json={"success": True, "data": f"{shadow.base_url}/torrent/download/7.example"})
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(upload))
-    monkeypatch.setattr("src.trackers.UNIT3D.httpx.AsyncClient", lambda **_: client)
+    mock_shadow_upload(shadow, tmp_path, monkeypatch, upload)
+    assert asyncio.run(shadow.upload(meta))
+    assert meta.tracker_status["SHADOW"]["torrent_id"] == "7"
+
+
+@pytest.mark.parametrize(("subtitles", "category_id"), [([], "17"), (["Romanian"], "11")])
+def test_shadow_uploads_documentary_series_as_tv(
+    shadow: Shadow, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, subtitles: list[str], category_id: str
+) -> None:
+    meta = Meta(
+        category="TV",
+        type="WEBDL",
+        resolution="1080p",
+        name="Fictional Documentary S01E03",
+        genres=["Documentary"],
+        subtitle_languages=subtitles,
+        season_int=1,
+        episode_int=3,
+        debug=False,
+        tracker_status={"SHADOW": {}},
+    )
+    preview = asyncio.run(shadow.get_payload_preview(meta))
+    category = preview.find("category_id")
+    assert category is not None
+    assert category.value == category_id
+    assert set(category.choices) == {("11", "Serial TV-RO"), ("17", "Serial TV")}
+    assert accept_edits(meta, {"SHADOW": preview}, {"SHADOW": {"category_id": "22"}}) == []
+
+    def upload(request: httpx.Request) -> httpx.Response:
+        fields = upload_fields(request)
+        assert fields["category_id"] == category_id.encode()
+        assert fields["season_number"] == b"1"
+        assert fields["episode_number"] == b"3"
+        return httpx.Response(200, json={"success": True, "data": f"{shadow.base_url}/torrent/download/7.example"})
+
+    mock_shadow_upload(shadow, tmp_path, monkeypatch, upload)
     assert asyncio.run(shadow.upload(meta))
     assert meta.tracker_status["SHADOW"]["torrent_id"] == "7"
 
 
 def test_shadow_dupe_search_covers_both_tv_categories_without_tmdb(shadow: Shadow, monkeypatch: pytest.MonkeyPatch) -> None:
     def search(request: httpx.Request) -> httpx.Response:
-        assert request.url.params.get_list("categories[]") == ["11", "17", "22"]
+        assert request.url.params.get_list("categories[]") == ["11", "17"]
         assert request.url.params["name"] == "Fictional Show S01"
         assert "tmdbId" not in request.url.params
         return httpx.Response(200, json={"data": []})
