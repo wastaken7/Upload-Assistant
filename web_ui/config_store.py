@@ -724,18 +724,8 @@ def _prepare_default_webui_section(
             comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
             subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
 
-    if "stats_enabled" in prepared or "history_enabled" in prepared:
-        # Group statistics and history with Main Settings only for WebUI presentation.
-        # Keep the fields together so the builder emits a single subsection.
-        for local_data_key in ("stats_enabled", "history_enabled", "history_retention_days"):
-            if local_data_key in prepared:
-                subsection_map[f"DEFAULT/{local_data_key}"] = "MAIN SETTINGS"
-        main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}
-        prepared = {**main_settings, **prepared}
-
-    # Keep WebUI-only options together for presentation while saving their
-    # values at the original DEFAULT paths used by the upload session manager.
-    webui_settings = {key: value for key, value in prepared.items() if key.startswith("webui_")}
+    webui_keys = ["stats_enabled", "history_enabled", "history_retention_days", *(key for key in prepared if key.startswith("webui_"))]
+    webui_settings = {key: prepared[key] for key in webui_keys if key in prepared}
     for key in webui_settings:
         subsection_map[f"DEFAULT/{key}"] = "WEBUI SETTINGS"
     main_settings = {key: value for key, value in prepared.items() if subsection_map.get(f"DEFAULT/{key}") == "MAIN SETTINGS"}

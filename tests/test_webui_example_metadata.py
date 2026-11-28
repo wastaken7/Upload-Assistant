@@ -59,34 +59,6 @@ def test_current_example_config_exposes_workflow_subsections() -> None:
     assert subsections["USENET/nzb_output_dir"] == "OUTPUT PATHS"
 
 
-def test_stats_enabled_is_grouped_with_main_settings_only_in_webui() -> None:
-    example_path = webui_context.CODE_DIR / "data" / "example_config.py"
-    example_config = webui_config_store._load_config_from_file(example_path)
-    assert example_config is not None
-    defaults = example_config["DEFAULT"]
-    original_keys = list(defaults)
-    comments, subsections = webui_config_store._extract_example_metadata(example_path)
-
-    prepared = webui_config_store._prepare_default_webui_section(defaults, comments, subsections)
-    items = webui_config_store._build_config_items(prepared, {"stats_enabled": True}, comments, subsections, ["DEFAULT"])
-
-    headings = [item["key"] for item in items if item.get("subsection")]
-    assert headings[:3] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
-    assert headings.count("MAIN SETTINGS") == 1
-    assert "LOCAL STATISTICS" not in headings
-    main_settings = next(item for item in items if item["key"] == "MAIN SETTINGS")
-    stats_items = [item for item in main_settings["children"] if item["key"] == "stats_enabled"]
-    assert len(stats_items) == 1
-    assert stats_items[0]["value"] is True
-    assert stats_items[0]["example_value"] is False
-    assert stats_items[0]["help"] == comments["DEFAULT/stats_enabled"]
-    history_items = [item for item in main_settings["children"] if item["key"] == "history_enabled"]
-    assert len(history_items) == 1
-    assert history_items[0]["example_value"] is True
-    assert list(defaults) == original_keys
-    assert defaults["stats_enabled"] is False
-
-
 @pytest.mark.parametrize(
     "removed_key,legacy_value",
     [("keep_meta", True), ("dvd_mediainfo_path", ""), ("dvd_mediainfo_path", "/legacy/DVD_MediaInfo")],
@@ -108,8 +80,11 @@ def test_removed_settings_are_not_exposed_from_existing_config(removed_key: str,
     assert user_section[removed_key] == legacy_value
 
 
-@pytest.mark.parametrize("keep_running,timeout", [(True, 60), (False, 0), (True, 150.5)])
-def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_running, timeout) -> None:
+@pytest.mark.parametrize(
+    "keep_running,timeout,history_enabled,retention_days,stats_enabled",
+    [(True, 60, True, 0, False), (False, 0, False, 30, True), (True, 150.5, True, 7, True)],
+)
+def test_webui_settings_are_grouped_without_changing_saved_paths(keep_running, timeout, history_enabled, retention_days, stats_enabled) -> None:
     example_path = webui_context.CODE_DIR / "data" / "example_config.py"
     example_config = webui_config_store._load_config_from_file(example_path)
     assert example_config is not None
@@ -117,6 +92,9 @@ def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_ru
     original_defaults = dict(defaults)
     comments, subsections = webui_config_store._extract_example_metadata(example_path)
     user_defaults = {
+        "stats_enabled": stats_enabled,
+        "history_enabled": history_enabled,
+        "history_retention_days": retention_days,
         "webui_keep_uploads_on_disconnect": keep_running,
         "webui_unattended_prompt_timeout": timeout,
     }
@@ -125,18 +103,22 @@ def test_webui_session_settings_are_grouped_without_changing_saved_paths(keep_ru
     items = webui_config_store._build_config_items(prepared, user_defaults, comments, subsections, ["DEFAULT"])
 
     assert [item["key"] for item in items[:3]] == ["MAIN SETTINGS", "WEBUI SETTINGS", "LOGGING"]
-    session_sections = [item for item in items if item["key"] == "WEBUI SETTINGS"]
-    assert len(session_sections) == 1
-    assert session_sections[0]["subsection"] is True
-    fields = {child["key"]: child for child in session_sections[0]["children"]}
-    assert set(fields) == set(user_defaults)
+    headings = [item["key"] for item in items if item.get("subsection")]
+    assert headings.count("MAIN SETTINGS") == 1
+    assert {"UPLOAD HISTORY", "LOCAL STATISTICS"}.isdisjoint(headings)
+    webui_sections = [item for item in items if item["key"] == "WEBUI SETTINGS"]
+    assert len(webui_sections) == 1
+    assert webui_sections[0]["subsection"] is True
+    fields = {child["key"]: child for child in webui_sections[0]["children"]}
+    assert list(fields) == list(user_defaults)
     for key, value in user_defaults.items():
         assert fields[key]["value"] == value
         assert fields[key]["example_value"] == defaults[key]
         assert fields[key]["source"] == "config"
         assert fields[key]["help"] == comments[f"DEFAULT/{key}"]
     main_settings = next(item for item in items if item["key"] == "MAIN SETTINGS")
-    assert not any(child["key"].startswith("webui_") for child in main_settings["children"])
+    assert set(fields).isdisjoint(child["key"] for child in main_settings["children"])
+    assert fields["stats_enabled"]["example_value"] is False
     assert defaults == original_defaults
 
 
