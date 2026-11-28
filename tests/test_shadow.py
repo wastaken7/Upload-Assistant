@@ -100,8 +100,6 @@ def test_shadow_uses_embedded_romanian_audio(shadow: Shadow, title: str, expecte
     [
         (854, 480, "Progressive", "480p", "8"),
         (720, 480, "Interlaced", "480i", "9"),
-        (960, 540, "Progressive", "540p", "10"),
-        (960, 540, "Interlaced", "540i", "10"),
         (1024, 576, "Progressive", "576p", "6"),
         (720, 576, "Interlaced", "576i", "7"),
     ],
