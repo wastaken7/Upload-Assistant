@@ -724,7 +724,7 @@ const CONFIG_HEADING_LABELS = {
 
 const CONFIG_HEADING_DESCRIPTIONS = {
   "WEBUI SETTINGS":
-    "Control uploads when their browser disconnects. Saved changes apply to newly started uploads. Set the prompt timeout to 0 to wait indefinitely.",
+    "Choose what UA records for Stats and History. Changes to browser disconnect behavior and prompt timeout apply to newly started WebUI uploads.",
   "EXTERNAL TOOL PATHS":
     "Optional executable overrides. Leave fields blank to use automatically managed tools or executables on the system PATH. Check Tools detects their availability without downloading or installing anything.",
   "PROWLARR CREDENTIAL FALLBACK":
